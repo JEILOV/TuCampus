@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body style="background: #f7f8fc; margin: 0; padding: 0;">
+<body style="background: var(--bg-crema); margin: 0; padding: 0;">
 <div class="app-shell">
 
   <header class="header" style="justify-content: flex-start; gap: 15px; border-bottom: 1px solid var(--border-subtle); padding: 15px 20px; background: white; box-sizing: border-box;">
@@ -36,7 +36,7 @@
         <input type="file" id="file-imagen-publicar" accept="image/*" style="display: none;">
 
         <!-- ── PILAR 2: Indicador de compresión ── -->
-        <p id="info-compresion" style="display:none; font-size:0.78rem; font-weight:700; color:#3a7d44; margin:4px 0 0; padding:6px 10px; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
+        <p id="info-compresion" style="display:none; font-size:0.78rem; font-weight:700; color:var(--verde-marca); margin:4px 0 0; padding:6px 10px; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
           ✓ La imagen se comprimirá automáticamente antes de subir
         </p>
       </div>
@@ -59,7 +59,7 @@
           required
           maxlength="200"
           placeholder="Ej: Galletas de avena"
-          style="background: #f7f8fc; border: 1.5px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; outline: none; box-sizing: border-box; width: 100%;"
+          style="background: var(--bg-crema); border: 1.5px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; outline: none; box-sizing: border-box; width: 100%;"
         >
       </div>
 
@@ -67,12 +67,12 @@
         
         <div class="form-group" style="flex: 1; min-width: 100px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box;">
           <label style="font-size: 0.9rem; font-weight: 800; color: var(--text-dark);">Precio (S/)</label>
-          <input type="number" id="precio" step="0.10" required placeholder="0.00" style="background: #f7f8fc; border: 1.5px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; outline: none; box-sizing: border-box; width: 100%;">
+          <input type="number" id="precio" step="0.10" required placeholder="0.00" style="background: var(--bg-crema); border: 1.5px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; outline: none; box-sizing: border-box; width: 100%;">
         </div>
         
         <div class="form-group" style="flex: 1.5; min-width: 140px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box;">
           <label style="font-size: 0.9rem; font-weight: 800; color: var(--text-dark);">Categoría</label>
-          <select id="categoria" required style="background: #f7f8fc; border: 1.5px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; outline: none; color: #1a1a2e; cursor:pointer; box-sizing: border-box; width: 100%;">
+          <select id="categoria" required style="background: var(--bg-crema); border: 1.5px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; outline: none; color: var(--azul-oscuro); cursor:pointer; box-sizing: border-box; width: 100%;">
             <option value="dulces">🍰 Dulces</option>
             <option value="salados">🍔 Salados</option>
             <option value="bebidas">🥤 Bebidas</option>
@@ -101,11 +101,11 @@
           rows="3"
           maxlength="500"
           placeholder="Detalles, sabores, dónde entregas en el campus..."
-          style="background: #f7f8fc; border: 1.5px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; outline: none; resize: none; box-sizing: border-box; width: 100%;"
+          style="background: var(--bg-crema); border: 1.5px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; outline: none; resize: none; box-sizing: border-box; width: 100%;"
         ></textarea>
       </div>
 
-      <button type="submit" id="btn-publicar" style="background: #3a7d44; color: white; border: none; padding: 16px; border-radius: 14px; font-size: 1.05rem; font-weight: 800; cursor: pointer; box-shadow: 0 6px 20px rgba(58,125,68,0.3); margin-top: 10px; font-family: 'Nunito', sans-serif; box-sizing: border-box; width: 100%;">Publicar Producto</button>
+      <button type="submit" id="btn-publicar" style="background: var(--verde-marca); color: white; border: none; padding: 16px; border-radius: 14px; font-size: 1.05rem; font-weight: 800; cursor: pointer; box-shadow: 0 6px 20px rgba(58,125,68,0.3); margin-top: 10px; font-family: 'Nunito', sans-serif; box-sizing: border-box; width: 100%;">Publicar Producto</button>
     </form>
   </main>
 

@@ -161,7 +161,7 @@
   </div>
 
   <div style="padding: 0 20px 20px; background: var(--bg-white); border-bottom: 1px solid var(--border-subtle);">
-    <div style="background: #f7f8fc; border-radius: 16px; padding: 16px; border: 1.5px solid var(--border-subtle);">
+    <div style="background: var(--bg-crema); border-radius: 16px; padding: 16px; border: 1.5px solid var(--border-subtle);">
         <h3 style="font-size: 12.5px; font-weight: 900; color: var(--text-dark); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--green-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
             Acerca de mí
@@ -189,17 +189,17 @@
     <div style="background:white; width:100%; max-width:380px; padding:25px; border-radius:24px; display:flex; flex-direction:column; gap:14px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
       <h3 style="font-weight:900; font-size:1.2rem; color: var(--text-dark); margin-bottom:5px;">Editar Producto</h3>
       <input type="hidden" id="edit-id">
-      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Título</label><input type="text" id="edit-titulo" maxlength="200" class="form-input" style="background:#f7f8fc; border:1.5px solid #e8e8f0; border-radius:12px; padding: 10px 14px;"></div>
-      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Precio (S/)</label><input type="number" id="edit-precio" step="0.10" class="form-input" style="background:#f7f8fc; border:1px solid #e8e8f0; border-radius:12px; padding: 10px 14px;"></div>
+      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Título</label><input type="text" id="edit-titulo" maxlength="200" class="form-input" style="background:var(--bg-crema); border:1.5px solid #e8e8f0; border-radius:12px; padding: 10px 14px;"></div>
+      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Precio (S/)</label><input type="number" id="edit-precio" step="0.10" class="form-input" style="background:var(--bg-crema); border:1px solid #e8e8f0; border-radius:12px; padding: 10px 14px;"></div>
       <div class="form-group" style="display:flex; flex-direction:column; gap:6px;">
         <label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Foto del producto</label>
-        <div id="edit-imagen-area" style="border:1.5px dashed #c3c6d4; border-radius:12px; padding:10px 14px; text-align:center; background:#f7f8fc; cursor:pointer; font-size:0.85rem; font-weight:700; color:#5c5c7a; transition: all 0.2s;">
+        <div id="edit-imagen-area" style="border:1.5px dashed #c3c6d4; border-radius:12px; padding:10px 14px; text-align:center; background:var(--bg-crema); cursor:pointer; font-size:0.85rem; font-weight:700; color:#5c5c7a; transition: all 0.2s;">
           Toca para cambiar la foto (opcional)
         </div>
         <input type="file" id="edit-imagen-file" accept="image/*" style="display:none;">
         <input type="hidden" id="edit-imagen-url">
       </div>
-      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Descripción</label><textarea id="edit-descripcion" class="form-input" rows="3" maxlength="500" style="background:#f7f8fc; border:1px solid #e8e8f0; border-radius:12px; resize:none; padding: 10px 14px;"></textarea></div>
+      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Descripción</label><textarea id="edit-descripcion" class="form-input" rows="3" maxlength="500" style="background:var(--bg-crema); border:1px solid #e8e8f0; border-radius:12px; resize:none; padding: 10px 14px;"></textarea></div>
       <div style="display:flex; gap:12px; margin-top:10px;">
         <button onclick="cerrarModalEdicion()" style="flex:1; background:#ecedf5; border:none; padding:14px; border-radius:14px; font-weight:800; color: var(--text-mid); cursor:pointer;">Cancelar</button>
         <button id="btn-guardar-edicion" style="flex:1; background:var(--green-primary); color:white; border:none; padding:14px; border-radius:14px; font-weight:800; cursor:pointer; box-shadow: 0 4px 12px rgba(58,125,68,0.25);">Guardar</button>
@@ -212,21 +212,21 @@
     <div style="background:white; width:100%; max-width:380px; padding:25px; border-radius:24px; display:flex; flex-direction:column; gap:14px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
       <h3 style="font-weight:900; font-size:1.2rem; color: var(--text-dark); margin-bottom:5px;">Editar Mi Perfil</h3>
 
-      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Nombre Completo</label><input type="text" id="perfil-input-nombre" class="form-input" style="background:#f7f8fc; border:1.5px solid #e8e8f0; border-radius:12px; padding: 10px 14px;"></div>
-      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Carrera / Título corto</label><input type="text" id="perfil-input-bio" class="form-input" style="background:#f7f8fc; border:1.5px solid #e8e8f0; border-radius:12px; padding: 10px 14px;"></div>
-      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Acerca de mí</label><textarea id="perfil-input-acerca" class="form-input" rows="3" style="background:#f7f8fc; border:1px solid #e8e8f0; border-radius:12px; resize:none; padding: 10px 14px;"></textarea></div>
-      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Ubicación actual</label><input type="text" id="perfil-input-ubicacion" class="form-input" style="background:#f7f8fc; border:1.5px solid #e8e8f0; border-radius:12px; padding: 10px 14px;"></div>
+      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Nombre Completo</label><input type="text" id="perfil-input-nombre" class="form-input" style="background:var(--bg-crema); border:1.5px solid #e8e8f0; border-radius:12px; padding: 10px 14px;"></div>
+      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Carrera / Título corto</label><input type="text" id="perfil-input-bio" class="form-input" style="background:var(--bg-crema); border:1.5px solid #e8e8f0; border-radius:12px; padding: 10px 14px;"></div>
+      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Acerca de mí</label><textarea id="perfil-input-acerca" class="form-input" rows="3" style="background:var(--bg-crema); border:1px solid #e8e8f0; border-radius:12px; resize:none; padding: 10px 14px;"></textarea></div>
+      <div class="form-group"><label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Ubicación actual</label><input type="text" id="perfil-input-ubicacion" class="form-input" style="background:var(--bg-crema); border:1.5px solid #e8e8f0; border-radius:12px; padding: 10px 14px;"></div>
 
       <div class="input-group form-group">
         <label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">WhatsApp (sin +51)</label>
         <input type="tel" id="perfil-input-telefono" class="form-input" maxlength="9" placeholder="Ej: 987654321"
-               style="background:#f7f8fc; border:1.5px solid #e8e8f0; border-radius:12px; padding: 10px 14px;
+               style="background:var(--bg-crema); border:1.5px solid #e8e8f0; border-radius:12px; padding: 10px 14px;
                       font-family:'Nunito',sans-serif; font-size:0.95rem; font-weight:700; outline:none; width:100%; box-sizing:border-box;">
       </div>
 
       <div class="form-group" style="display:flex; flex-direction:column; gap:6px;">
         <label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Foto de Perfil</label>
-        <div id="box-upload-avatar" style="border:1.5px dashed #c3c6d4; border-radius:12px; padding:12px; text-align:center; background:#f7f8fc; cursor:pointer; font-size:0.85rem; font-weight:700; color:#5c5c7a; transition: all 0.2s;">
+        <div id="box-upload-avatar" style="border:1.5px dashed #c3c6d4; border-radius:12px; padding:12px; text-align:center; background:var(--bg-crema); cursor:pointer; font-size:0.85rem; font-weight:700; color:#5c5c7a; transition: all 0.2s;">
           Subir foto de perfil
         </div>
         <input type="file" id="file-avatar" accept="image/*" style="display:none;">
@@ -235,7 +235,7 @@
 
       <div class="form-group" style="display:flex; flex-direction:column; gap:6px;">
         <label style="font-size:0.8rem; font-weight:800; color: var(--text-dark);">Imagen de Portada (Banner)</label>
-        <div id="box-upload-portada" style="border:1.5px dashed #c3c6d4; border-radius:12px; padding:12px; text-align:center; background:#f7f8fc; cursor:pointer; font-size:0.85rem; font-weight:700; color:#5c5c7a; transition: all 0.2s;">
+        <div id="box-upload-portada" style="border:1.5px dashed #c3c6d4; border-radius:12px; padding:12px; text-align:center; background:var(--bg-crema); cursor:pointer; font-size:0.85rem; font-weight:700; color:#5c5c7a; transition: all 0.2s;">
           Subir imagen de portada
         </div>
         <input type="file" id="file-portada" accept="image/*" style="display:none;">

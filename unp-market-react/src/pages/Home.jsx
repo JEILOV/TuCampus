@@ -82,7 +82,7 @@ const ProductCard = ({ producto, onVerDetalle }) => {
         <span style={{
           position: "absolute", bottom: "10px", right: "10px",
           background: estaAgotado ? "#555" : "rgba(0,0,0,0.7)", color: "white",
-         fontWeight: 900 , fontSize: "0.85rem", padding: "4px 10px",
+         fontWeight: 700 , fontSize: "0.85rem", padding: "4px 10px",
           borderRadius: "12px", backdropFilter: "blur(4px)"
         }}>
           S/ {(precio || 0).toFixed(2)}
@@ -92,7 +92,7 @@ const ProductCard = ({ producto, onVerDetalle }) => {
           <div style={{
             position: "absolute", top: "50%", left: "50%",
             transform: "translate(-50%,-50%) rotate(-10deg)",
-            background: "#ff4d6d", color: "white", fontWeight: 900,
+            background: "#ff4d6d", color: "white", fontWeight: 700,
             fontSize: "1rem", padding: "4px 10px", borderRadius: "6px",
             border: "2px solid white", zIndex: 10,
           }}>
@@ -102,7 +102,7 @@ const ProductCard = ({ producto, onVerDetalle }) => {
       </div>
 
       <div className="card-body" style={{ padding: "12px", flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
-        <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: estaAgotado ? "#999" : "#1a1a2e", textDecoration: estaAgotado ? "line-through" : "none" }}>
+        <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 600, color: estaAgotado ? "#999" : "var(--azul-oscuro)", textDecoration: estaAgotado ? "line-through" : "none" }}>
           {titulo || "Sin título"}
         </h3>
 
@@ -112,7 +112,7 @@ const ProductCard = ({ producto, onVerDetalle }) => {
               width: "22px", height: "22px", borderRadius: "50%",
               background: "linear-gradient(135deg,#c8a97a,#a07850)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "11px", color: "white", fontWeight: 800, flexShrink: 0,
+              fontSize: "11px", color: "white", fontWeight: 600, flexShrink: 0,
               overflow: "hidden"
             }}>
               {avatarVendedor?.trim() ? (
@@ -344,7 +344,7 @@ const Home = () => {
           {!todoCargado && <div ref={sentinelRef} style={{ width: "100%", height: "20px", margin: "10px 0" }} />}
           {cargando && (
             <div style={{ display: "block", textAlign: "center", padding: "20px 0" }}>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: "10px", background: "white", padding: "12px 20px", borderRadius: "50px", boxShadow: "0 4px 15px rgba(0,0,0,0.06)", fontSize: "0.85rem", fontWeight: 800, color: "#5c5c7a" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "10px", background: "white", padding: "12px 20px", borderRadius: "50px", boxShadow: "0 4px 15px rgba(0,0,0,0.06)", fontSize: "0.85rem", fontWeight: 600, color: "#5c5c7a" }}>
                 <svg style={{ animation: "spin 1s linear infinite" }} viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#c8a97a" strokeWidth="2.5"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
                 Cargando más productos...
               </div>
@@ -355,7 +355,7 @@ const Home = () => {
 
       {tabActiva === "favoritos" && (
         <section style={{ padding: "20px 16px 100px" }}>
-          <h2 style={{ fontSize: "1.2rem", fontWeight: 800, marginBottom: "15px" }}>Mis Favoritos</h2>
+          <h2 style={{ fontSize: "1.2rem", fontWeight: 600, marginBottom: "15px" }}>Mis Favoritos</h2>
           <div className="product-grid">
             {favoritos.size === 0 ? (
               <p style={{ textAlign: "center", width: "100%", color: "#666", gridColumn: "1/-1" }}>Aún no tienes favoritos guardados.</p>
@@ -371,18 +371,18 @@ const Home = () => {
       {tabActiva === "notifs" && (
         <section style={{ padding: "20px 16px 100px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
-            <h2 style={{ fontSize: "1.2rem", fontWeight: 800, margin: 0 }}>Notificaciones</h2>
+            <h2 style={{ fontSize: "1.2rem", fontWeight: 600, margin: 0 }}>Notificaciones</h2>
             {notificaciones.some((n) => !n.leido) && (
-              <button onClick={handleMarcarLeidas} style={{ background: "transparent", border: "1.5px solid #22c55e", color: "#22c55e", padding: "6px 12px", borderRadius: "8px", fontSize: "0.75rem", fontWeight: 800, cursor: "pointer" }}>
+              <button onClick={handleMarcarLeidas} style={{ background: "transparent", border: "1.5px solid #22c55e", color: "#22c55e", padding: "6px 12px", borderRadius: "8px", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
                 Marcar todas leídas
               </button>
             )}
           </div>
 
           {notificaciones.length === 0 ? (
-            <div style={{ background: "#f7f8fc", padding: "24px 16px", borderRadius: "14px", border: "1.5px solid #e8e8f0", textAlign: "center" }}>
+            <div style={{ background: "var(--bg-crema)", padding: "24px 16px", borderRadius: "14px", border: "1.5px solid #e8e8f0", textAlign: "center" }}>
               <span style={{ fontSize: "2.5rem", display: "block", marginBottom: "8px" }}>🔔</span>
-              <p style={{ fontWeight: 800, fontSize: "1rem", color: "#1a1a2e", margin: "0 0 6px 0" }}>Todo al día</p>
+              <p style={{ fontWeight: 600, fontSize: "1rem", color: "var(--azul-oscuro)", margin: "0 0 6px 0" }}>Todo al día</p>
               <p style={{ fontSize: "0.85rem", color: "#5c5c7a", margin: 0 }}>Aquí verás cuando alguien interactúe con tus productos.</p>
             </div>
           ) : (
@@ -393,12 +393,12 @@ const Home = () => {
                   <div key={notif.id} style={{ background: esFav ? "#fff1f2" : "#f0fdf4", border: `1px solid ${esFav ? "#ffe4e6" : "#dcfce7"}`, padding: "16px", borderRadius: "14px", display: "flex", gap: "12px", alignItems: "flex-start", opacity: notif.leido ? 0.6 : 1 }}>
                     <div style={{ fontSize: "1.5rem" }}>{esFav ? "❤️" : "💬"}</div>
                     <div style={{ flex: 1 }}>
-                      <p style={{ margin: "0 0 4px 0", fontSize: "0.9rem", color: "#1a1a2e", lineHeight: 1.4 }}>
-                        <span style={{ fontWeight: 800 }}>{notif.deNombre}</span> {esFav ? "guardó" : "quiere comprar"} <span style={{ fontWeight: 800 }}>"{notif.productoTitulo}"</span>
+                      <p style={{ margin: "0 0 4px 0", fontSize: "0.9rem", color: "var(--azul-oscuro)", lineHeight: 1.4 }}>
+                        <span style={{ fontWeight: 600 }}>{notif.deNombre}</span> {esFav ? "guardó" : "quiere comprar"} <span style={{ fontWeight: 600 }}>"{notif.productoTitulo}"</span>
                       </p>
                       <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600 }}>{formatearTiempo(notif.timestamp)}</span>
                     </div>
-                    {!notif.leido && <span style={{ background: "#22c55e", color: "white", padding: "4px 8px", borderRadius: "8px", fontSize: "0.7rem", fontWeight: 900 }}>NUEVA</span>}
+                    {!notif.leido && <span style={{ background: "#22c55e", color: "white", padding: "4px 8px", borderRadius: "8px", fontSize: "0.7rem", fontWeight: 700 }}>NUEVA</span>}
                   </div>
                 )
               })}

@@ -214,8 +214,8 @@ const Producto = () => {
     return (
       <div style={{
         display: "flex", justifyContent: "center", alignItems: "center",
-        height: "100vh", color: "#5c5c7a", fontWeight: 800,
-        fontFamily: "'Nunito', sans-serif", background: "#f7f8fc",
+        height: "100vh", color: "#5c5c7a", fontWeight: 600,
+        fontFamily: "'Nunito', sans-serif", background: "var(--bg-crema)",
       }}>
         Cargando producto...
       </div>
@@ -230,18 +230,18 @@ const Producto = () => {
       <div style={{
         display: "flex", flexDirection: "column", justifyContent: "center",
         alignItems: "center", height: "100vh", gap: "16px",
-        fontFamily: "'Nunito', sans-serif", background: "#f7f8fc",
+        fontFamily: "'Nunito', sans-serif", background: "var(--bg-crema)",
       }}>
         <span style={{ fontSize: "3rem" }}>🚫</span>
-        <p style={{ fontWeight: 800, color: "#1a1a2e", fontSize: "1.1rem" }}>
+        <p style={{ fontWeight: 600, color: "var(--azul-oscuro)", fontSize: "1.1rem" }}>
           Este producto ya no está disponible
         </p>
         <button
           onClick={() => navigate("/")}
           style={{
-            background: "#3a7d44", color: "white", border: "none",
+            background: "var(--verde-marca)", color: "white", border: "none",
             padding: "12px 24px", borderRadius: "12px",
-            fontWeight: 800, fontSize: "0.95rem", cursor: "pointer",
+            fontWeight: 600, fontSize: "0.95rem", cursor: "pointer",
             fontFamily: "'Nunito', sans-serif",
           }}
         >
@@ -270,7 +270,7 @@ const Producto = () => {
   return (
     <div
       className="app-shell"
-      style={{ background: "#f7f8fc", paddingBottom: "90px", position: "relative" }}
+      style={{ background: "var(--bg-crema)", paddingBottom: "90px", position: "relative" }}
     >
 
       {/* ── IMAGEN PRINCIPAL ── */}
@@ -294,7 +294,7 @@ const Producto = () => {
             background: "rgba(255,255,255,0.9)", borderRadius: "50%",
             border: "none", cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#1a1a2e", boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+            color: "var(--azul-oscuro)", boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
           }}
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
@@ -333,7 +333,7 @@ const Producto = () => {
             zIndex: 5,
           }}>
             <span style={{
-              background: "#1a1a2e", color: "white", fontWeight: 900,
+              background: "var(--azul-oscuro)", color: "white", fontWeight: 700,
               padding: "10px 24px", borderRadius: "20px",
               fontSize: "1.1rem", letterSpacing: "1px",
               transform: "rotate(-5deg)",
@@ -349,7 +349,7 @@ const Producto = () => {
           position: "absolute", bottom: "35px", left: "20px",
           background: "rgba(0,0,0,0.6)", color: "white",
           padding: "6px 14px", borderRadius: "20px",
-          fontSize: "0.8rem", fontWeight: 800,
+          fontSize: "0.8rem", fontWeight: 600,
           textTransform: "uppercase", backdropFilter: "blur(4px)",
           zIndex: 6,
         }}>
@@ -369,7 +369,7 @@ const Producto = () => {
         {/* Título + Precio */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
           <h1 style={{
-            fontSize: "1.35rem", fontWeight: 900, color: "#1a1a2e",
+            fontSize: "1.35rem", fontWeight: 700, color: "var(--azul-oscuro)",
             margin: 0, lineHeight: 1.3,
           }}>
             {titulo}
@@ -377,7 +377,7 @@ const Producto = () => {
           <div style={{
             background: "#e6faf0", color: "#16a34a",
             padding: "6px 12px", borderRadius: "12px",
-            fontWeight: 900, fontSize: "1.1rem", whiteSpace: "nowrap",
+            fontWeight: 700, fontSize: "1.1rem", whiteSpace: "nowrap",
           }}>
             S/ {(precio || 0).toFixed(2)}
           </div>
@@ -388,7 +388,7 @@ const Producto = () => {
           display: "inline-flex", alignItems: "center", gap: "6px",
           background: "#fffbeb", color: "#d97706",
           padding: "5px 12px", borderRadius: "12px",
-          fontSize: "0.75rem", fontWeight: 800, marginTop: "12px",
+          fontSize: "0.75rem", fontWeight: 600, marginTop: "12px",
         }}>
           <span style={{
             width: "6px", height: "6px",
@@ -403,21 +403,21 @@ const Producto = () => {
         <div
           onClick={() => { if (producto.userUid) navigate(`/vendedor?uid=${producto.userUid}`); }}
           style={{
-            background: "#f7f8fc", border: "1.5px solid #e8e8f0",
+            background: "var(--bg-crema)", border: "1.5px solid #e8e8f0",
             borderRadius: "16px", padding: "12px 15px",
             display: "flex", alignItems: "center", gap: "12px",
             cursor: producto.userUid ? "pointer" : "default",
             transition: "background 0.15s",
           }}
           onMouseEnter={(e) => { if (producto.userUid) e.currentTarget.style.background = "#eef0f5"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "#f7f8fc"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-crema)"; }}
         >
           {/* Avatar */}
           <div style={{
             width: "44px", height: "44px", borderRadius: "50%",
             background: "linear-gradient(135deg,#c8a97a,#a07850)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "1.2rem", fontWeight: 900, color: "white",
+            fontSize: "1.2rem", fontWeight: 700, color: "white",
             overflow: "hidden", flexShrink: 0,
           }}>
             {avatarVendedor?.trim() ? (
@@ -435,7 +435,7 @@ const Producto = () => {
           <div style={{ flex: 1 }}>
             <h3 style={{
               margin: 0, fontSize: "0.95rem",
-              fontWeight: 800, color: "#1a1a2e",
+              fontWeight: 600, color: "var(--azul-oscuro)",
             }}>
               {nombreVendedor}
             </h3>
@@ -452,8 +452,8 @@ const Producto = () => {
 
         {/* Descripción */}
         <h2 style={{
-          fontSize: "1.1rem", fontWeight: 900,
-          color: "#1a1a2e", marginBottom: "10px",
+          fontSize: "1.1rem", fontWeight: 700,
+          color: "var(--azul-oscuro)", marginBottom: "10px",
         }}>
           Descripción
         </h2>
@@ -470,9 +470,9 @@ const Producto = () => {
           <button
             onClick={handleCompartir}
             style={{
-              width: "100%", background: "#f7f8fc", color: "#5c5c7a",
+              width: "100%", background: "var(--bg-crema)", color: "#5c5c7a",
               border: "1.5px solid #e8e8f0", borderRadius: "14px",
-              padding: "12px", fontSize: "0.9rem", fontWeight: 800,
+              padding: "12px", fontSize: "0.9rem", fontWeight: 600,
               cursor: "pointer", display: "flex", alignItems: "center",
               justifyContent: "center", gap: "8px",
               fontFamily: "'Nunito', sans-serif",
@@ -533,7 +533,7 @@ const Producto = () => {
             flex: 1, height: "54px",
             background: "#e8e8f0", color: "#a0a5b9",
             border: "none", borderRadius: "14px",
-            fontSize: "1rem", fontWeight: 800, cursor: "not-allowed",
+            fontSize: "1rem", fontWeight: 600, cursor: "not-allowed",
             display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
             fontFamily: "'Nunito', sans-serif",
           }}>
@@ -549,7 +549,7 @@ const Producto = () => {
             flex: 1, height: "54px",
             background: "#e8e8f0", color: "#a0a5b9",
             border: "none", borderRadius: "14px",
-            fontSize: "0.95rem", fontWeight: 800, cursor: "not-allowed",
+            fontSize: "0.95rem", fontWeight: 600, cursor: "not-allowed",
             fontFamily: "'Nunito', sans-serif",
           }}>
             Vendedor sin WhatsApp
@@ -559,9 +559,9 @@ const Producto = () => {
             onClick={handleWhatsApp}
             style={{
               flex: 1, height: "54px",
-              background: "#3a7d44", color: "white",
+              background: "var(--verde-marca)", color: "white",
               border: "none", borderRadius: "14px",
-              fontSize: "1.05rem", fontWeight: 800, cursor: "pointer",
+              fontSize: "1.05rem", fontWeight: 600, cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
               boxShadow: "0 4px 15px rgba(58,125,68,0.3)",
               transition: "background 0.2s",

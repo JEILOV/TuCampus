@@ -108,9 +108,9 @@ function mostrarConfirmacion(titulo, mensaje, tipo = "normal") {
       elIcono.style.background    = "#fff0f0";
       elIcono.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#dc2626" stroke-width="2.5"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
     } else {
-      btnOk.style.background      = "#1a1a2e";
+      btnOk.style.background      = "var(--azul-oscuro)";
       elIcono.style.background    = "#f0f1f9";
-      elIcono.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#1a1a2e" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+      elIcono.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--azul-oscuro)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
     }
 
     modal.style.display = "flex";
@@ -766,9 +766,9 @@ function iniciarEscuchaNotificaciones() {
       vacio.style.cssText = "padding:20px 16px;";
       vacio.innerHTML = `
         <h2 style="font-size:1.2rem; font-weight:800; margin-bottom:15px;">Notificaciones</h2>
-        <div style="background:#f7f8fc; padding:20px 16px; border-radius:14px; border:1.5px solid #e8e8f0; text-align:center;">
+        <div style="background:var(--bg-crema); padding:20px 16px; border-radius:14px; border:1.5px solid #e8e8f0; text-align:center;">
           <p style="font-size:2rem; margin-bottom:8px;">🔔</p>
-          <p style="font-weight:700; font-size:0.9rem; color:#1a1a2e; margin-bottom:4px;">Todo al día</p>
+          <p style="font-weight:700; font-size:0.9rem; color:var(--azul-oscuro); margin-bottom:4px;">Todo al día</p>
           <p style="font-size:0.8rem; color:#5c5c7a;">Aquí verás cuando alguien guarde tus productos como favorito.</p>
         </div>`;
       panelEl.appendChild(vacio);
@@ -782,7 +782,7 @@ function iniciarEscuchaNotificaciones() {
     header.textContent = "Notificaciones";
 
     const btnTodas = document.createElement("button");
-    btnTodas.style.cssText = "font-size:0.75rem; font-weight:800; color:#3a7d44; background:none; border:1.5px solid #3a7d44; border-radius:20px; padding:4px 12px; cursor:pointer; font-family:'Nunito',sans-serif;";
+    btnTodas.style.cssText = "font-size:0.75rem; font-weight:800; color:var(--verde-marca); background:none; border:1.5px solid var(--verde-marca); border-radius:20px; padding:4px 12px; cursor:pointer; font-family:'Nunito',sans-serif;";
     btnTodas.textContent    = "Marcar todas leídas";
     btnTodas.dataset.action = "marcar-todas-leidas";
     header.appendChild(btnTodas);
@@ -818,7 +818,7 @@ function iniciarEscuchaNotificaciones() {
       contenido.style.flex = "1";
 
       const texto = document.createElement("p");
-      texto.style.cssText = "font-size:0.85rem; font-weight:600; color:#1a1a2e; margin:0; line-height:1.45;";
+      texto.style.cssText = "font-size:0.85rem; font-weight:600; color:var(--azul-oscuro); margin:0; line-height:1.45;";
       const negrita = document.createElement("strong");
       negrita.textContent = n.deNombre || "Alguien";
       const sufijo  = document.createElement("span");
@@ -842,7 +842,7 @@ function iniciarEscuchaNotificaciones() {
       contenido.appendChild(tiempo);
 
       const badge2 = document.createElement("span");
-      badge2.style.cssText = "font-size:0.65rem; font-weight:900; color:white; background:#3a7d44; border-radius:20px; padding:2px 8px; flex-shrink:0; align-self:center;";
+      badge2.style.cssText = "font-size:0.65rem; font-weight:900; color:white; background:var(--verde-marca); border-radius:20px; padding:2px 8px; flex-shrink:0; align-self:center;";
       badge2.textContent   = "NUEVA";
 
       item.appendChild(icono);

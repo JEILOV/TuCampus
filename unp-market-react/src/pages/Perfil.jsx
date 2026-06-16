@@ -112,7 +112,7 @@ const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
           position: "absolute", top: "8px", right: "8px",
           background: "rgba(0,0,0,0.55)", color: "white",
           padding: "4px 10px", borderRadius: "12px",
-          fontSize: "0.82rem", fontWeight: 900,
+          fontSize: "0.82rem", fontWeight: 700,
         }}>
           S/ {(precio || 0).toFixed(2)}
         </span>
@@ -123,7 +123,7 @@ const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
             background: "rgba(255,255,255,0.35)", backdropFilter: "blur(2px)",
           }}>
             <span style={{
-              background: "#1a1a2e", color: "white", fontWeight: 900,
+              background: "var(--azul-oscuro)", color: "white", fontWeight: 700,
               padding: "6px 18px", borderRadius: "16px", fontSize: "0.95rem",
               transform: "rotate(-5deg)", boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
             }}>AGOTADO</span>
@@ -133,7 +133,7 @@ const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
 
       {/* Cuerpo */}
       <div style={{ padding: "12px 12px 14px", flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
-        <p style={{ margin: 0, fontWeight: 800, fontSize: "0.95rem", color: "#1a1a2e", lineHeight: 1.3 }}>
+        <p style={{ margin: 0, fontWeight: 600, fontSize: "0.95rem", color: "var(--azul-oscuro)", lineHeight: 1.3 }}>
           {titulo || "Sin título"}
         </p>
 
@@ -144,7 +144,7 @@ const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
             background: "linear-gradient(135deg,#c8a97a,#a07850)",
             overflow: "hidden", flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "11px", color: "white", fontWeight: 800,
+            fontSize: "11px", color: "white", fontWeight: 600,
           }}>
             {avatarVendedor?.trim()
               ? <img src={avatarVendedor} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -170,7 +170,7 @@ const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
 const btnAccionStyle = (bg, color) => ({
   flex: 1, padding: "7px 0", borderRadius: "10px",
   border: "none", background: bg, color,
-  fontSize: "0.78rem", fontWeight: 800, cursor: "pointer",
+  fontSize: "0.78rem", fontWeight: 600, cursor: "pointer",
   fontFamily: "'Nunito', sans-serif",
 });
 
@@ -178,13 +178,13 @@ const btnAccionStyle = (bg, color) => ({
 //  ESTILOS INLINE compartidos
 // ──────────────────────────────────────────────────────────────
 const inputStyle = {
-  width: "100%", background: "#f7f8fc", border: "1.5px solid #e8e8f0",
+  width: "100%", background: "var(--bg-crema)", border: "1.5px solid #e8e8f0",
   borderRadius: "12px", padding: "12px 14px",
   fontFamily: "'Nunito', sans-serif", fontSize: "0.95rem",
   fontWeight: 700, outline: "none", boxSizing: "border-box",
-  color: "#1a1a2e",
+  color: "var(--azul-oscuro)",
 };
-const labelStyle = { fontSize: "0.88rem", fontWeight: 800, color: "#1a1a2e" };
+const labelStyle = { fontSize: "0.88rem", fontWeight: 600, color: "var(--azul-oscuro)" };
 
 // ──────────────────────────────────────────────────────────────
 //  COMPONENTE PRINCIPAL
@@ -426,7 +426,7 @@ const Perfil = () => {
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "center",
         height: "100vh", fontFamily: "'Nunito', sans-serif",
-        fontWeight: 800, color: "#5c5c7a", background: "#f7f8fc",
+        fontWeight: 600, color: "#5c5c7a", background: "var(--bg-crema)",
       }}>
         Cargando perfil...
       </div>
@@ -439,7 +439,7 @@ const Perfil = () => {
   //  RENDER PRINCIPAL
   // ──────────────────────────────────────────────────────────────
   return (
-    <div className="app-shell" style={{ background: "#f7f8fc", paddingBottom: "90px" }}>
+    <div className="app-shell" style={{ background: "var(--bg-crema)", paddingBottom: "90px" }}>
 
     {/* ════════════════════════════════════════════════════
            CABECERA — Banner + Avatar + Nombre
@@ -501,7 +501,7 @@ const Perfil = () => {
               position: "absolute", top: "46px", right: 0, background: "white", borderRadius: "14px",
               boxShadow: "0 8px 30px rgba(0,0,0,0.15)", border: "1px solid #f1f3f5", minWidth: "180px", overflow: "hidden", zIndex: 200,
             }}>
-              <button onClick={abrirModal} style={dropItemStyle("#1a1a2e")}>Editar perfil</button>
+              <button onClick={abrirModal} style={dropItemStyle("var(--azul-oscuro)")}>Editar perfil</button>
               <button onClick={handleSignOut} style={dropItemStyle("#ef4444")}>Cerrar sesión</button>
             </div>
           )}
@@ -516,7 +516,7 @@ const Perfil = () => {
               width: "100px", height: "100px", borderRadius: "50%",
               border: "3px solid white", boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
               background: "linear-gradient(135deg,#c8a97a,#a07850)", overflow: "hidden",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.5rem", fontWeight: 900, color: "white",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.5rem", fontWeight: 700, color: "white",
             }}>
               {p.avatar?.trim() ? <img src={p.avatar} alt={p.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (p.nombre || "U")[0].toUpperCase()}
             </div>
@@ -536,7 +536,7 @@ const Perfil = () => {
           </div>
 
           {/* Textos */}
-          <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 900, color: "white", textAlign: "center", textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
+          <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 700, color: "white", textAlign: "center", textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
             {p.nombre || "Estudiante UNP"}
           </h1>
           <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "rgba(255,255,255,0.9)", textShadow: "0 1px 2px rgba(0,0,0,0.3)" }}>
@@ -545,7 +545,7 @@ const Perfil = () => {
           <div style={{
             display: "inline-flex", alignItems: "center", gap: "6px",
             background: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.4)",
-            padding: "6px 16px", borderRadius: "20px", fontSize: "0.8rem", fontWeight: 800, marginTop: "4px", backdropFilter: "blur(4px)",
+            padding: "6px 16px", borderRadius: "20px", fontSize: "0.8rem", fontWeight: 600, marginTop: "4px", backdropFilter: "blur(4px)",
           }}>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.8">
               <polyline points="20 6 9 17 4 12"/>
@@ -568,11 +568,11 @@ const Perfil = () => {
         {/* Ubicación */}
         <div style={infoColStyle}>
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-            stroke="#3a7d44" strokeWidth="2.2" strokeLinecap="round">
+            stroke="var(--verde-marca)" strokeWidth="2.2" strokeLinecap="round">
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
             <circle cx="12" cy="10" r="3"/>
           </svg>
-          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#1a1a2e" }}>
+          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--azul-oscuro)" }}>
             {p.ubicacion || "Piura"}
           </span>
         </div>
@@ -583,10 +583,10 @@ const Perfil = () => {
         {/* Teléfono */}
         <div style={infoColStyle}>
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-            stroke="#3a7d44" strokeWidth="2.2" strokeLinecap="round">
+            stroke="var(--verde-marca)" strokeWidth="2.2" strokeLinecap="round">
             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.5 2 2 0 0 1 3.6 1.32h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
           </svg>
-          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#1a1a2e" }}>
+          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--azul-oscuro)" }}>
             {p.telefono || "Sin WhatsApp"}
           </span>
         </div>
@@ -602,12 +602,12 @@ const Perfil = () => {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
-              stroke="#3a7d44" strokeWidth="2.2">
+              stroke="var(--verde-marca)" strokeWidth="2.2">
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="16" x2="12" y2="12"/>
               <line x1="12" y1="8" x2="12.01" y2="8"/>
             </svg>
-            <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "#1a1a2e" }}>Acerca de mí</span>
+            <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--azul-oscuro)" }}>Acerca de mí</span>
           </div>
           <p style={{ margin: 0, fontSize: "0.88rem", color: "#5c5c7a", fontWeight: 600, lineHeight: 1.5 }}>
             {p.acercaDe || "¡Hola! Bienvenido a mi tienda en el campus."}
@@ -622,14 +622,14 @@ const Perfil = () => {
         <div style={{
           display: "flex", alignItems: "center", gap: "8px",
           marginBottom: "12px", paddingBottom: "10px",
-          borderBottom: "2px solid #3a7d44",
+          borderBottom: "2px solid var(--verde-marca)",
         }}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-            stroke="#3a7d44" strokeWidth="2.2">
+            stroke="var(--verde-marca)" strokeWidth="2.2">
             <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
             <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
           </svg>
-          <span style={{ fontWeight: 900, fontSize: "1rem", color: "#3a7d44" }}>
+          <span style={{ fontWeight: 700, fontSize: "1rem", color: "var(--verde-marca)" }}>
             Mis Publicaciones Activas
           </span>
         </div>
@@ -699,10 +699,10 @@ const Perfil = () => {
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
             <circle cx="12" cy="7" r="4"/>
           </svg>
-          <span className="nav-label" style={{ color: "#3a7d44" }}>Perfil</span>
+          <span className="nav-label" style={{ color: "var(--verde-marca)" }}>Perfil</span>
           <span style={{
             width: "4px", height: "4px", borderRadius: "50%",
-            background: "#3a7d44", display: "block", margin: "2px auto 0",
+            background: "var(--verde-marca)", display: "block", margin: "2px auto 0",
           }}/>
         </button>
       </nav>
@@ -727,7 +727,7 @@ const Perfil = () => {
             maxHeight: "90vh", overflowY: "auto",
             boxSizing: "border-box",
           }}>
-            <h2 style={{ margin: "0 0 20px", fontSize: "1.2rem", fontWeight: 900, color: "#1a1a2e" }}>
+            <h2 style={{ margin: "0 0 20px", fontSize: "1.2rem", fontWeight: 700, color: "var(--azul-oscuro)" }}>
               Editar Mi Perfil
             </h2>
 
@@ -815,7 +815,7 @@ const Perfil = () => {
                 style={{
                   flex: 1, padding: "14px", borderRadius: "14px",
                   background: "#f1f3f5", border: "none", cursor: "pointer",
-                  fontWeight: 800, fontSize: "0.95rem", color: "#5c5c7a",
+                  fontWeight: 600, fontSize: "0.95rem", color: "#5c5c7a",
                   fontFamily: "'Nunito', sans-serif",
                 }}
               >
@@ -826,9 +826,9 @@ const Perfil = () => {
                 disabled={guardando}
                 style={{
                   flex: 1.5, padding: "14px", borderRadius: "14px",
-                  background: guardando ? "#6b9e74" : "#3a7d44",
+                  background: guardando ? "#6b9e74" : "var(--verde-marca)",
                   border: "none", cursor: guardando ? "not-allowed" : "pointer",
-                  fontWeight: 800, fontSize: "0.95rem", color: "white",
+                  fontWeight: 600, fontSize: "0.95rem", color: "white",
                   fontFamily: "'Nunito', sans-serif",
                   boxShadow: "0 4px 15px rgba(58,125,68,0.3)",
                 }}
@@ -867,9 +867,9 @@ const dropItemStyle = (color) => ({
   width: "100%", padding: "13px 16px", border: "none",
   background: "none", cursor: "pointer", textAlign: "left",
   display: "flex", alignItems: "center", gap: "10px",
-  fontSize: "0.9rem", fontWeight: 800, color,
+  fontSize: "0.9rem", fontWeight: 600, color,
   fontFamily: "'Nunito', sans-serif",
-  borderBottom: "1px solid #f7f8fc",
+  borderBottom: "1px solid var(--bg-crema)",
 });
 
 const filePickerStyle = {

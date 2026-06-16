@@ -139,8 +139,8 @@ const Login = () => {
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
-          --navy:        #1a1a2e;
-          --green:       #3a7d44;
+          --navy:        var(--azul-oscuro);
+          --green:       var(--verde-marca);
           --text-mid:    #5c5c7a;
           --text-light:  #a0a0b8;
           --bg:          #f4f6f9;

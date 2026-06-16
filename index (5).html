@@ -96,8 +96,8 @@
 
     <section id="seccion-notifs" style="display: none; padding: 20px 16px 100px;">
       <h2 style="font-size: 1.2rem; font-weight: 800; margin-bottom: 15px;">Notificaciones</h2>
-      <div style="background: #f7f8fc; padding: 16px; border-radius: 14px; border: 1.5px solid #e8e8f0;">
-         <p style="font-weight: 700; font-size: 0.9rem; color: #1a1a2e; margin-bottom: 4px;">🚀 ¡Bienvenido a UNP Market!</p>
+      <div style="background: var(--bg-crema); padding: 16px; border-radius: 14px; border: 1.5px solid #e8e8f0;">
+         <p style="font-weight: 700; font-size: 0.9rem; color: var(--azul-oscuro); margin-bottom: 4px;">🚀 ¡Bienvenido a UNP Market!</p>
          <p style="font-size: 0.8rem; color: #5c5c7a;">Aquí verás las alertas de tus productos y novedades del campus.</p>
       </div>
     </section>
@@ -139,17 +139,17 @@
 
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:0.8rem; font-weight:800; color:var(--text-dark);">Título</label>
-          <input type="text" id="edit-titulo" maxlength="200" style="background:#f7f8fc; border:1.5px solid #e8e8f0; border-radius:12px; padding:10px 14px; font-family:'Nunito',sans-serif; font-size:0.9rem; font-weight:700; outline:none;">
+          <input type="text" id="edit-titulo" maxlength="200" style="background:var(--bg-crema); border:1.5px solid #e8e8f0; border-radius:12px; padding:10px 14px; font-family:'Nunito',sans-serif; font-size:0.9rem; font-weight:700; outline:none;">
         </div>
 
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:0.8rem; font-weight:800; color:var(--text-dark);">Precio (S/)</label>
-          <input type="number" id="edit-precio" step="0.10" style="background:#f7f8fc; border:1px solid #e8e8f0; border-radius:12px; padding:10px 14px; font-family:'Nunito',sans-serif; font-size:0.9rem; font-weight:700; outline:none;">
+          <input type="number" id="edit-precio" step="0.10" style="background:var(--bg-crema); border:1px solid #e8e8f0; border-radius:12px; padding:10px 14px; font-family:'Nunito',sans-serif; font-size:0.9rem; font-weight:700; outline:none;">
         </div>
 
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:0.8rem; font-weight:800; color:var(--text-dark);">Foto del producto</label>
-          <div id="edit-imagen-area" style="border:1.5px dashed #c3c6d4; border-radius:12px; padding:10px 14px; text-align:center; background:#f7f8fc; cursor:pointer; font-size:0.85rem; font-weight:700; color:#5c5c7a;">
+          <div id="edit-imagen-area" style="border:1.5px dashed #c3c6d4; border-radius:12px; padding:10px 14px; text-align:center; background:var(--bg-crema); cursor:pointer; font-size:0.85rem; font-weight:700; color:#5c5c7a;">
             Toca para cambiar la foto (opcional)
           </div>
           <input type="file" id="edit-imagen-file" accept="image/*" style="display:none;">
@@ -158,12 +158,12 @@
 
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:0.8rem; font-weight:800; color:var(--text-dark);">Descripción</label>
-          <textarea id="edit-descripcion" rows="3" maxlength="500" style="background:#f7f8fc; border:1px solid #e8e8f0; border-radius:12px; resize:none; padding:10px 14px; font-family:'Nunito',sans-serif; font-size:0.9rem; font-weight:700; outline:none;"></textarea>
+          <textarea id="edit-descripcion" rows="3" maxlength="500" style="background:var(--bg-crema); border:1px solid #e8e8f0; border-radius:12px; resize:none; padding:10px 14px; font-family:'Nunito',sans-serif; font-size:0.9rem; font-weight:700; outline:none;"></textarea>
         </div>
 
         <div style="display:flex; gap:12px; margin-top:10px;">
           <button onclick="cerrarModalEdicion()" style="flex:1; background:#ecedf5; border:none; padding:14px; border-radius:14px; font-weight:800; font-family:'Nunito',sans-serif; color:var(--text-mid); cursor:pointer;">Cancelar</button>
-          <button id="btn-guardar-edicion" style="flex:1; background:#3a7d44; color:white; border:none; padding:14px; border-radius:14px; font-weight:800; font-family:'Nunito',sans-serif; cursor:pointer; box-shadow:0 4px 12px rgba(58,125,68,0.25);">Guardar</button>
+          <button id="btn-guardar-edicion" style="flex:1; background:var(--verde-marca); color:white; border:none; padding:14px; border-radius:14px; font-weight:800; font-family:'Nunito',sans-serif; cursor:pointer; box-shadow:0 4px 12px rgba(58,125,68,0.25);">Guardar</button>
         </div>
       </div>
     </div>
@@ -172,7 +172,7 @@
     <div id="modal-confirmar" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:300; align-items:center; justify-content:center; padding:20px;">
       <div style="background:white; width:100%; max-width:340px; padding:28px 24px; border-radius:24px; display:flex; flex-direction:column; align-items:center; gap:14px; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
         <div id="confirmar-icono" style="width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center;"></div>
-        <h3 id="confirmar-titulo" style="font-weight:900; font-size:1.15rem; color:#1a1a2e; text-align:center; margin:0;"></h3>
+        <h3 id="confirmar-titulo" style="font-weight:900; font-size:1.15rem; color:var(--azul-oscuro); text-align:center; margin:0;"></h3>
         <p id="confirmar-mensaje" style="font-size:0.875rem; font-weight:600; color:#5c5c7a; text-align:center; margin:0; line-height:1.5;"></p>
         <div style="display:flex; gap:10px; width:100%; margin-top:4px;">
           <button id="btn-confirmar-cancelar" style="flex:1; background:#ecedf5; border:none; padding:13px; border-radius:14px; font-weight:800; font-family:'Nunito',sans-serif; color:#5c5c7a; cursor:pointer;">Cancelar</button>

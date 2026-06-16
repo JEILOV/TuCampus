@@ -11,12 +11,12 @@
 }
 
 :root {
-  --green-primary: #3a7d44;
+  --green-primary: var(--verde-marca);
   --yellow-accent:  #f5a623;
-  --text-dark:      #1a1a2e;
+  --text-dark:      var(--azul-oscuro);
   --text-mid:       #5c5c7a;
   --text-light:     #a0a0b8;
-  --bg-app:         #f7f8fc;
+  --bg-app:         var(--bg-crema);
   --bg-white:       #ffffff;
   --border-subtle:  #e8e8f0;
   --shadow-card:    0 4px 16px rgba(0,0,0,.08);
@@ -24,13 +24,18 @@
   --radius-search:  14px;
   --radius-chip:    14px;
   --font:           'Nunito', sans-serif;
+  --bg-crema: #F1E7D3;      /* Color de fondo principal */
+  --azul-oscuro: #0F2540;   /* Textos y elementos principales */
+  --naranja-marca: #E58A3B; /* Acentos y botones */
+  --verde-marca: #2E6B4E;   /* Verificados y botones secundarios */
+  --blanco-puro: #FFFFFF;
 }
 
 html, body {
-  font-family: var(--font);
-  background: var(--bg-app);
-  color: var(--text-dark);
-  -webkit-font-smoothing: antialiased;
+  background-color: var(--bg-crema); /* ¡Adiós al fondo aburrido! */
+  margin: 0;
+  font-family: 'Nunito', sans-serif;
+  color: var(--azul-oscuro);
 }
 
 /* ── App shell — keeps it phone-width on desktop ── */
@@ -977,7 +982,7 @@ html, body {
   margin: 20px 20px 0;
   border: 2px dashed #c8cad8;
   border-radius: 20px;
-  background: #f7f8fc;
+  background: var(--bg-crema);
   min-height: 172px;
   display: flex;
   align-items: center;
@@ -1823,7 +1828,7 @@ html, body {
   flex-direction: column;
   align-items: center;
   padding: 56px 20px 28px;
-  background: linear-gradient(160deg, #2d6535 0%, #3a7d44 45%, #5aaa64 100%);
+  background: linear-gradient(160deg, #2d6535 0%, var(--verde-marca) 45%, #5aaa64 100%);
   text-align: center;
   overflow: hidden;
 }
@@ -2256,7 +2261,7 @@ html, body {
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: #f7f8fc;
+  background: var(--bg-crema);
   border-bottom: 1px solid var(--border-subtle);
 }
  
@@ -2673,7 +2678,7 @@ body {
   max-width: 480px; 
   margin: 0 auto; /* Esto centra el contenedor en la pantalla de la PC */
   min-height: 100vh;
-  background-color: #f7f8fc;
+  background-color: var(--bg-crema);
   box-shadow: 0 0 40px rgba(0,0,0,0.08); /* Sombra suave para darle profundidad */
   position: relative;
   overflow-x: hidden;

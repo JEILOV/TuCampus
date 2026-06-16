@@ -237,7 +237,7 @@ const Publicar = () => {
   //  ESTILOS reutilizables (inline, fieles al original)
   // ──────────────────────────────────────────────────────────────
   const inputStyle = {
-    background: "#f7f8fc", border: "1.5px solid #e8e8f0",
+    background: "var(--bg-crema)", border: "1.5px solid #e8e8f0",
     borderRadius: "12px", padding: "14px 16px",
     fontFamily: "'Nunito', sans-serif", fontSize: "0.95rem",
     fontWeight: 700, outline: "none",
@@ -245,7 +245,7 @@ const Publicar = () => {
   };
 
   const labelStyle = {
-    fontSize: "0.9rem", fontWeight: 800, color: "var(--text-dark)",
+    fontSize: "0.9rem", fontWeight: 600, color: "var(--text-dark)",
   };
 
   const contadorColor = (len, max, umbral) =>
@@ -255,7 +255,7 @@ const Publicar = () => {
   //  RENDER
   // ──────────────────────────────────────────────────────────────
   return (
-    <div className="app-shell" style={{ background: "#f7f8fc", margin: "0 auto", padding: 0 }}>
+    <div className="app-shell" style={{ background: "var(--bg-crema)", margin: "0 auto", padding: 0 }}>
       {/* HEADER */}
       <header
         className="header"
@@ -279,7 +279,7 @@ const Publicar = () => {
             <polyline points="12 19 5 12 12 5"/>
           </svg>
         </button>
-        <h1 style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-dark)", margin: 0 }}>
+        <h1 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text-dark)", margin: 0 }}>
           Nueva Publicación
         </h1>
       </header>
@@ -355,7 +355,7 @@ const Publicar = () => {
             {/* Info de compresión */}
             {mostrarInfoCompresion && (
               <p style={{
-                fontSize: "0.78rem", fontWeight: 700, color: "#3a7d44",
+                fontSize: "0.78rem", fontWeight: 700, color: "var(--verde-marca)",
                 margin: "4px 0 0", padding: "6px 10px",
                 background: "#f0fdf4", borderRadius: "8px",
                 border: "1px solid #bbf7d0",
@@ -409,7 +409,7 @@ const Publicar = () => {
                 value={categoria}
                 onChange={(e) => setCategoria(e.target.value)}
                 required
-                style={{ ...inputStyle, color: "#1a1a2e", cursor: "pointer" }}
+                style={{ ...inputStyle, color: "var(--azul-oscuro)", cursor: "pointer" }}
               >
                 <option value="dulces">🍰 Dulces</option>
                 <option value="salados">🍔 Salados</option>
@@ -448,10 +448,10 @@ const Publicar = () => {
             type="submit"
             disabled={enviando}
             style={{
-              background: enviando ? "#6b9e74" : "#3a7d44",
+              background: enviando ? "#6b9e74" : "var(--verde-marca)",
               color: "white", border: "none",
               padding: "16px", borderRadius: "14px",
-              fontSize: "1.05rem", fontWeight: 800,
+              fontSize: "1.05rem", fontWeight: 600,
               cursor: enviando ? "not-allowed" : "pointer",
               boxShadow: "0 6px 20px rgba(58,125,68,0.3)",
               marginTop: "10px",

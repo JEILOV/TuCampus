@@ -49,7 +49,7 @@ const TarjetaVendedor = ({ producto, onVerDetalle }) => {
         <span style={{
           position: "absolute", bottom: "10px", right: "10px",
           background: agotado ? "#555" : "rgba(0,0,0,0.70)",
-          color: "white", fontWeight: 900,
+          color: "white", fontWeight: 700,
           fontSize: "0.82rem", padding: "4px 10px",
           borderRadius: "20px", backdropFilter: "blur(4px)",
         }}>
@@ -60,7 +60,7 @@ const TarjetaVendedor = ({ producto, onVerDetalle }) => {
           <div style={{
             position: "absolute", top: "50%", left: "50%",
             transform: "translate(-50%,-50%) rotate(-10deg)",
-            background: "#ff4d6d", color: "white", fontWeight: 900,
+            background: "#ff4d6d", color: "white", fontWeight: 700,
             fontSize: "0.95rem", padding: "4px 10px", borderRadius: "6px",
             border: "2px solid white", zIndex: 5,
           }}>
@@ -71,7 +71,7 @@ const TarjetaVendedor = ({ producto, onVerDetalle }) => {
 
       <div style={{ padding: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
         <p style={{
-          margin: 0, fontWeight: 800, fontSize: "0.92rem", color: "#1a1a2e", lineHeight: 1.3,
+          margin: 0, fontWeight: 600, fontSize: "0.92rem", color: "var(--azul-oscuro)", lineHeight: 1.3,
           ...(agotado ? { color: "#999", textDecoration: "line-through" } : {}),
         }}>
           {titulo || "Sin título"}
@@ -82,7 +82,7 @@ const TarjetaVendedor = ({ producto, onVerDetalle }) => {
             background: "linear-gradient(135deg,#c8a97a,#a07850)",
             overflow: "hidden", flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "11px", color: "white", fontWeight: 800,
+            fontSize: "11px", color: "white", fontWeight: 600,
           }}>
             {avatarVendedor?.trim()
               ? <img src={avatarVendedor} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -165,8 +165,8 @@ const Vendedor = () => {
 
   if (cargando) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center",
-      height: "100vh", fontFamily: "'Nunito', sans-serif", fontWeight: 800,
-      color: "#5c5c7a", background: "#f7f8fc" }}>
+      height: "100vh", fontFamily: "'Nunito', sans-serif", fontWeight: 600,
+      color: "#5c5c7a", background: "var(--bg-crema)" }}>
       Cargando perfil del vendedor...
     </div>
   );
@@ -174,15 +174,15 @@ const Vendedor = () => {
   if (noExiste || !vendedor) return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center",
       justifyContent: "center", height: "100vh", gap: "16px",
-      fontFamily: "'Nunito', sans-serif", background: "#f7f8fc" }}>
+      fontFamily: "'Nunito', sans-serif", background: "var(--bg-crema)" }}>
       <span style={{ fontSize: "3rem" }}>🚫</span>
-      <p style={{ fontWeight: 800, color: "#1a1a2e", fontSize: "1.1rem" }}>
+      <p style={{ fontWeight: 600, color: "var(--azul-oscuro)", fontSize: "1.1rem" }}>
         Vendedor no encontrado
       </p>
       <button onClick={() => navigate("/")} style={{
-        background: "#3a7d44", color: "white", border: "none",
+        background: "var(--verde-marca)", color: "white", border: "none",
         padding: "12px 24px", borderRadius: "12px",
-        fontWeight: 800, fontSize: "0.95rem", cursor: "pointer",
+        fontWeight: 600, fontSize: "0.95rem", cursor: "pointer",
         fontFamily: "'Nunito', sans-serif",
       }}>
         Volver al inicio
@@ -193,7 +193,7 @@ const Vendedor = () => {
   const v = vendedor;
 
   return (
-    <div className="app-shell" style={{ background: "#f7f8fc", paddingBottom: "90px" }}>
+    <div className="app-shell" style={{ background: "var(--bg-crema)", paddingBottom: "90px" }}>
 
       {/* ════════════════════════════════════════════════════
            CABECERA — TODO ADENTRO DEL BANNER (Pixel-Perfect)
@@ -237,14 +237,14 @@ const Vendedor = () => {
             width: "90px", height: "90px", borderRadius: "50%",
             border: "3px solid white", boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
             background: "linear-gradient(135deg,#c8a97a,#a07850)", overflow: "hidden",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.5rem", fontWeight: 900, color: "white",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.5rem", fontWeight: 700, color: "white",
             marginBottom: "4px"
           }}>
             {v.avatar?.trim() ? <img src={v.avatar} alt={v.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (v.nombre || "V")[0].toUpperCase()}
           </div>
 
           {/* Textos */}
-          <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 900, color: "white", textAlign: "center", letterSpacing: "-0.5px" }}>
+          <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 700, color: "white", textAlign: "center", letterSpacing: "-0.5px" }}>
             {v.nombre || "Vendedor UNP"}
           </h1>
           <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
@@ -253,7 +253,7 @@ const Vendedor = () => {
           <div style={{
             display: "inline-flex", alignItems: "center", gap: "6px",
             background: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.4)",
-            padding: "5px 14px", borderRadius: "20px", fontSize: "0.8rem", fontWeight: 800, marginTop: "4px", backdropFilter: "blur(4px)",
+            padding: "5px 14px", borderRadius: "20px", fontSize: "0.8rem", fontWeight: 600, marginTop: "4px", backdropFilter: "blur(4px)",
           }}>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5">
               <polyline points="20 6 9 17 4 12"/>
@@ -271,11 +271,11 @@ const Vendedor = () => {
       }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-            stroke="#3a7d44" strokeWidth="2.2" strokeLinecap="round">
+            stroke="var(--verde-marca)" strokeWidth="2.2" strokeLinecap="round">
             <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/>
             <circle cx="12" cy="10" r="3"/>
           </svg>
-          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#1a1a2e" }}>
+          <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--azul-oscuro)" }}>
             {v.ubicacion || "Piura"}
           </span>
         </div>
@@ -285,10 +285,10 @@ const Vendedor = () => {
       <div style={{ padding: "0 16px 16px" }}>
         <div style={{ background: "white", borderRadius: "16px", border: "1.5px solid #e8e8f0", padding: "14px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#3a7d44" strokeWidth="2.2">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--verde-marca)" strokeWidth="2.2">
               <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
             </svg>
-            <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "#1a1a2e" }}>Acerca de mí</span>
+            <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--azul-oscuro)" }}>Acerca de mí</span>
           </div>
           <p style={{ margin: 0, fontSize: "0.88rem", color: "#5c5c7a", fontWeight: 600, lineHeight: 1.5 }}>
             {v.acercaDe || "¡Hola! Bienvenido a mi tienda."}
@@ -300,13 +300,13 @@ const Vendedor = () => {
       <div style={{ padding: "0 16px 20px" }}>
         <div style={{
           display: "flex", alignItems: "center", gap: "8px",
-          marginBottom: "12px", paddingBottom: "10px", borderBottom: "2px solid #3a7d44",
+          marginBottom: "12px", paddingBottom: "10px", borderBottom: "2px solid var(--verde-marca)",
         }}>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#3a7d44" strokeWidth="2.2">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--verde-marca)" strokeWidth="2.2">
             <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
             <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
           </svg>
-          <span style={{ fontWeight: 900, fontSize: "1rem", color: "#3a7d44" }}>Publicaciones Activas</span>
+          <span style={{ fontWeight: 700, fontSize: "1rem", color: "var(--verde-marca)" }}>Publicaciones Activas</span>
         </div>
 
         {productos.length === 0 ? (
