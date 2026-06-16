@@ -394,7 +394,7 @@ const Home = () => {
                     <div style={{ fontSize: "1.5rem" }}>{esFav ? "❤️" : "💬"}</div>
                     <div style={{ flex: 1 }}>
                       <p style={{ margin: "0 0 4px 0", fontSize: "0.9rem", color: "#1a1a2e", lineHeight: 1.4 }}>
-                        <span style={{ fontWeight: 800 }}>{notif.remitenteNombre}</span> {esFav ? "guardó" : "quiere comprar"} <span style={{ fontWeight: 800 }}>"{notif.productoTitulo}"</span>
+                        <span style={{ fontWeight: 800 }}>{notif.notif.deNombre}</span> {esFav ? "guardó" : "quiere comprar"} <span style={{ fontWeight: 800 }}>"{notif.productoTitulo}"</span>
                       </p>
                       <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600 }}>{formatearTiempo(notif.timestamp)}</span>
                     </div>
