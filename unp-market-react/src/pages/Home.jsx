@@ -262,9 +262,19 @@ const Home = () => {
   // ──────────────────────────────────────────────────────────────
   return (
     <div className="app-shell">
-      <header className="header">
-        <div className="logo">
-          <span className="logo-unp">UNP</span><span className="logo-market">Market</span>
+    {/* HEADER CENTRADO Y LOGO MÁS GRANDE */}
+      <header className="header" style={{ justifyContent: 'center', paddingBottom: '0' }}>
+        <div className="logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+          <img 
+            src="https://i.ibb.co/fzNKyX51/Dise-o-sin-t-tulo-1.png" 
+            alt="Mercado UNP" 
+            style={{ 
+              height: '56px', /* <-- Tamaño aumentado para que destaque */
+              width: 'auto', 
+              objectFit: 'contain',
+              mixBlendMode: 'multiply' 
+            }} 
+          />
         </div>
       </header>
 
