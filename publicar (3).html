@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Publicar — UNP Market</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body style="background: #f7f8fc; margin: 0; padding: 0;">
+<div class="app-shell">
+
+  <header class="header" style="justify-content: flex-start; gap: 15px; border-bottom: 1px solid var(--border-subtle); padding: 15px 20px; background: white; box-sizing: border-box;">
+    <a href="index.html" style="color: var(--text-dark); text-decoration: none; display: flex; align-items: center;">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+    </a>
+    <h1 style="font-size: 1.25rem; font-weight: 900; color: var(--text-dark); margin: 0;">Nueva Publicación</h1>
+  </header>
+
+  <main style="padding: 16px; padding-bottom: 110px; box-sizing: border-box;">
+    <form id="form-publicar" style="display: flex; flex-direction: column; gap: 16px; background: white; padding: 20px; border-radius: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); box-sizing: border-box; width: 100%;">
+      
+      <div class="form-group" style="display: flex; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box;">
+        <label style="font-size: 0.9rem; font-weight: 800; color: var(--text-dark);">Foto del producto <span style="color:#dc2626;">*</span></label>
+
+        <div id="image-upload-container" style="border: 2px dashed #c3c6d4; border-radius: 16px; padding: 25px 15px; text-align: center; background: #fafbff; cursor: pointer; transition: all 0.2s ease; box-sizing: border-box; width: 100%;">
+          <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#a0a5b9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 10px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          <p id="upload-text" style="margin: 0; font-size: 0.9rem; color: #5c5c7a; font-weight: 700; line-height: 1.4;">Toca para abrir la cámara o galería</p>
+          <!-- ── PILAR 2: Preview de la imagen seleccionada ── -->
+          <img id="image-preview" style="display: none; width: 100%; height: 180px; object-fit: cover; border-radius: 12px; margin-top: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);" />
+        </div>
+
+        <input type="file" id="file-imagen-publicar" accept="image/*" style="display: none;">
+
+        <!-- ── PILAR 2: Indicador de compresión ── -->
+        <p id="info-compresion" style="display:none; font-size:0.78rem; font-weight:700; color:#3a7d44; margin:4px 0 0; padding:6px 10px; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
+          ✓ La imagen se comprimirá automáticamente antes de subir
+        </p>
+      </div>
+
+      <div class="form-group" style="display: flex; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box;">
+        <label style="font-size: 0.9rem; font-weight: 800; color: var(--text-dark);">
+          ¿Qué vas a vender?
+          <!-- ── PILAR 2: Contador de caracteres ── -->
+          <span id="contador-titulo" style="font-weight:600; color:#a0a5b9; font-size:0.8rem; float:right;">0/200</span>
+        </label>
+        <!--
+          PILAR 2 — maxlength="200":
+          Esto es la primera línea de defensa en el cliente.
+          Las Reglas de Firestore son la segunda (ya implementadas en Fase 1).
+          Siempre ambas: el HTML protege la UX, Firestore protege los datos.
+        -->
+        <input
+          type="text"
+          id="titulo"
+          required
+          maxlength="200"
+          placeholder="Ej: Galletas de avena"
+          style="background: #f7f8fc; border: 1.5px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; outline: none; box-sizing: border-box; width: 100%;"
+        >
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 12px; width: 100%; box-sizing: border-box;">
+        
+        <div class="form-group" style="flex: 1; min-width: 100px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box;">
+          <label style="font-size: 0.9rem; font-weight: 800; color: var(--text-dark);">Precio (S/)</label>
+          <input type="number" id="precio" step="0.10" required placeholder="0.00" style="background: #f7f8fc; border: 1.5px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; outline: none; box-sizing: border-box; width: 100%;">
+        </div>
+        
+        <div class="form-group" style="flex: 1.5; min-width: 140px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box;">
+          <label style="font-size: 0.9rem; font-weight: 800; color: var(--text-dark);">Categoría</label>
+          <select id="categoria" required style="background: #f7f8fc; border: 1.5px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; outline: none; color: #1a1a2e; cursor:pointer; box-sizing: border-box; width: 100%;">
+            <option value="dulces">🍰 Dulces</option>
+            <option value="salados">🍔 Salados</option>
+            <option value="bebidas">🥤 Bebidas</option>
+            <option value="servicios">🔧 Servicios</option>
+            <option value="materiales">📚 Materiales</option>
+          </select>
+        </div>
+
+      </div>
+
+      <div class="form-group" style="display: flex; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box;">
+        <label style="font-size: 0.9rem; font-weight: 800; color: var(--text-dark);">
+          Descripción
+          <!-- ── PILAR 2: Contador de caracteres para descripción ── -->
+          <span id="contador-descripcion" style="font-weight:600; color:#a0a5b9; font-size:0.8rem; float:right;">0/500</span>
+        </label>
+        <!--
+          PILAR 2 — maxlength="500":
+          500 caracteres es suficiente para describir un producto
+          de campus: sabores, lugar de entrega, condiciones, etc.
+          Más texto = Firestore rechaza, ImgBB tarda más, UX se rompe.
+        -->
+        <textarea
+          id="descripcion"
+          required
+          rows="3"
+          maxlength="500"
+          placeholder="Detalles, sabores, dónde entregas en el campus..."
+          style="background: #f7f8fc; border: 1.5px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; outline: none; resize: none; box-sizing: border-box; width: 100%;"
+        ></textarea>
+      </div>
+
+      <button type="submit" id="btn-publicar" style="background: #3a7d44; color: white; border: none; padding: 16px; border-radius: 14px; font-size: 1.05rem; font-weight: 800; cursor: pointer; box-shadow: 0 6px 20px rgba(58,125,68,0.3); margin-top: 10px; font-family: 'Nunito', sans-serif; box-sizing: border-box; width: 100%;">Publicar Producto</button>
+    </form>
+  </main>
+
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item" aria-label="Inicio">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span class="nav-label">Inicio</span>
+    </a>
+    <a href="index.html?tab=favoritos" class="nav-item" aria-label="Favoritos">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      <span class="nav-label">Favoritos</span>
+    </a>
+    <a href="publicar.html" class="nav-item active nav-add" aria-label="Publicar">
+      <div class="nav-add-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+      <span class="nav-label">Publicar</span>
+    </a>
+    <a href="index.html?tab=notifs" class="nav-item" aria-label="Notificaciones">
+      <div class="nav-icon-wrap"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="nav-notif-badge">1</span></div>
+      <span class="nav-label">Notifs</span>
+    </a>
+    <a href="perfil.html" class="nav-item" aria-label="Perfil">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span class="nav-label">Perfil</span>
+    </a>
+  </nav>
+
+</div>
+
+<!--
+  NOTA ARQUITECTÓNICA IMPORTANTE:
+  Este <script> NO tiene type="module" porque solo maneja la UI del picker
+  de imagen (preview local inmediato). No importa nada de Firebase.
+  El type="module" del script de app.js (abajo) maneja toda la lógica
+  de negocio. Mantener los dos separados es correcto y deliberado.
+  Mezclar lógica de UI simple con módulos ES6 añade complejidad sin beneficio.
+-->
+<script>
+  const container = document.getElementById('image-upload-container');
+  const preview   = document.getElementById('image-preview');
+  const text      = document.getElementById('upload-text');
+  const fileInput = document.getElementById('file-imagen-publicar');
+  const infoComp  = document.getElementById('info-compresion');
+
+  // ── Contador de caracteres para título ──
+  const inputTitulo      = document.getElementById('titulo');
+  const contadorTitulo   = document.getElementById('contador-titulo');
+  inputTitulo.addEventListener('input', () => {
+    const len = inputTitulo.value.length;
+    contadorTitulo.textContent = `${len}/200`;
+    contadorTitulo.style.color = len > 180 ? '#dc2626' : '#a0a5b9';
+  });
+
+  // ── Contador de caracteres para descripción ──
+  const inputDesc       = document.getElementById('descripcion');
+  const contadorDesc    = document.getElementById('contador-descripcion');
+  inputDesc.addEventListener('input', () => {
+    const len = inputDesc.value.length;
+    contadorDesc.textContent = `${len}/500`;
+    contadorDesc.style.color = len > 450 ? '#dc2626' : '#a0a5b9';
+  });
+
+  // ── Preview local de imagen (instantáneo, sin subir nada aún) ──
+  container.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Mostrar nombre del archivo y confirmar selección
+    const nombreCorto = file.name.length > 30 ? file.name.substring(0, 27) + '...' : file.name;
+    const tamanoMB    = (file.size / 1024 / 1024).toFixed(1);
+    text.innerHTML = `Imagen seleccionada ✓<br><span style='font-size:0.75rem; color:#999;'>${nombreCorto} · ${tamanoMB}MB → se comprimirá al subir</span>`;
+    container.style.borderColor = "#22c55e";
+
+    // Preview local inmediato con URL de objeto (no sube nada a ningún servidor)
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = "block";
+
+    // Mostrar info de compresión si el archivo pesa más de 500KB
+    if (infoComp) {
+      infoComp.style.display = file.size > 500 * 1024 ? 'block' : 'none';
+    }
+  });
+</script>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

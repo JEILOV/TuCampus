@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f4f6f9" />
+  <title>UNP Market — Ingresar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <style>
+    /* RESET & BASE */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:        #1a1a2e;
+      --green:       #3a7d44;
+      --text-mid:    #5c5c7a;
+      --text-light:  #a0a0b8;
+      --bg:          #f4f6f9;
+      --white:       #ffffff;
+      --border:      #e8e8f0;
+      --shadow-card: 0 10px 40px rgba(0,0,0,.06), 0 2px 12px rgba(0,0,0,.04);
+      --radius-card: 30px;
+      --font:        'Nunito', sans-serif;
+    }
+    html, body { height: 100%; font-family: var(--font); background: var(--bg); -webkit-font-smoothing: antialiased; }
+
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: radial-gradient(circle at 15% 20%, rgba(58,125,68,.08) 0%, transparent 50%),
+                        radial-gradient(circle at 85% 80%, rgba(26,26,46,.06) 0%, transparent 50%);
+      pointer-events: none; z-index: 0;
+    }
+
+    .login-page { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 32px 20px 24px; }
+    .login-shell { width: 100%; max-width: 480px; display: flex; flex-direction: column; align-items: center; gap: 0; }
+
+    .login-header { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .login-logo { width: 68px; height: 68px; border-radius: 50%; object-fit: contain; border: 3px solid var(--white); box-shadow: 0 4px 20px rgba(26,26,46,.18); background: white; padding: 4px; }
+    .login-title { font-size: 34px; font-weight: 900; color: var(--navy); letter-spacing: -1px; line-height: 1; }
+    .login-title em { font-style: normal; color: var(--green); }
+    .login-subtitle { font-size: 15px; font-weight: 600; color: var(--text-mid); letter-spacing: .1px; }
+
+    .login-card { width: 100%; background: var(--white); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 28px 28px 32px; display: flex; flex-direction: column; align-items: center; gap: 0; border: 1px solid rgba(232,232,240,.8); }
+    
+    .login-illustration-wrap { width: 100%; height: 200px; border-radius: 18px; overflow: hidden; margin-bottom: 26px; background: #e8ecf4; position: relative; }
+    .login-illustration { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 18px; }
+    
+    .login-floats { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+    .login-float { position: absolute; font-size: 22px; animation: floatBob var(--dur, 3s) ease-in-out infinite; animation-delay: var(--delay, 0s); filter: drop-shadow(0 3px 6px rgba(0,0,0,.15)); }
+    .login-float:nth-child(1) { top: 12%; left: 8%;  --dur: 3.2s; --delay: 0s; }
+    .login-float:nth-child(2) { top: 8%;  right: 10%; --dur: 2.8s; --delay: .4s; }
+    .login-float:nth-child(3) { bottom: 14%; left: 14%;  --dur: 3.5s; --delay: .8s; }
+    .login-float:nth-child(4) { bottom: 10%; right: 8%;  --dur: 2.6s; --delay: .2s; }
+
+    @keyframes floatBob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
+
+    .login-card-title { font-size: 22px; font-weight: 800; color: var(--navy); text-align: center; letter-spacing: -.4px; line-height: 1.25; margin-bottom: 10px; }
+    .login-card-body { font-size: 14px; font-weight: 600; color: var(--text-mid); text-align: center; line-height: 1.65; max-width: 300px; margin-bottom: 28px; }
+
+    .btn-google { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; padding: 15px 24px; background: var(--white); border: 1.5px solid var(--border); border-radius: 50px; font-family: var(--font); font-size: 15.5px; font-weight: 800; color: var(--navy); cursor: pointer; letter-spacing: -.1px; text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05); transition: transform .18s ease, box-shadow .18s ease, border-color .15s; position: relative; overflow: hidden; }
+    .btn-google:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.12); border-color: #c8c8d8; }
+    .btn-google:active { transform: scale(.97); }
+    .google-icon { width: 22px; height: 22px; flex-shrink: 0; }
+
+    .login-separator { display: flex; align-items: center; gap: 10px; width: 100%; margin: 20px 0; }
+    .login-separator::before, .login-separator::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .login-separator span { font-size: 11.5px; font-weight: 700; color: var(--text-light); letter-spacing: .3px; }
+
+    .btn-email { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 14px 24px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 50px; font-family: var(--font); font-size: 14.5px; font-weight: 700; color: var(--text-mid); cursor: pointer; text-decoration: none; transition: background .15s; }
+
+    .login-features { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 24px; width: 100%; }
+    .feature-chip { display: flex; align-items: center; gap: 5px; background: #f0f7f2; border: 1px solid rgba(58,125,68,.15); border-radius: 20px; padding: 5px 11px; font-size: 11px; font-weight: 700; color: var(--green); }
+
+    .login-footer { margin-top: 20px; padding: 0 8px; font-size: 11px; font-weight: 600; color: var(--text-light); text-align: center; line-height: 1.6; }
+    .login-footer a { color: var(--green); text-decoration: none; font-weight: 700; }
+
+    .btn-google.loading { pointer-events: none; opacity: .75; }
+    .btn-google.loading .btn-google-label::after { content: '…'; animation: dots 1s steps(3, end) infinite; }
+    @keyframes dots { 0% { content: '.'; } 33% { content: '..'; } 66% { content: '...'; } 100% { content: '.'; } }
+  </style>
+</head>
+
+<body>
+<div class="login-page">
+  <div class="login-shell">
+
+    <header class="login-header">
+      <img src="https://i.ibb.co/CGgVsvN/Escudo-Universidad-Nacional-de-Piura.png" alt="Logo UNP Market" class="login-logo" width="68" height="68" />
+      <h1 class="login-title">UNP <em>Market</em></h1>
+      <p class="login-subtitle">El mercado oficial de tu campus</p>
+    </header>
+
+    <div class="login-card">
+      <div class="login-illustration-wrap">
+        <img src="https://i.ibb.co/qLmxNQTz/Chat-GPT-Image-16-may-2026-04-32-51-a-m.png" alt="Ilustración del campus de la UNP" class="login-illustration" width="600" height="340" />
+        <div class="login-floats" aria-hidden="true">
+        
+        </div>
+      </div>
+
+      <h2 class="login-card-title">Únete a la Comunidad</h2>
+      <p class="login-card-body">Compre y venda dentro de la Universidad Nacional de Piura de forma segura y rápida.</p>
+
+      <button class="btn-google" id="btn-google" aria-label="Continuar con Google">
+        <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        <span class="btn-google-label">Continuar con correo institucional</span>
+      </button>
+
+    
+      <div class="login-features" aria-label="Beneficios de la plataforma">
+        <div class="feature-chip"><span></span> Gratis</div>
+        <div class="feature-chip"><span></span> Seguro</div>
+        <div class="feature-chip"><span></span> Instantáneo</div>
+        <div class="feature-chip"><span></span> Solo UNP</div>
+      </div>
+    </div>
+
+    <footer class="login-footer">
+      Al continuar, aceptas registrarte con tu correo institucional y los <a href="#">Términos y Condiciones</a>.
+    </footer>
+
+  </div>
+</div>
+
+<script type="module">
+  import { auth, db } from "./firebase.js";
+  import {
+    GoogleAuthProvider,
+    signInWithPopup,
+    signOut
+  } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+  import {
+    doc, getDoc, setDoc
+  } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+ 
+  const provider  = new GoogleAuthProvider();
+  // Fuerza al popup a mostrar el selector de cuentas siempre,
+  // evitando que Google inicie sesión automáticamente con una
+  // cuenta que no sea la institucional.
+  provider.setCustomParameters({ prompt: "select_account" });
+ 
+  const btnGoogle = document.getElementById("btn-google");
+  const labelBtn  = btnGoogle.querySelector(".btn-google-label");
+ 
+  btnGoogle.addEventListener("click", async () => {
+    btnGoogle.classList.add("loading");
+    labelBtn.textContent = "Conectando";
+ 
+    // Limpieza preventiva: si había una sesión anterior en caché,
+    // la borramos ANTES de resolver la nueva para evitar contaminación
+    // cruzada entre cuentas distintas.
+    localStorage.removeItem("unp_user_profile");
+    localStorage.removeItem("listaFavoritos");
+ 
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user   = result.user;
+ 
+      // ── FILTRO DE DOMINIO (primera capa de defensa) ──────────
+      // La segunda capa, definitiva, son las Security Rules de
+      // Firestore que validan request.auth.token.email.
+      if (!user.email.endsWith("@alumnos.unp.edu.pe")) {
+        await signOut(auth);
+        btnGoogle.classList.remove("loading");
+        labelBtn.textContent = "Ingresar con correo UNP";
+        alert(
+          "Acceso exclusivo para la comunidad UNP.\n" +
+          "Por favor inicia sesión con tu correo @alumnos.unp.edu.pe"
+        );
+        return;
+      }
+ 
+      // ── LECTURA / CREACIÓN DEL PERFIL EN FIRESTORE ───────────
+      const userRef  = doc(db, "usuarios", user.uid);
+      const userSnap = await getDoc(userRef);
+ 
+      let profileData = {
+        uid:       user.uid,
+        nombre:    user.displayName || "Estudiante UNP",
+        email:     user.email,
+        avatar:    user.photoURL   || "",
+        ubicacion: "Piura",
+        bio:       "Estudiante de la UNP",
+        acercaDe:  "¡Hola! Bienvenido a mi tienda en el campus.",
+        telefono:  ""
+      };
+ 
+      if (!userSnap.exists()) {
+        // Primera vez: crea el documento base
+        await setDoc(userRef, profileData);
+      } else {
+        // Ya existe: los datos de Firestore tienen prioridad
+        // (por ejemplo si el usuario ya editó su nombre o bio)
+        profileData = { ...profileData, ...userSnap.data() };
+      }
+ 
+      // Caché local SOLO para velocidad de UI (mostrar nombre/avatar
+      // sin esperar a Firestore en cada carga). NO se usa para seguridad.
+      localStorage.setItem("unp_user_profile", JSON.stringify(profileData));
+      localStorage.setItem(
+        "listaFavoritos",
+        JSON.stringify(userSnap.exists() ? (userSnap.data().favoritos || []) : [])
+      );
+ 
+      window.location.replace("index.html");
+ 
+    } catch (error) {
+      console.error("Error de login:", error);
+      btnGoogle.classList.remove("loading");
+      labelBtn.textContent = "Ingresar con correo UNP";
+      if (error.code !== "auth/popup-closed-by-user") {
+        alert("Error de conexión. Inténtalo nuevamente.");
+      }
+    }
+  });
+ 
+  // ── FUNCIÓN GLOBAL DE CIERRE DE SESIÓN ───────────────────────
+  // Úsala desde cualquier botón "Cerrar sesión" con:
+  //   window.cerrarSesionSeguro()
+  // Está en window porque perfil.html la llama desde un <script>
+  // normal (no module) que no puede hacer import.
+  window.cerrarSesionSeguro = async function () {
+    // 1. Limpiar caché local
+    ["unp_user_profile", "listaFavoritos",
+     "mostrarToastPublicar", "productoSeleccionado"
+    ].forEach(k => localStorage.removeItem(k));
+ 
+    // 2. Revocar la sesión en Firebase (invalida el token)
+    try { await signOut(auth); } catch (e) { /* ignorable */ }
+ 
+    // 3. Redirigir sin dejar historial (el botón Atrás no vuelve
+    //    a una pantalla de app sin sesión)
+    window.location.replace("login.html");
+  };
+</script>
+ 
+</body>
+</html>

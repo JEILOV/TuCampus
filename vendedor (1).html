@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Perfil del Vendedor — UNP Market</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ══ CABECERA DEL VENDEDOR ══ -->
+  <header class="up-header" id="vd-header">
+
+    <div class="up-header-actions" style="justify-content: flex-start;">
+      <a href="javascript:history.back()" class="up-action-btn" aria-label="Volver">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </a>
+    </div>
+
+    <div class="up-avatar-wrap">
+      <div class="up-avatar" id="vd-avatar">?</div>
+    </div>
+
+    <h1 class="up-name" id="vd-nombre">Cargando...</h1>
+    <p class="up-bio" id="vd-bio" style="word-break: break-word;">Estudiante de la UNP</p>
+    <span class="up-verified-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      Estudiante verificado
+    </span>
+
+  </header>
+
+  <!-- ══ UBICACIÓN ══ -->
+  <div class="up-stats-grid" style="justify-content: center; padding-bottom: 12px; border-bottom: none;">
+    <div class="up-stat">
+      <span class="up-stat-value up-stat-value--location">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+      </span>
+      <span class="up-stat-label" id="vd-ubicacion" style="font-size: 11.5px; text-transform: uppercase;">Piura</span>
+    </div>
+  </div>
+
+  <!-- ══ ACERCA DE ══ -->
+  <div style="padding: 0 20px 20px; background: var(--bg-white); border-bottom: 1px solid var(--border-subtle);">
+    <div style="background: #f7f8fc; border-radius: 16px; padding: 16px; border: 1.5px solid var(--border-subtle);">
+      <h3 style="font-size: 12.5px; font-weight: 900; color: var(--text-dark); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--green-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        Acerca de mí
+      </h3>
+      <p id="vd-acerca" style="font-size: 13px; font-weight: 600; color: var(--text-mid); line-height: 1.6; word-break: break-word;">
+        ¡Hola! Bienvenido a mi tienda.
+      </p>
+    </div>
+  </div>
+
+  <!-- ══ PESTAÑA ══ -->
+  <div class="up-tabs" role="tablist">
+    <button class="up-tab up-tab--active" style="width: 100%;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"/>
+        <rect x="14" y="3" width="7" height="7"/>
+        <rect x="14" y="14" width="7" height="7"/>
+        <rect x="3" y="14" width="7" height="7"/>
+      </svg>
+      Publicaciones Activas
+    </button>
+  </div>
+
+  <!-- ══ GRILLA DE PRODUCTOS ══ -->
+  <section class="up-tab-panel catalog">
+    <div class="product-grid" id="grid-vendedor" style="padding: 16px 16px 100px;">
+      <p id="vd-loading" style="text-align:center; width:100%; color: var(--text-mid); font-weight: 700; grid-column: 1/-1;">
+        Cargando publicaciones...
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ NAVEGACIÓN INFERIOR ══ -->
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item" aria-label="Inicio">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span class="nav-label">Inicio</span>
+    </a>
+    <a href="index.html?tab=favoritos" class="nav-item" aria-label="Favoritos">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      <span class="nav-label">Favoritos</span>
+    </a>
+    <a href="publicar.html" class="nav-item nav-add" aria-label="Publicar">
+      <div class="nav-add-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+      <span class="nav-label">Publicar</span>
+    </a>
+    <a href="index.html?tab=notifs" class="nav-item" aria-label="Notificaciones">
+      <div class="nav-icon-wrap">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </div>
+      <span class="nav-label">Notifs</span>
+    </a>
+    <a href="perfil.html" class="nav-item" aria-label="Perfil">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span class="nav-label">Perfil</span>
+    </a>
+  </nav>
+
+</div>
+
+<script type="module">
+  import { db } from "./firebase.js";
+  import {
+    doc, getDoc, collection, query, where, getDocs, orderBy
+  } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+  // ... aquí sigue el resto de tu código normal
+  
+
+
+  // Función global requerida por los onclick inline de las tarjetas
+  window.verDetalle = function(id) {
+    localStorage.setItem('productoSeleccionado', id);
+    window.location.href = 'producto.html';
+  };
+
+  // Leer uid desde la URL
+  const uid = new URLSearchParams(window.location.search).get('uid');
+  if (!uid) { window.location.replace('index.html'); }
+
+  // ── Renderiza la cabecera con los datos del documento de usuario ────────────
+  function renderizarCabecera(datos) {
+    const nombre    = datos.nombre    || 'Vendedor UNP';
+    const bio       = datos.bio       || 'Estudiante de la UNP';
+    const acercaDe  = datos.acercaDe  || '¡Hola! Bienvenido a mi tienda.';
+    const ubicacion = datos.ubicacion || 'Piura';
+    const avatar    = datos.avatar    || '';
+    const portada   = datos.portada   || '';
+
+    document.getElementById('vd-nombre').textContent    = nombre;
+    document.getElementById('vd-bio').textContent       = bio;
+    document.getElementById('vd-acerca').textContent    = acercaDe;
+    document.getElementById('vd-ubicacion').textContent = ubicacion;
+    document.title = `${nombre} — UNP Market`;
+
+    // Avatar: imagen real o inicial del nombre
+    const avatarEl = document.getElementById('vd-avatar');
+    if (avatar && avatar.trim() !== '') {
+      avatarEl.innerHTML = `<img src="${avatar}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+    } else {
+      avatarEl.textContent = nombre.charAt(0).toUpperCase();
+    }
+
+    // Portada de la cabecera: misma lógica que renderizarPerfil en app.js
+    const headerEl = document.getElementById('vd-header');
+    if (portada && portada.trim() !== '') {
+      headerEl.style.backgroundImage    = `url('${portada}')`;
+      headerEl.style.backgroundSize     = 'cover';
+      headerEl.style.backgroundPosition = 'center';
+      headerEl.style.borderBottom       = 'none';
+    } else {
+      headerEl.style.backgroundImage = 'none';
+      headerEl.style.background      = 'linear-gradient(135deg, #c8a97a 0%, #a07850 100%)';
+      headerEl.style.borderBottom    = '1px solid var(--border-subtle)';
+    }
+  }
+
+  // ── Construye el HTML de una tarjeta de producto ───────────────────────────
+  function construirTarjeta(id, p) {
+    const iconos = { 'dulces': '🍫', 'bebidas': '☕', 'salados': '🍔', 'servicios': '🔧', 'materiales': '📚' };
+    const emoji  = iconos[(p.categoria || '').toLowerCase()] || '📦';
+
+    const estaAgotado   = p.estado === 'agotado' || p.estado === 'Agotado';
+    const filtroCSS     = estaAgotado ? 'filter: grayscale(100%) opacity(0.6);' : '';
+    const cartelAgotado = estaAgotado
+      ? `<div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-10deg); background:#ff4d6d; color:white; font-weight:900; font-size:1rem; padding:4px 10px; border-radius:6px; z-index:10; border:2px solid white; box-shadow:0 4px 10px rgba(0,0,0,0.15);">AGOTADO</div>`
+      : '';
+
+    const imagenHTML = (p.imagen && p.imagen.trim() !== '')
+      ? `<img src="${p.imagen}" style="width:100%; height:100%; object-fit:cover; border-radius:18px 18px 0 0; ${filtroCSS}">`
+      : `<span class="img-placeholder-icon" style="font-size:3rem; ${filtroCSS}">${emoji}</span>`;
+
+    return `
+      <article class="product-card" onclick="window.verDetalle('${id}')" data-category="${(p.categoria || '').toLowerCase()}" style="cursor:pointer; position:relative;">
+        <div class="card-image-wrap" style="background: linear-gradient(135deg,#c8a97a 0%,#a07850 100%); display:flex; align-items:center; justify-content:center; position:relative;">
+          ${cartelAgotado}
+          ${imagenHTML}
+          <span class="badge-price" style="${estaAgotado ? 'background:#666; color:white;' : ''}">S/ ${p.precio.toFixed(2)}</span>
+        </div>
+        <div class="card-body">
+          <h3 class="card-title" style="${estaAgotado ? 'color:#999; text-decoration:line-through;' : ''}">${p.titulo}</h3>
+        </div>
+      </article>`;
+  }
+
+  // ── Carga principal ────────────────────────────────────────────────────────
+  async function cargar() {
+    const grid       = document.getElementById('grid-vendedor');
+    const loadingMsg = document.getElementById('vd-loading');
+
+    try {
+      // 1. Perfil del vendedor desde la colección 'usuarios'
+      const userSnap = await getDoc(doc(db, 'usuarios', uid));
+
+      if (userSnap.exists()) {
+        renderizarCabecera(userSnap.data());
+      }
+      // Si no existe el documento de usuario, la cabecera se rellena
+      // con los datos del primer producto (ver paso 2)
+
+      // 2. Productos del vendedor filtrados por userUid
+      const q    = query(collection(db, 'productos'), where('userUid', '==', uid));
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        if (loadingMsg) loadingMsg.textContent = 'Este vendedor aún no tiene publicaciones activas.';
+        // Fallback de cabecera si tampoco hay documento de usuario
+        if (!userSnap.exists()) renderizarCabecera({});
+        return;
+      }
+
+      // Fallback de cabecera usando los datos del primer producto
+      if (!userSnap.exists()) {
+        const primerProducto = snap.docs[0].data();
+        renderizarCabecera({
+          nombre: primerProducto.vendedor       || 'Vendedor UNP',
+          avatar: primerProducto.avatarVendedor || ''
+        });
+      }
+
+      // 3. Renderizar tarjetas
+      let html = '';
+      snap.forEach((documento) => {
+        html += construirTarjeta(documento.id, documento.data());
+      });
+      grid.innerHTML = html;
+
+    } catch (err) {
+      console.error('Error al cargar el perfil del vendedor:', err);
+      if (loadingMsg) {
+        loadingMsg.textContent = 'No se pudo cargar el perfil. Verifica tu conexión.';
+      }
+    }
+  }
+
+  cargar();
+</script>
+
+</body>
+</html>

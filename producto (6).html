@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Detalle — UNP Market</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body style="background: #f7f8fc;">
+<div class="app-shell" style="padding-bottom: 90px; position: relative;">
+
+  <div id="loading-screen" style="display:flex; justify-content:center; align-items:center; height:100vh; color:var(--text-mid); font-weight:800;">
+    Cargando producto...
+  </div>
+
+  <div id="product-content" style="display:none;">
+    
+    <div id="image-container" style="position: relative; width: 100%; height: 320px; background: #e8e8f0; overflow: hidden;">
+      <a href="index.html" style="position: absolute; top: 20px; left: 20px; z-index: 10; width: 40px; height: 40px; background: rgba(255,255,255,0.9); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-dark); text-decoration: none; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </a>
+      
+      <img id="det-imagen" src="" style="width: 100%; height: 100%; object-fit: cover;">
+      
+      <span id="det-categoria" style="position: absolute; bottom: 35px; left: 20px; background: rgba(0,0,0,0.6); color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase; backdrop-filter: blur(4px); z-index: 6;">
+        Categoría
+      </span>
+    </div>
+
+    <div style="background: white; border-radius: 30px 30px 0 0; margin-top: -30px; position: relative; z-index: 10; padding: 25px 20px;">
+      
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+        <h1 id="det-titulo" style="font-size: 1.35rem; font-weight: 900; color: var(--text-dark); margin: 0; line-height: 1.3;">Cargando...</h1>
+        <div style="background: #e6faf0; color: #16a34a; padding: 6px 12px; border-radius: 12px; font-weight: 900; font-size: 1.1rem; white-space: nowrap;">
+          S/ <span id="det-precio">0.00</span>
+        </div>
+      </div>
+
+      <div style="display: inline-flex; align-items: center; gap: 6px; background: #fffbeb; color: #d97706; padding: 5px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 800; margin-top: 12px;">
+        <span style="width: 6px; height: 6px; background: #f59e0b; border-radius: 50%;"></span> Verificado
+      </div>
+
+      <hr style="border: none; border-top: 1px solid #f1f3f5; margin: 20px 0;">
+
+      <div id="seller-container" style="background: #f7f8fc; border: 1.5px solid #e8e8f0; border-radius: 16px; padding: 12px 15px; display: flex; align-items: center; gap: 12px; cursor: pointer;">
+        <div id="seller-avatar" style="width: 44px; height: 44px; border-radius: 50%; background: #c8a97a; color: white; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 900; overflow: hidden;">
+          ?
+        </div>
+        <div style="flex: 1;">
+          <h3 id="seller-name" style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--text-dark);">Vendedor</h3>
+          <p style="margin: 0; font-size: 0.8rem; color: var(--text-mid); font-weight: 600;">Vendedor de la UNP</p>
+        </div>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid #f1f3f5; margin: 20px 0;">
+
+      <h2 style="font-size: 1.1rem; font-weight: 900; color: var(--text-dark); margin-bottom: 10px;">Descripción</h2>
+      <p id="det-desc" style="font-size: 0.95rem; color: var(--text-mid); line-height: 1.6; font-weight: 600; white-space: pre-wrap; margin: 0;"></p>
+
+      <!-- ── PILAR 1: Botón de compartir URL ─────────────────────── -->
+      <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #f1f3f5;">
+        <button id="btn-compartir" style="width:100%; background:#f7f8fc; color:#5c5c7a; border:1.5px solid #e8e8f0; border-radius:14px; padding:12px; font-size:0.9rem; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; font-family:'Nunito',sans-serif;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Compartir este producto
+        </button>
+      </div>
+      
+    </div>
+  </div>
+
+  <div style="position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: white; padding: 15px 20px; border-top: 1px solid #f1f3f5; display: flex; gap: 12px; z-index: 100; box-shadow: 0 -4px 20px rgba(0,0,0,0.03);">
+    
+    <button id="btn-favorito" style="width: 54px; height: 54px; background: white; border: 1.5px solid #e8e8f0; border-radius: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-mid); transition: all 0.2s;">
+      <svg id="icon-heart" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+    </button>
+    
+    <button id="btn-whatsapp" style="flex: 1; background: #3a7d44; color: white; border: none; border-radius: 14px; font-size: 1.05rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 15px rgba(58,125,68,0.3); transition: background 0.2s;">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+      Contactar por WhatsApp
+    </button>
+  </div>
+
+</div>
+
+<div id="toast-container" style="position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; flex-direction: column; gap: 8px; width: calc(100% - 40px); max-width: 390px; pointer-events: none;"></div>
+
+<script type="module">
+  import { db } from "./firebase.js";
+  import {
+    doc, getDoc, setDoc,
+    addDoc, collection, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+  
+  function mostrarToast(mensaje) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.style.cssText = `background: #1e293b; color: white; padding: 14px 18px; border-radius: 16px; font-size: 13.5px; font-weight: 700; box-shadow: 0 8px 20px rgba(0,0,0,0.15); text-align: center; animation: fadeIn 0.3s, fadeOutToast 0.3s 2.7s both;`;
+    toast.textContent = mensaje;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  async function enviarNotificacion({ paraUid, tipo, productoId, productoTitulo }) {
+    if (!paraUid) return;
+    const perfil = JSON.parse(localStorage.getItem('unp_user_profile')) || {};
+    if (perfil.uid === paraUid) return;
+    try {
+      await addDoc(collection(db, "notificaciones"), {
+        paraUid,
+        deUid:          perfil.uid    || "anon",
+        deNombre:       perfil.nombre || "Un usuario",
+        tipo,
+        productoId,
+        productoTitulo: productoTitulo || "un producto",
+        leido:          false,
+        timestamp:      serverTimestamp()
+      });
+    } catch (err) {
+      console.warn("Notificación no enviada:", err);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', async () => {
+
+    // ══════════════════════════════════════════════════════════════
+    //  PILAR 1 — LEER ID DESDE LA URL (no desde localStorage)
+    //
+    //  ANTES (roto para compartir):
+    //    const productId = localStorage.getItem('productoSeleccionado');
+    //
+    //  AHORA (compartible):
+    //    const productId = new URLSearchParams(window.location.search).get('id');
+    //
+    //  URLSearchParams es una API nativa del navegador que parsea
+    //  los parámetros de la URL. Para la URL:
+    //    producto.html?id=abc123
+    //  .get('id') devuelve exactamente "abc123".
+    //
+    //  RETROCOMPATIBILIDAD: Si por algún motivo alguien llega sin
+    //  el parámetro ?id= (un link viejo guardado), hacemos fallback
+    //  a localStorage. Esto garantiza cero regresión.
+    // ══════════════════════════════════════════════════════════════
+    const params    = new URLSearchParams(window.location.search);
+    const productId = params.get('id') || localStorage.getItem('productoSeleccionado');
+
+    if (!productId) {
+      window.location.href = 'index.html';
+      return;
+    }
+
+    // Actualizar la URL canónica si llegamos por localStorage (fallback)
+    // para que el usuario pueda compartir desde aquí en adelante
+    if (!params.get('id') && productId) {
+      history.replaceState(null, '', `producto.html?id=${productId}`);
+    }
+
+    try {
+      const docSnap = await getDoc(doc(db, "productos", productId));
+      if (docSnap.exists()) {
+        const p = docSnap.data();
+
+        // 1. Inyectar textos básicos con textContent (seguro contra XSS)
+        document.getElementById('det-titulo').textContent    = p.titulo;
+        document.getElementById('det-precio').textContent    = p.precio.toFixed(2);
+        document.getElementById('det-categoria').textContent = p.categoria;
+        document.getElementById('det-desc').textContent      = p.descripcion;
+        document.title = `${p.titulo} — UNP Market`;
+
+        // 2. Manejo de imagen
+        const emoji = {'dulces':'🍰','bebidas':'🥤','salados':'🍔','servicios':'🔧','materiales':'📚'}[(p.categoria || '').toLowerCase()] || '📦';
+        const imgEl = document.getElementById('det-imagen');
+        if (p.imagen && p.imagen.trim() !== "") {
+          imgEl.src = p.imagen;
+        } else {
+          imgEl.style.display = 'none';
+          imgEl.parentElement.style.background = 'linear-gradient(135deg,#c8a97a 0%,#a07850 100%)';
+          const emojiDiv = document.createElement('div');
+          emojiDiv.style.cssText = "position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:5rem;";
+          emojiDiv.textContent = emoji;
+          imgEl.parentElement.appendChild(emojiDiv);
+        }
+
+        // 3. VENDEDOR — siempre desde Firestore
+        const nombreVendedor = p.vendedor || "Vendedor UNP";
+        document.getElementById('seller-name').textContent = nombreVendedor;
+        const avatarBox = document.getElementById('seller-avatar');
+
+        if (p.avatarVendedor && p.avatarVendedor.trim() !== "") {
+          const avatarImg = document.createElement('img');
+          avatarImg.src = p.avatarVendedor;
+          avatarImg.style.cssText = "width:100%; height:100%; object-fit:cover;";
+          avatarBox.innerHTML = "";
+          avatarBox.appendChild(avatarImg);
+        } else {
+          avatarBox.textContent = nombreVendedor.charAt(0).toUpperCase();
+        }
+
+        // 4. Navegación al perfil público del vendedor
+        const sellerContainer = document.getElementById('seller-container');
+        if (sellerContainer && p.userUid) {
+          sellerContainer.addEventListener('click', () => {
+            window.location.href = 'vendedor.html?uid=' + p.userUid;
+          });
+        }
+
+        // 5. Lógica de Agotado y WhatsApp
+        const btnWpp = document.getElementById('btn-whatsapp');
+
+        if (p.estado === 'Agotado' || p.estado === 'agotado') {
+          btnWpp.style.background   = '#e8e8f0';
+          btnWpp.style.color        = '#a0a5b9';
+          btnWpp.style.boxShadow    = 'none';
+          btnWpp.style.cursor       = 'not-allowed';
+          btnWpp.disabled = true;
+          const svgAgotado = document.createElement('svg');
+          svgAgotado.setAttribute('viewBox', '0 0 24 24');
+          svgAgotado.setAttribute('width', '20');
+          svgAgotado.setAttribute('height', '20');
+          svgAgotado.setAttribute('fill', 'none');
+          svgAgotado.setAttribute('stroke', 'currentColor');
+          svgAgotado.setAttribute('stroke-width', '2.5');
+          svgAgotado.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>';
+          const textoAgotado = document.createTextNode(' Agotado');
+          btnWpp.innerHTML = '';
+          btnWpp.appendChild(svgAgotado);
+          btnWpp.appendChild(textoAgotado);
+
+          const imgContainer = document.getElementById('image-container');
+          if (imgContainer) {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = "position:absolute; inset:0; background:rgba(255,255,255,0.5); backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; z-index:5;";
+            const tag = document.createElement('span');
+            tag.style.cssText = "background:var(--text-dark); color:white; font-weight:900; padding:10px 24px; border-radius:20px; font-size:1.1rem; letter-spacing:1px; transform:rotate(-5deg); box-shadow:0 4px 15px rgba(0,0,0,0.2);";
+            tag.textContent = "AGOTADO";
+            overlay.appendChild(tag);
+            imgContainer.appendChild(overlay);
+          }
+
+        } else if (!p.telefono || p.telefono.trim().length < 9) {
+          btnWpp.style.background    = '#e8e8f0';
+          btnWpp.style.color         = '#a0a5b9';
+          btnWpp.style.boxShadow     = 'none';
+          btnWpp.style.cursor        = 'not-allowed';
+          btnWpp.style.pointerEvents = 'none';
+          btnWpp.disabled = true;
+          btnWpp.textContent = 'Vendedor sin WhatsApp';
+
+        } else {
+          btnWpp.addEventListener('click', async () => {
+            let numeroLimpio = p.telefono.replace(/\D/g, '');
+            const numeroFinal = numeroLimpio.startsWith('51') ? numeroLimpio : '51' + numeroLimpio;
+            const mensaje = `¡Hola ${nombreVendedor}! Vi tu publicación de "${p.titulo}" en UNP Market y me gustaría comprarlo.`;
+
+            window.open(`https://wa.me/${numeroFinal}?text=${encodeURIComponent(mensaje)}`, '_blank');
+
+            await enviarNotificacion({
+              paraUid:        p.userUid,
+              tipo:           "contacto",
+              productoId:     productId,
+              productoTitulo: p.titulo
+            });
+          });
+        }
+
+        // 6. Lógica de Favoritos
+        const btnFav    = document.getElementById('btn-favorito');
+        const iconHeart = document.getElementById('icon-heart');
+
+        const actualizarBotonFav = () => {
+          const favs   = JSON.parse(localStorage.getItem('listaFavoritos')) || [];
+          const activo = favs.includes(productId);
+          iconHeart.setAttribute('fill',   activo ? '#ef4444' : 'none');
+          iconHeart.setAttribute('stroke', activo ? '#ef4444' : 'currentColor');
+          btnFav.style.borderColor = activo ? '#ef4444' : '#e8e8f0';
+        };
+
+        actualizarBotonFav();
+
+        btnFav.addEventListener('click', async () => {
+          let favs     = JSON.parse(localStorage.getItem('listaFavoritos')) || [];
+          const eraFav = favs.includes(productId);
+
+          if (eraFav) {
+            favs = favs.filter(id => id !== productId);
+          } else {
+            favs.push(productId);
+          }
+
+          localStorage.setItem('listaFavoritos', JSON.stringify(favs));
+          actualizarBotonFav();
+          mostrarToast(eraFav ? 'Eliminado de favoritos' : '¡Guardado en favoritos! ❤️');
+
+          const perfil = JSON.parse(localStorage.getItem('unp_user_profile')) || {};
+          if (perfil.uid) {
+            try {
+              await setDoc(doc(db, 'usuarios', perfil.uid), { favoritos: favs }, { merge: true });
+            } catch (err) {
+              console.warn('Error al sincronizar favoritos:', err);
+            }
+          }
+
+          if (!eraFav) {
+            await enviarNotificacion({
+              paraUid:        p.userUid,
+              tipo:           "favorito",
+              productoId:     productId,
+              productoTitulo: p.titulo
+            });
+          }
+        });
+
+        // 7. PILAR 1: Botón "Compartir este producto"
+        //    Usa la Web Share API si está disponible (móvil nativo),
+        //    con fallback a copiar el URL al portapapeles.
+        const btnCompartir = document.getElementById('btn-compartir');
+        if (btnCompartir) {
+          btnCompartir.addEventListener('click', async () => {
+            const urlCompartir = window.location.href; // Ya tiene ?id= gracias al Pilar 1
+            const textoCompartir = {
+              title: `${p.titulo} — UNP Market`,
+              text:  `Mira este producto en UNP Market: ${p.titulo} a S/ ${p.precio.toFixed(2)}`,
+              url:   urlCompartir
+            };
+
+            if (navigator.share) {
+              // Web Share API: abre el menú nativo de compartir del móvil
+              try {
+                await navigator.share(textoCompartir);
+              } catch (err) {
+                // El usuario canceló el share — no es un error real
+                if (err.name !== 'AbortError') console.warn(err);
+              }
+            } else {
+              // Fallback: copiar URL al portapapeles
+              try {
+                await navigator.clipboard.writeText(urlCompartir);
+                mostrarToast('¡Link copiado al portapapeles! 🔗');
+              } catch {
+                mostrarToast('Copia este link: ' + urlCompartir);
+              }
+            }
+          });
+        }
+
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('product-content').style.display = 'block';
+
+      } else {
+        alert("El producto ya no existe.");
+        window.location.href = 'index.html';
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error al cargar producto.");
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,2766 @@
+/* ============================================
+   UNP Market — styles.css
+   Mobile-first · Pure CSS · No frameworks
+   ============================================ */
+
+/* ── Reset & base ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --green-primary: #3a7d44;
+  --yellow-accent:  #f5a623;
+  --text-dark:      #1a1a2e;
+  --text-mid:       #5c5c7a;
+  --text-light:     #a0a0b8;
+  --bg-app:         #f7f8fc;
+  --bg-white:       #ffffff;
+  --border-subtle:  #e8e8f0;
+  --shadow-card:    0 4px 16px rgba(0,0,0,.08);
+  --shadow-btn:     0 2px 8px  rgba(0,0,0,.10);
+  --radius-search:  14px;
+  --radius-chip:    14px;
+  --font:           'Nunito', sans-serif;
+}
+
+html, body {
+  font-family: var(--font);
+  background: var(--bg-app);
+  color: var(--text-dark);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── App shell — keeps it phone-width on desktop ── */
+.app-shell {
+  max-width: 430px;
+  margin: 0 auto;
+  background: var(--bg-white);
+  min-height: 100vh;
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+  position: relative;
+
+}
+
+/* ════════════════════════════════════════════
+   CABECERA
+   ════════════════════════════════════════════ */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 10px;
+  background: var(--bg-white);
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.logo-unp {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--green-primary);
+  letter-spacing: -.5px;
+}
+
+.logo-market {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--yellow-accent);
+  letter-spacing: -.5px;
+}
+
+/* Icon buttons */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: var(--bg-app);
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: background 0.18s, transform 0.12s;
+}
+
+.icon-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-btn:hover {
+  background: #ecedf5;
+}
+
+.icon-btn:active {
+  transform: scale(0.93);
+}
+
+/* Notification dot */
+.notif-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff4d6d;
+  border: 2px solid var(--bg-white);
+}
+
+/* ════════════════════════════════════════════
+   BARRA DE BÚSQUEDA
+   ════════════════════════════════════════════ */
+.search-wrapper {
+  padding: 8px 20px 12px;
+  background: var(--bg-white);
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-app);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-search);
+  padding: 11px 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-bar:focus-within {
+  border-color: var(--green-primary);
+  box-shadow: 0 0 0 3px rgba(58, 125, 68, 0.12);
+}
+
+.search-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--text-light);
+}
+
+.search-bar input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-dark);
+  outline: none;
+}
+
+.search-bar input::placeholder {
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+/* ════════════════════════════════════════════
+   CATEGORÍAS — scroll horizontal
+   ════════════════════════════════════════════ */
+.categories-scroll {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 20px 18px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  /* hide scrollbar */
+  scrollbar-width: none;
+}
+
+.categories-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Individual chip ── */
+.category-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s;
+}
+
+.category-chip:active {
+  transform: scale(0.92);
+}
+
+/* Emoji circle */
+.chip-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  font-size: 26px;
+  line-height: 1;
+  transition: box-shadow 0.18s, transform 0.18s;
+  /* subtle inner border */
+  border: 1.5px solid rgba(0,0,0,.05);
+}
+
+.category-chip:hover .chip-icon {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,.13);
+}
+
+/* Active state — green underline dot */
+.chip-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-mid);
+  letter-spacing: 0.1px;
+  position: relative;
+  padding-bottom: 2px;
+  transition: color 0.18s;
+}
+
+.category-chip.active .chip-label {
+  color: var(--green-primary);
+}
+
+.category-chip.active .chip-label::after {
+  content: '';
+  display: block;
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--green-primary);
+  margin: 3px auto 0;
+}
+
+.category-chip.active .chip-icon {
+  box-shadow: 0 4px 14px rgba(58, 125, 68, .22);
+}
+
+/* ════════════════════════════════════════════
+   Animations — fade + slide in on load
+   ════════════════════════════════════════════ */
+.header,
+.search-wrapper,
+.categories-scroll {
+  animation: fadeUp 0.35s ease both;
+}
+
+.search-wrapper   { animation-delay: 0.06s; }
+.categories-scroll { animation-delay: 0.12s; }
+
+.category-chip {
+  animation: fadeUp 0.32s ease both;
+}
+.category-chip:nth-child(1) { animation-delay: 0.15s; }
+.category-chip:nth-child(2) { animation-delay: 0.20s; }
+.category-chip:nth-child(3) { animation-delay: 0.25s; }
+.category-chip:nth-child(4) { animation-delay: 0.30s; }
+.category-chip:nth-child(5) { animation-delay: 0.35s; }
+
+
+/* ════════════════════════════════════════════
+   CATÁLOGO DE PRODUCTOS
+   ════════════════════════════════════════════ */
+
+/* ── Encabezado de sección ── */
+.catalog {
+  padding: 4px 16px 32px;
+  background: var(--bg-app);
+}
+
+.catalog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 4px 12px;
+}
+
+.catalog-title {
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--text-dark);
+  letter-spacing: -.3px;
+}
+
+.catalog-see-all {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green-primary);
+  text-decoration: none;
+  opacity: .85;
+  transition: opacity .15s;
+}
+.catalog-see-all:hover { opacity: 1; }
+
+/* ── Grid 2 columnas ── */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+/* ════════════════════════════════════════════
+   TARJETA DE PRODUCTO
+   ════════════════════════════════════════════ */
+.product-card {
+  background: var(--bg-white);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05);
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease;
+  animation: fadeUp .38s ease both;
+}
+
+.product-card:nth-child(1) { animation-delay: .10s; }
+.product-card:nth-child(2) { animation-delay: .18s; }
+.product-card:nth-child(3) { animation-delay: .26s; }
+.product-card:nth-child(4) { animation-delay: .34s; }
+
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 28px rgba(0,0,0,.13);
+}
+
+.product-card:active {
+  transform: translateY(-1px) scale(.98);
+}
+
+/* ── Imagen + overlays ── */
+.card-image-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;       /* cuadrada, igual a la app */
+  overflow: hidden;
+  border-radius: 18px 18px 0 0;
+}
+
+.card-img {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* Patrón de puntos sutil como textura de fondo */
+.img-placeholder-pattern {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,.12) 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+
+/* Emoji central del placeholder */
+.img-placeholder-icon {
+  font-size: 42px;
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,.25));
+  position: relative;
+  z-index: 1;
+  transition: transform .25s ease;
+}
+.product-card:hover .img-placeholder-icon {
+  transform: scale(1.12);
+}
+
+/* ── Badge precio — esquina superior derecha ── */
+.badge-price {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  background: rgba(255,255,255,.96);
+  color: var(--text-dark);
+  font-size: 11.5px;
+  font-weight: 900;
+  padding: 3px 8px;
+  border-radius: 20px;
+  letter-spacing: -.2px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.14);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* ── Badge tag — esquina inferior izquierda ── */
+.badge-tag {
+  position: absolute;
+  bottom: 9px;
+  left: 9px;
+  background: rgba(26,26,46,.72);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  letter-spacing: .2px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  white-space: nowrap;
+}
+
+/* ── Cuerpo de la tarjeta ── */
+.card-body {
+  padding: 10px 11px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.card-title {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--text-dark);
+  line-height: 1.35;
+  letter-spacing: -.15px;
+  /* máximo 2 líneas con ellipsis */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Fila vendedor + rating ── */
+.card-seller {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+/* Avatar circular con inicial */
+.seller-avatar {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--text-dark);
+  border: 1.5px solid rgba(0,0,0,.06);
+}
+
+.seller-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.seller-name {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seller-location {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--text-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seller-location svg {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  color: var(--green-primary);
+}
+
+/* ── Rating ── */
+.card-rating {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.star-icon {
+  width: 11px;
+  height: 11px;
+  fill: #f5a623;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);     }
+}
+
+
+
+/* ════════════════════════════════════════════
+   PADDING EXTRA al catálogo — evita que la
+   barra fija tape las últimas tarjetas
+   ════════════════════════════════════════════ */
+.catalog {
+  padding-bottom: 96px;
+}
+
+/* ════════════════════════════════════════════
+   BARRA DE NAVEGACIÓN INFERIOR
+   ════════════════════════════════════════════ */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;          /* <-- NUEVO */
+  right: 0;         /* <-- NUEVO */
+  margin: 0 auto;   /* <-- NUEVO */
+  width: 100%;
+  max-width: 430px;
+  height: 68px;
+  background: var(--bg-white);
+  box-shadow: 0 -4px 20px rgba(0,0,0,.09), 0 -1px 4px rgba(0,0,0,.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 8px env(safe-area-inset-bottom, 0px);
+  z-index: 100;
+  animation: fadeUp .4s ease .25s both;
+}
+
+/* ── Ítem genérico ── */
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 1;
+  height: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: var(--text-light);
+  transition: color .18s, transform .14s;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-item:active { transform: scale(.88); }
+
+.nav-item svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke .18s;
+}
+
+.nav-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1px;
+}
+
+/* ── Estado activo ── */
+.nav-item.active { color: var(--green-primary); }
+
+.nav-item.active .nav-label {
+  position: relative;
+}
+.nav-item.active .nav-label::after {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--green-primary);
+  margin: 2px auto 0;
+}
+
+/* ── Botón central "+" ── */
+.nav-item.nav-add {
+  flex: 1.1;
+  color: var(--text-light);
+}
+
+.nav-add-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--green-primary);
+  box-shadow: 0 6px 20px rgba(58,125,68,.45);
+  margin-top: -20px;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.nav-add-circle svg {
+  width: 26px;
+  height: 26px;
+  stroke: #fff;
+  stroke-width: 2.8;
+}
+
+.nav-item.nav-add:hover .nav-add-circle {
+  transform: scale(1.08) translateY(-3px);
+  box-shadow: 0 10px 28px rgba(58,125,68,.50);
+}
+
+.nav-item.nav-add:active .nav-add-circle {
+  transform: scale(.93);
+}
+/* ════════════════════════════════════════════
+   PERFIL DEL VENDEDOR — clases nuevas
+   Agregar al final de styles.css
+   ════════════════════════════════════════════ */
+ 
+/* ── Cabecera de perfil ── */
+.profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 12px;
+  background: var(--bg-white);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--border-subtle);
+  animation: fadeUp .3s ease both;
+}
+ 
+.profile-header-title {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text-dark);
+  letter-spacing: -.3px;
+  /* centrado real cuando los botones tienen el mismo ancho */
+  flex: 1;
+  text-align: center;
+}
+ 
+/* ── Sección central del perfil ── */
+.seller-info-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 28px 24px 20px;
+  gap: 10px;
+  animation: fadeUp .35s ease .06s both;
+}
+ 
+/* Avatar grande con puntito online */
+.seller-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  margin-bottom: 4px;
+}
+ 
+.seller-avatar-lg {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c8a97a 0%, #a07850 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -.5px;
+  box-shadow: 0 6px 24px rgba(160,120,80,.30);
+  border: 3px solid var(--bg-white);
+}
+ 
+.online-dot {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 3px solid var(--bg-white);
+  box-shadow: 0 2px 6px rgba(34,197,94,.40);
+}
+ 
+/* Nombre del vendedor */
+.seller-name-lg {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--text-dark);
+  letter-spacing: -.4px;
+  line-height: 1.2;
+}
+ 
+/* Badge "Disponible Ahora" */
+.badge-available {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 12.5px;
+  font-weight: 800;
+  padding: 5px 14px;
+  border-radius: 20px;
+  letter-spacing: .1px;
+}
+ 
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  /* pulso de disponibilidad */
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+ 
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .6; transform: scale(1.3); }
+}
+ 
+/* Biografía */
+.seller-bio {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-mid);
+  line-height: 1.6;
+  max-width: 280px;
+}
+ 
+/* Fila de estrellas + puntuación */
+.seller-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+ 
+.stars-group {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+ 
+.star {
+  width: 17px;
+  height: 17px;
+}
+ 
+.star.filled {
+  fill: var(--yellow-accent);
+}
+ 
+.star.empty {
+  fill: none;
+  stroke: var(--yellow-accent);
+  stroke-width: 1.5;
+}
+ 
+/* Media estrella */
+.star-half-wrap {
+  position: relative;
+  display: inline-block;
+  width: 17px;
+  height: 17px;
+}
+ 
+.rating-score {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--text-dark);
+  letter-spacing: -.2px;
+}
+ 
+.rating-count {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-light);
+}
+ 
+/* ── Botón CTA WhatsApp ── */
+.cta-wrap {
+  padding: 4px 20px 24px;
+  animation: fadeUp .38s ease .10s both;
+}
+ 
+.btn-whatsapp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 15px 20px;
+  background: var(--green-primary);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -.1px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 6px 20px rgba(58,125,68,.38);
+  transition: transform .18s ease, box-shadow .18s ease, background .15s;
+}
+ 
+.btn-whatsapp:hover {
+  background: #2d6535;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(58,125,68,.46);
+}
+ 
+.btn-whatsapp:active {
+  transform: translateY(0) scale(.97);
+  box-shadow: 0 4px 12px rgba(58,125,68,.30);
+}
+ 
+.whatsapp-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+ 
+/* ── Catálogo en perfil: quita fondo gris del .catalog base ── */
+.catalog--profile {
+  background: var(--bg-white);
+  padding-top: 0;
+  animation: fadeUp .4s ease .14s both;
+}
+/* ════════════════════════════════════════════
+   MODAL / BOTTOM SHEET (REVISADO)
+   ════════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 999;
+  /* Ya no dependemos de flex en el padre para posicionarlo */
+  display: block; 
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+/* Esta clase es la que JavaScript encenderá y apagará */
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bottom-sheet {
+  background: var(--bg-white);
+  width: 100%;
+  max-width: 430px;
+  border-radius: 24px 24px 0 0;
+  padding: 24px 20px 40px;
+  
+  /* --- SOLUCIÓN DEL POSICIONAMIENTO AL FONDO --- */
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  /* Centrado horizontalmente y oculto hacia abajo */
+  transform: translateX(-50%) translateY(100%); 
+  /* ------------------------------------------- */
+  
+  /* Animación con rebote sutil */
+  transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Actualizamos el estado activo para que se deslice centrado */
+.modal-overlay.active .bottom-sheet {
+  transform: translateX(-50%) translateY(0);
+}
+
+.sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.sheet-header h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+.close-sheet {
+  background: none;
+  border: none;
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--text-light);
+  cursor: pointer;
+}
+
+.sheet-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.option-btn {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--bg-app);
+  border: 2px solid transparent;
+  border-radius: 16px;
+  padding: 16px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  text-align: left;
+}
+
+.option-btn:hover, .option-btn:active {
+  background: #f0fdf4;
+  border-color: var(--green-primary);
+}
+
+.option-icon { font-size: 24px; }
+.option-text { font-size: 15px; font-weight: 700; color: var(--text-dark); }
+
+/* ════════════════════════════════════════════
+   PANTALLA: NUEVA PUBLICACIÓN (publicar.html)
+   Solo clases nuevas — asume variables base
+   ════════════════════════════════════════════ */
+ 
+/* ── Scroll area entre header y CTA fijo ── */
+.publish-scroll {
+  overflow-y: auto;
+  /* deja espacio para el CTA fijo (72px) + margen */
+  padding-bottom: 96px;
+  animation: fadeUp .32s ease .05s both;
+}
+ 
+/* ════════════════════════════════════════════
+   ÁREA DE CARGA DE FOTO
+   ════════════════════════════════════════════ */
+.photo-upload-area {
+  margin: 20px 20px 0;
+  border: 2px dashed #c8cad8;
+  border-radius: 20px;
+  background: #f7f8fc;
+  min-height: 172px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s, background .2s, transform .15s;
+}
+ 
+.photo-upload-area:hover,
+.photo-upload-area:focus-visible {
+  border-color: var(--green-primary);
+  background: #f0f7f1;
+  outline: none;
+}
+ 
+.photo-upload-area:active {
+  transform: scale(.985);
+}
+ 
+.photo-upload-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 20px;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+ 
+.photo-icon-circle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--bg-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 14px rgba(0,0,0,.09);
+  margin-bottom: 2px;
+}
+ 
+.photo-icon-circle svg {
+  width: 26px;
+  height: 26px;
+  color: var(--green-primary);
+}
+ 
+.photo-upload-label {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+ 
+.photo-upload-hint {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-light);
+}
+ 
+/* Input file oculto — activado por JS */
+.photo-file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  pointer-events: none; /* manejado por JS para evitar doble click */
+}
+ 
+/* ════════════════════════════════════════════
+   FORMULARIO
+   ════════════════════════════════════════════ */
+.publish-form {
+  padding: 24px 20px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+ 
+/* ── Grupo de campo ── */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+ 
+.form-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-dark);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -.1px;
+}
+ 
+.label-optional {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-light);
+  font-style: italic;
+}
+ 
+/* ── Wrapper de input con ícono ── */
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--bg-app);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 14px;
+  transition: border-color .2s, box-shadow .2s;
+}
+ 
+.input-wrap:focus-within {
+  border-color: var(--green-primary);
+  box-shadow: 0 0 0 3px rgba(58,125,68,.11);
+  background: var(--bg-white);
+}
+ 
+/* Ícono izquierdo */
+.input-icon {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  margin-left: 14px;
+  color: var(--text-light);
+  transition: color .2s;
+}
+ 
+.input-wrap:focus-within .input-icon {
+  color: var(--green-primary);
+}
+ 
+/* Prefijo S/ */
+.input-prefix {
+  flex-shrink: 0;
+  padding: 0 4px 0 16px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-mid);
+  pointer-events: none;
+}
+ 
+/* ── Campos de texto base ── */
+.form-input,
+.form-select,
+.form-textarea {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dark);
+  outline: none;
+  padding: 13px 14px;
+}
+ 
+.form-input::placeholder,
+.form-textarea::placeholder {
+  color: var(--text-light);
+  font-weight: 500;
+}
+ 
+.form-input--has-prefix {
+  padding-left: 4px;
+}
+ 
+/* ── Select ── */
+.input-wrap--select {
+  cursor: pointer;
+}
+ 
+.form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  padding-right: 40px; /* espacio para la flecha custom */
+}
+ 
+.select-arrow {
+  position: absolute;
+  right: 13px;
+  width: 17px;
+  height: 17px;
+  color: var(--text-light);
+  pointer-events: none;
+  transition: color .2s, transform .2s;
+}
+ 
+.input-wrap--select:focus-within .select-arrow {
+  color: var(--green-primary);
+  transform: rotate(180deg);
+}
+ 
+/* ── Textarea ── */
+.input-wrap--textarea {
+  align-items: flex-start;
+  flex-direction: column;
+  padding: 0;
+}
+ 
+.form-textarea {
+  width: 100%;
+  resize: none;
+  line-height: 1.55;
+  border-radius: 14px;
+  padding: 13px 14px 10px;
+}
+ 
+.char-count {
+  align-self: flex-end;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-light);
+  padding: 0 14px 10px;
+  transition: color .2s;
+}
+ 
+.char-count--warn {
+  color: #e05d44;
+}
+ 
+/* ── Tips de ayuda ── */
+.publish-tips {
+  background: #f0f7f1;
+  border-left: 3.5px solid var(--green-primary);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+ 
+.tips-title {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--green-primary);
+}
+ 
+.tips-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+ 
+.tips-list li {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mid);
+  padding-left: 14px;
+  position: relative;
+  line-height: 1.45;
+}
+ 
+.tips-list li::before {
+  content: '·';
+  position: absolute;
+  left: 4px;
+  color: var(--green-primary);
+  font-weight: 900;
+}
+ 
+/* ════════════════════════════════════════════
+   BOTÓN CTA FIJO
+   ════════════════════════════════════════════ */
+.publish-cta-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  padding: 12px 20px env(safe-area-inset-bottom, 12px);
+  background: linear-gradient(to top, var(--bg-white) 70%, transparent);
+  z-index: 50;
+}
+ 
+.btn-publish {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 16px 20px;
+  background: var(--green-primary);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: .1px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  box-shadow: 0 6px 22px rgba(58,125,68,.40);
+  transition: transform .18s ease, box-shadow .18s ease, background .15s;
+}
+ 
+.btn-publish-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+ 
+.btn-publish:hover {
+  background: #2d6535;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(58,125,68,.48);
+}
+ 
+.btn-publish:active {
+  transform: scale(.97);
+  box-shadow: 0 3px 12px rgba(58,125,68,.28);
+}
+
+/* ════════════════════════════════════════════
+   PANTALLA: DETALLE DE PRODUCTO (producto.html)
+   Solo clases nuevas — asume variables base
+   ════════════════════════════════════════════ */
+ 
+/* Body sin fondo gris, la imagen ocupa el tope */
+.product-page {
+  background: var(--bg-white);
+}
+ 
+/* ════════════════════════════════════════════
+   CABECERA FLOTANTE
+   ════════════════════════════════════════════ */
+.pd-floating-header {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  padding: 52px 16px 12px; /* 52px = status bar space */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 50;
+  /* Se vuelve opaca cuando el usuario hace scroll — gestionado via JS inline abajo */
+  pointer-events: none;
+}
+ 
+.pd-floating-header > *,
+.pd-floating-header .pd-header-right > * {
+  pointer-events: auto;
+}
+ 
+.pd-header-right {
+  display: flex;
+  gap: 8px;
+}
+ 
+/* Botones circulares con glassmorphism */
+.pd-circle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 2px 12px rgba(0,0,0,.18);
+  color: var(--text-dark);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .18s, transform .14s, box-shadow .18s;
+}
+ 
+.pd-circle-btn svg {
+  width: 18px;
+  height: 18px;
+}
+ 
+.pd-circle-btn:hover {
+  background: rgba(255,255,255,.98);
+  box-shadow: 0 4px 18px rgba(0,0,0,.22);
+}
+ 
+.pd-circle-btn:active {
+  transform: scale(.90);
+}
+ 
+/* ════════════════════════════════════════════
+   IMAGEN HERO (40vh)
+   ════════════════════════════════════════════ */
+.pd-hero-image {
+  width: 100%;
+  height: 40vh;
+  min-height: 240px;
+  max-height: 320px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  /* Si hubiera una imagen real: background-image: url(...); background-size: cover; */
+}
+ 
+.pd-hero-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, #c8a97a 0%, #8a5c2e 60%, #5c3010 100%);
+}
+ 
+/* Patrón de textura sutil */
+.pd-hero-gradient::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,.10) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+ 
+.pd-hero-emoji {
+  font-size: 72px;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 8px 24px rgba(0,0,0,.35));
+  animation: floatEmoji 3.5s ease-in-out infinite;
+}
+ 
+@keyframes floatEmoji {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+ 
+/* Badge de categoría sobre la imagen */
+.pd-hero-category {
+  position: absolute;
+  bottom: 70px; /* queda visible sobre la hoja blanca */
+  left: 16px;
+  background: rgba(255,255,255,.22);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 20px;
+  letter-spacing: .3px;
+  border: 1px solid rgba(255,255,255,.30);
+}
+ 
+/* ════════════════════════════════════════════
+   HOJA DE INFORMACIÓN (se superpone a la foto)
+   ════════════════════════════════════════════ */
+.pd-info-sheet {
+  position: relative;
+  z-index: 10;
+  background: var(--bg-white);
+  border-radius: 28px 28px 0 0;
+  margin-top: -32px;      /* superposición sobre la imagen */
+  padding: 26px 20px 0;
+  min-height: calc(100vh - 40vh + 32px);
+  box-shadow: 0 -6px 24px rgba(0,0,0,.10);
+  animation: sheetUp .38s cubic-bezier(.22,.68,0,1.2) both;
+}
+ 
+@keyframes sheetUp {
+  from { transform: translateY(24px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+ 
+/* ── Filas genéricas ── */
+.pd-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+ 
+/* ── Fila 1: Título + Precio ── */
+.pd-title-row {
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+ 
+.pd-product-title {
+  font-size: 19px;
+  font-weight: 900;
+  color: var(--text-dark);
+  line-height: 1.25;
+  letter-spacing: -.4px;
+  flex: 1;
+  padding-right: 8px;
+}
+ 
+.pd-price-block {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  flex-shrink: 0;
+  background: #f0faf2;
+  border-radius: 12px;
+  padding: 6px 12px 6px 10px;
+}
+ 
+.pd-price-currency {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--green-primary);
+}
+ 
+.pd-price-amount {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--green-primary);
+  letter-spacing: -.5px;
+  line-height: 1;
+}
+ 
+/* ── Fila 2: Tags ── */
+.pd-tags-row {
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+ 
+.pd-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 20px;
+  letter-spacing: .1px;
+}
+ 
+.pd-tag svg {
+  width: 12px;
+  height: 12px;
+}
+ 
+.pd-tag--fresh {
+  background: #fff7e6;
+  color: #9a5a00;
+}
+ 
+.pd-tag-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--yellow-accent);
+  flex-shrink: 0;
+}
+ 
+.pd-tag--cat {
+  background: var(--bg-app);
+  color: var(--text-mid);
+}
+ 
+/* ── Separador ── */
+.pd-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 4px 0 16px;
+}
+ 
+/* ── Fila 3: Tarjeta vendedor ── */
+.pd-seller-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-app);
+  border-radius: 16px;
+  padding: 12px 14px;
+  text-decoration: none;
+  margin-bottom: 18px;
+  border: 1.5px solid var(--border-subtle);
+  transition: background .18s, border-color .18s, transform .14s;
+}
+ 
+.pd-seller-card:hover {
+  background: #f0f7f1;
+  border-color: rgba(58,125,68,.3);
+}
+ 
+.pd-seller-card:active {
+  transform: scale(.98);
+}
+ 
+.pd-seller-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c8a97a, #a07850);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 900;
+  color: #fff;
+  flex-shrink: 0;
+}
+ 
+.pd-seller-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+ 
+.pd-seller-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+ 
+.pd-seller-meta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-light);
+}
+ 
+.pd-seller-meta svg {
+  width: 10px;
+  height: 10px;
+  color: var(--green-primary);
+}
+ 
+.pd-seller-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+ 
+.pd-seller-rating {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12.5px;
+  font-weight: 900;
+  color: var(--text-dark);
+}
+ 
+.pd-seller-rating svg {
+  width: 13px;
+  height: 13px;
+  fill: var(--yellow-accent);
+}
+ 
+.pd-seller-reviews {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-light);
+}
+ 
+.pd-seller-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+ 
+/* ── Fila 4: Descripción ── */
+.pd-description-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+ 
+.pd-section-title {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--text-dark);
+  letter-spacing: -.2px;
+}
+ 
+.pd-description-text {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-mid);
+  line-height: 1.65;
+}
+ 
+/* Grid de detalles rápidos */
+.pd-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+ 
+.pd-detail-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-app);
+  border-radius: 14px;
+  padding: 12px 12px;
+  border: 1.5px solid var(--border-subtle);
+}
+ 
+.pd-detail-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+ 
+.pd-detail-chip > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+ 
+.pd-detail-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+ 
+.pd-detail-value {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+ 
+/* ════════════════════════════════════════════
+   BARRA DE ACCIÓN FIJA
+   ════════════════════════════════════════════ */
+.pd-cta-bar {
+  position: sticky; /* Cambiamos fixed por sticky */
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 20px 30px;
+  background: white;
+  border-top: 1px solid var(--border-subtle);
+  z-index: 100;
+  margin-top: -80px; /* Esto hace que flote sobre el contenido final */
+}
+ 
+/* Botón wishlist (corazón) */
+.pd-btn-wishlist {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  border: 2px solid var(--border-subtle);
+  background: var(--bg-white);
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: border-color .18s, color .18s, transform .14s, background .18s;
+  box-shadow: 0 2px 10px rgba(0,0,0,.07);
+}
+ 
+.pd-btn-wishlist svg {
+  width: 22px;
+  height: 22px;
+}
+ 
+.pd-btn-wishlist:hover {
+  border-color: #ff6b8a;
+  color: #ff6b8a;
+  background: #fff5f7;
+}
+ 
+.pd-btn-wishlist:active {
+  transform: scale(.90);
+}
+ 
+/* Botón WhatsApp principal */
+.pd-btn-whatsapp {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 15px 16px;
+  background: var(--green-primary);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 900;
+  border-radius: 16px;
+  text-decoration: none;
+  box-shadow: 0 6px 22px rgba(58,125,68,.40);
+  letter-spacing: -.1px;
+  transition: background .15s, transform .18s, box-shadow .18s;
+}
+ 
+.pd-wa-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+ 
+.pd-btn-whatsapp:hover {
+  background: #2d6535;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(58,125,68,.46);
+}
+ 
+.pd-btn-whatsapp:active {
+  transform: scale(.97);
+  box-shadow: 0 3px 12px rgba(58,125,68,.28);
+}
+  
+/* ════════════════════════════════════════════
+   PANTALLA: PERFIL DEL USUARIO (perfil-usuario.html)
+   Solo clases nuevas — asume variables base
+   ════════════════════════════════════════════ */
+ 
+/* ════════════════════════════════════════════
+   HEADER CON GRADIENTE
+   ════════════════════════════════════════════ */
+.up-header {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 56px 20px 28px;
+  background: linear-gradient(160deg, #2d6535 0%, #3a7d44 45%, #5aaa64 100%);
+  text-align: center;
+  overflow: hidden;
+}
+ 
+/* Círculos decorativos de fondo */
+.up-header::before,
+.up-header::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,.07);
+  pointer-events: none;
+}
+.up-header::before {
+  width: 220px; height: 220px;
+  top: -80px; right: -60px;
+}
+.up-header::after {
+  width: 160px; height: 160px;
+  bottom: -40px; left: -50px;
+}
+ 
+/* ── Botones de acción (atrás / configuración) ── */
+.up-header-actions {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 2;
+}
+ 
+.up-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,.20);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .18s, transform .14s;
+}
+ 
+.up-action-btn svg { width: 18px; height: 18px; }
+ 
+.up-action-btn:hover  { background: rgba(255,255,255,.32); }
+.up-action-btn:active { transform: scale(.90); }
+ 
+/* ── Avatar ── */
+.up-avatar-wrap {
+  position: relative;
+  margin-bottom: 14px;
+  z-index: 1;
+}
+ 
+.up-avatar {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4a7a8a 0%, #2c5060 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 38px;
+  font-weight: 900;
+  color: #fff;
+  border: 4px solid rgba(255,255,255,.90);
+  box-shadow: 0 8px 28px rgba(0,0,0,.28);
+  letter-spacing: -.5px;
+}
+ 
+.up-avatar-edit {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255,255,255,.9);
+  background: var(--yellow-accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform .15s;
+}
+ 
+.up-avatar-edit svg { width: 12px; height: 12px; }
+.up-avatar-edit:hover { transform: scale(1.12); }
+ 
+/* ── Nombre y bio ── */
+.up-name {
+  font-size: 20px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -.4px;
+  line-height: 1.2;
+  margin-bottom: 5px;
+  z-index: 1;
+}
+ 
+.up-bio {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(255,255,255,.80);
+  line-height: 1.5;
+  max-width: 260px;
+  margin-bottom: 12px;
+  z-index: 1;
+}
+ 
+/* Badge verificado */
+.up-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255,255,255,.18);
+  border: 1px solid rgba(255,255,255,.30);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 20px;
+  letter-spacing: .2px;
+  z-index: 1;
+}
+ 
+.up-verified-badge svg {
+  width: 11px;
+  height: 11px;
+  stroke: #fff;
+}
+ 
+/* ════════════════════════════════════════════
+   GRID DE STATS
+   ════════════════════════════════════════════ */
+.up-stats-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 18px 20px;
+  background: var(--bg-white);
+  border-bottom: 1px solid var(--border-subtle);
+  animation: fadeUp .32s ease .05s both;
+}
+ 
+.up-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+}
+ 
+.up-stat-value {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--text-dark);
+  letter-spacing: -.4px;
+  line-height: 1;
+}
+ 
+.up-stat-value--location {
+  font-size: 14px;
+}
+ 
+.up-stat-value--location svg {
+  width: 22px;
+  height: 22px;
+  color: var(--green-primary);
+}
+ 
+.up-stat-star {
+  width: 16px;
+  height: 16px;
+  fill: var(--yellow-accent);
+}
+ 
+.up-stat-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-light);
+  letter-spacing: .1px;
+  text-align: center;
+}
+ 
+.up-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+}
+ 
+/* ════════════════════════════════════════════
+   TABS
+   ════════════════════════════════════════════ */
+.up-tabs {
+  display: flex;
+  background: var(--bg-white);
+  border-bottom: 2px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  animation: fadeUp .32s ease .08s both;
+}
+ 
+.up-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 14px 12px;
+  background: none;
+  border: none;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-light);
+  cursor: pointer;
+  position: relative;
+  transition: color .18s;
+  -webkit-tap-highlight-color: transparent;
+}
+ 
+.up-tab svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+ 
+/* Indicador activo */
+.up-tab--active {
+  color: var(--green-primary);
+}
+ 
+.up-tab--active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 16px;
+  right: 16px;
+  height: 2.5px;
+  border-radius: 2px 2px 0 0;
+  background: var(--green-primary);
+}
+ 
+/* ════════════════════════════════════════════
+   PANELES DE TABS
+   ════════════════════════════════════════════ */
+.up-tab-panel {
+  animation: fadeUp .28s ease both;
+}
+ 
+.up-tab-panel--hidden {
+  display: none;
+}
+ 
+/* ════════════════════════════════════════════
+   MENÚ CONTEXTUAL DE CONFIGURACIÓN
+   ════════════════════════════════════════════ */
+.up-settings-menu {
+  position: fixed;
+  top: 60px;
+  right: calc(50% - 215px);   /* alineado al borde derecho del app-shell */
+  width: 200px;
+  background: var(--bg-white);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.10);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  z-index: 200;
+  /* oculto por defecto */
+  opacity: 0;
+  transform: translateY(-8px) scale(.95);
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+ 
+.up-settings-menu--open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+ 
+.up-settings-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 16px;
+  background: none;
+  border: none;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  cursor: pointer;
+  text-align: left;
+  transition: background .15s;
+}
+ 
+.up-settings-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--text-mid);
+}
+ 
+.up-settings-item:hover { background: var(--bg-app); }
+ 
+.up-settings-item--danger       { color: #dc2626; }
+.up-settings-item--danger svg   { color: #dc2626; }
+.up-settings-item--danger:hover { background: #fff5f5; }
+ 
+.up-settings-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 2px 0;
+}
+ /* ════════════════════════════════════════════
+   PANTALLA: MENSAJES / CHAT (mensajes.html)
+   Solo clases nuevas — asume variables base
+   ════════════════════════════════════════════ */
+ 
+/* ── Cabecera del chat ── */
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  background: var(--bg-white);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  animation: fadeUp .28s ease both;
+}
+ 
+.chat-header-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+ 
+.chat-header-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c8a97a, #a07850);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 900;
+  color: #fff;
+  flex-shrink: 0;
+  position: relative;
+}
+ 
+/* Punto verde online sobre el avatar del header */
+.chat-header-avatar::after {
+  content: '';
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid var(--bg-white);
+}
+ 
+.chat-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+ 
+.chat-header-name {
+  font-size: 14.5px;
+  font-weight: 900;
+  color: var(--text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -.2px;
+}
+ 
+.chat-header-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #22c55e;
+}
+ 
+.chat-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+ 
+/* ── Banner del producto en negociación ── */
+.chat-product-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #f7f8fc;
+  border-bottom: 1px solid var(--border-subtle);
+}
+ 
+.chat-product-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #c8a97a, #a07850);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+ 
+.chat-product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+ 
+.chat-product-name {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+ 
+.chat-product-price {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-light);
+}
+ 
+.chat-product-price a {
+  color: var(--green-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+ 
+.chat-product-price a:hover {
+  text-decoration: underline;
+}
+ 
+/* ════════════════════════════════════════════
+   ÁREA DE MENSAJES
+   ════════════════════════════════════════════ */
+.chat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 14px;
+  /* Espacio para input + nav */
+  padding-bottom: calc(68px + 72px + 16px);
+  overflow-y: auto;
+  min-height: calc(100vh - 64px - 41px);
+  background: var(--bg-app);
+}
+ 
+/* ── Separador de fecha ── */
+.chat-date-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px 0 10px;
+}
+ 
+.chat-date-divider span {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-light);
+  background: var(--bg-app);
+  padding: 0 10px;
+  position: relative;
+  letter-spacing: .2px;
+}
+ 
+.chat-date-divider::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  height: 1px;
+  background: var(--border-subtle);
+}
+ 
+/* ── Envoltorio de burbuja ── */
+.chat-bubble-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  animation: fadeUp .2s ease both;
+}
+ 
+.chat-bubble-wrap--out {
+  flex-direction: row-reverse; /* alinea burbuja a la derecha */
+}
+ 
+/* Avatar pequeño (solo en burbujas recibidas) */
+.chat-avatar-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c8a97a, #a07850);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 900;
+  color: #fff;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+ 
+/* ── Burbuja base ── */
+.chat-bubble {
+  position: relative;
+  max-width: 75%;
+  padding: 10px 13px 22px; /* espacio abajo para la hora */
+  border-radius: 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  word-break: break-word;
+}
+ 
+/* Recibida */
+.chat-bubble--in {
+  background: var(--bg-white);
+  color: var(--text-dark);
+  border-bottom-left-radius: 5px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.07);
+}
+ 
+/* Enviada */
+.chat-bubble--out {
+  background: var(--green-primary);
+  color: #fff;
+  border-bottom-right-radius: 5px;
+  box-shadow: 0 2px 8px rgba(58,125,68,.30);
+}
+ 
+/* Hora dentro de la burbuja */
+.chat-time {
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  font-size: 9.5px;
+  font-weight: 700;
+  opacity: .65;
+  white-space: nowrap;
+}
+ 
+.chat-time--delivered {
+  opacity: .85;
+}
+ 
+/* ── Indicador "escribiendo..." ── */
+.chat-bubble--typing {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 14px 18px;
+  min-width: 60px;
+}
+ 
+.typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-light);
+  animation: typingBounce 1.2s ease-in-out infinite;
+}
+ 
+.typing-dot:nth-child(2) { animation-delay: .2s; }
+.typing-dot:nth-child(3) { animation-delay: .4s; }
+ 
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0);    opacity: .5; }
+  30%            { transform: translateY(-6px); opacity: 1;  }
+}
+ 
+/* ════════════════════════════════════════════
+   BARRA DE ESCRITURA
+   ════════════════════════════════════════════ */
+.chat-input-bar {
+  position: fixed;
+  bottom: 68px;              /* encima de la bottom-nav */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;          /* respeta el app-shell */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-white);
+  border-top: 1px solid var(--border-subtle);
+  z-index: 25;
+}
+ 
+.chat-attach-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-app);
+  color: var(--text-light);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background .15s, color .15s;
+}
+ 
+.chat-attach-btn svg { width: 18px; height: 18px; }
+.chat-attach-btn:hover { background: #ecedf5; color: var(--text-mid); }
+ 
+.chat-input-wrap {
+  flex: 1;
+  background: var(--bg-app);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 22px;
+  transition: border-color .2s;
+}
+ 
+.chat-input-wrap:focus-within {
+  border-color: var(--green-primary);
+}
+ 
+.chat-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-dark);
+  outline: none;
+  padding: 10px 16px;
+  border-radius: 22px;
+}
+ 
+.chat-input::placeholder { color: var(--text-light); }
+ 
+/* Botón enviar */
+.chat-send-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: var(--border-subtle);
+  color: var(--text-light);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background .18s, color .18s, transform .14s, box-shadow .18s;
+}
+ 
+.chat-send-btn svg { width: 17px; height: 17px; }
+ 
+/* Estado activo cuando hay texto */
+.chat-send-btn--active {
+  background: var(--green-primary);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(58,125,68,.38);
+}
+ 
+.chat-send-btn--active:hover {
+  background: #2d6535;
+}
+ 
+.chat-send-btn:active { transform: scale(.90); }
+ 
+/* ── Notificación en icono de nav ── */
+.nav-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+ 
+.nav-notif-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background: #ff4d6d;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-white);
+}
+/* ── RESTAURACIÓN DEL BOTÓN FLOTANTE (PUBLICAR) ── */
+.nav-item.nav-add {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.nav-add-btn {
+  background-color: #2e7d32; /* Verde tipo UNP */
+  color: white;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -28px; /* Esto hace que flote por encima de la barra */
+  margin-bottom: 4px;
+  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.4);
+  transition: transform 0.2s ease;
+}
+
+.nav-add-btn:active {
+  transform: scale(0.95); /* Efecto de toque */
+}
+
+.nav-add-btn svg {
+  width: 28px;
+  height: 28px;
+  stroke: white; /* Asegura que el ícono "+" sea blanco */
+}
+/* ============================================
+   ANIMACIONES CUSTOM PARA TOASTS Y MODALES
+   ============================================ */
+@keyframes slideUpToast {
+  from { transform: translateY(100px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeOutToast {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-10px); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+/* ============================================================
+   BLOQUE 3A — CSS para el badge de notificaciones
+   Añadir a styles.css (o dentro de un <style> en index.html)
+   ============================================================ */
+
+/*
+  El .nav-notif-badge YA existe en tu HTML con esta clase.
+  Añade o verifica que en styles.css tenga estos estilos.
+  Si ya los tienes, solo revisa que display:none sea el estado inicial.
+*/
+
+.nav-notif-badge {
+  display: none;                        /* oculto por defecto hasta que haya notifs */
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: 900;
+  border-radius: 20px;
+  padding: 0 4px;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Nunito', sans-serif;
+  border: 2px solid white;
+  z-index: 10;
+  /* Animación pulso cuando hay nuevas notifs */
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.15); }
+}
+
+/* El .nav-icon-wrap del botón de notifs necesita position:relative */
+/* para que el badge se posicione correctamente sobre la campana.    */
+/* Verifica que en styles.css .nav-icon-wrap tenga: */
+.nav-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+
+/* ============================================================
+   BLOQUE 3B — REGLAS DE SEGURIDAD FIRESTORE
+   Copia esto en Firebase Console → Firestore → Rules
+   ============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Colección: notificaciones
+    match /notificaciones/{notifId} {
+
+      // Cualquier usuario autenticado puede CREAR una notificación
+      // (el trigger ocurre cuando alguien marca favorito o hace clic en WhatsApp)
+      allow create: if request.auth != null
+                    && request.resource.data.leido == false
+                    && request.resource.data.paraUid is string
+                    && request.resource.data.paraUid != request.auth.uid;
+                    // Un usuario no puede generarse notificaciones a sí mismo
+
+      // Solo el destinatario (paraUid) puede LEER sus propias notificaciones
+      allow read: if request.auth != null
+                  && resource.data.paraUid == request.auth.uid;
+
+      // Solo el destinatario puede ACTUALIZAR (marcar como leído)
+      // Solo puede cambiar el campo 'leido' a true
+      allow update: if request.auth != null
+                    && resource.data.paraUid == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leido'])
+                    && request.resource.data.leido == true;
+
+      // Nadie puede borrar notificaciones desde el cliente
+      allow delete: if false;
+    }
+
+    // Tus reglas existentes para 'productos' y 'usuarios' van aquí...
+    match /productos/{productoId} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null
+                    && resource.data.userUid == request.auth.uid;
+      allow delete: if request.auth != null
+                    && resource.data.userUid == request.auth.uid;
+    }
+
+    match /usuarios/{userId} {
+      allow read:   if request.auth != null;
+      allow write:  if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+
+   ============================================================ */
+
+
+/* ============================================================
+   BLOQUE 3C — CHECKLIST DE INTEGRACIÓN
+   Pasos exactos para conectar todo
+   ============================================================
+
+PASO 1 — app.js › Import de Firestore (línea 5)
+  Añadir serverTimestamp y getDoc a la lista existente:
+  import { ..., serverTimestamp, getDoc } from "...firebase-firestore.js";
+
+PASO 2 — app.js › Pegar el BLOQUE 1 completo
+  Posición: antes del DOMContentLoaded final.
+  Elimina el bloque /* import serverTimestamp */ del interior
+  (ya lo hiciste en el paso 1).
+
+PASO 3 — app.js › Reemplazar toggleFavorito
+  Sustituye la función window.toggleFavorito completa por
+  la del BLOQUE 2A.
+
+PASO 4 — app.js › DOMContentLoaded
+  Añadir iniciarEscuchaNotificaciones() dentro:
+  document.addEventListener('DOMContentLoaded', () => {
+      cargarCatalogos();
+      renderizarPerfil();
+      iniciarEscuchaNotificaciones();   ← NUEVA
+      ...
+  });
+
+PASO 5 — producto.html › Import de Firestore
+  Añadir addDoc, collection, serverTimestamp si no están:
+  import { ..., addDoc, collection, serverTimestamp } from "...firestore.js";
+
+PASO 6 — producto.html › Reemplazar el Caso C de WhatsApp
+  Sustituir el addEventListener del botón WhatsApp por
+  el del BLOQUE 2B (buscar "Caso C" en el script).
+
+PASO 7 — styles.css
+  Añadir los estilos del BLOQUE 3A.
+  Verificar que .nav-icon-wrap tenga position:relative.
+
+PASO 8 — Firebase Console › Firestore › Rules
+  Copiar y pegar las reglas del BLOQUE 3B.
+  Publicar.
+
+PASO 9 — Firebase Console › Firestore › Índices
+  El query usa WHERE paraUid == X AND leido == false.
+  Si Firestore pide un índice compuesto, abre el link que
+  aparece en la consola del navegador y créalo con un clic.
+
+   ============================================================ */
