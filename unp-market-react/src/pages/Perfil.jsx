@@ -416,7 +416,7 @@ const Perfil = () => {
     }
   };
 
-  const handleEditar = () => mostrarToast("Edición de producto próximamente ✏️");
+  const handleEditar = (prod) => navigate(`/editar?id=${prod.id}`);
 
   // ──────────────────────────────────────────────────────────────
   //  Render: cargando
@@ -653,7 +653,7 @@ const Perfil = () => {
                 producto={prod}
                 onAgotar={() => handleAgotar(prod)}
                 onBorrar={() => handleBorrar(prod)}
-                onEditar={handleEditar}
+                onEditar={() => handleEditar(prod)}
               />
             ))}
           </div>

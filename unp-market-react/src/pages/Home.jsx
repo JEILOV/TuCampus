@@ -28,6 +28,13 @@ const ICONOS_CAT = {
   servicios: "🔧", materiales: "📚",
 };
 
+// ── Mapeo orden → campo y dirección para Firestore ──
+const ORDEN_CONFIG = {
+  recientes:     { campo: "fecha",  dir: "desc" },
+  precio_asc:    { campo: "precio", dir: "asc"  },
+  precio_desc:   { campo: "precio", dir: "desc" },
+};
+
 const formatearTiempo = (timestamp) => {
   if (!timestamp) return "Hace un momento";
   const segundos = Math.floor((new Date() - timestamp.toDate()) / 1000);
@@ -121,15 +128,19 @@ const Home = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser,    setCurrentUser]    = useState(null);
   const [notificaciones, setNotificaciones] = useState([]);
-  
+
   const [productos,       setProductos]       = useState([]);
   const [cargando,        setCargando]        = useState(false);
   const [todoCargado,     setTodoCargado]     = useState(false);
   const [busqueda,        setBusqueda]        = useState("");
   const [categoriaActiva, setCategoriaActiva] = useState("todos");
   const [toasts,          setToasts]          = useState([]);
+
+  // ── NUEVO: estado de ordenamiento ──
+  const [orden, setOrden] = useState("recientes");
+  const [menuOrdenAbierto, setMenuOrdenAbierto] = useState(false);
 
   const tabUrl = searchParams.get("tab") || "inicio";
   const [tabActiva, setTabActiva] = useState(tabUrl);
@@ -197,18 +208,43 @@ const Home = () => {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
   }, []);
 
+  // ──────────────────────────────────────────────────────────────
+  //  CARGA DE PRODUCTOS — combina categoría (where) + orden (orderBy)
+  //
+  //  Nota sobre índices compuestos:
+  //  Cuando categoriaActiva !== "todos", Firestore combina un where()
+  //  con un orderBy() en un campo distinto, lo que requiere un índice
+  //  compuesto. Si la consola arroja un error con un enlace de Firebase,
+  //  haz clic en él para crearlo en un paso.
+  //  Las combinaciones necesarias son:
+  //    - categoria (asc) + fecha (desc)
+  //    - categoria (asc) + precio (asc)
+  //    - categoria (asc) + precio (desc)
+  // ──────────────────────────────────────────────────────────────
   const cargarMasProductos = useCallback(async () => {
     if (cargando || todoCargado) return;
     setCargando(true);
 
     try {
-      let q = query(collection(db, "productos"), orderBy("fecha", "desc"), limit(PAGE_SIZE));
+      const { campo, dir } = ORDEN_CONFIG[orden];
+      const col            = collection(db, "productos");
 
-      if (ultimoDocRef.current) {
-        q = query(collection(db, "productos"), orderBy("fecha", "desc"), limit(PAGE_SIZE), startAfter(ultimoDocRef.current));
+      // Construir constraints dinámicamente para poder combinar
+      // where + orderBy sin repetir la query base dos veces.
+      const constraints = [];
+
+      if (categoriaActiva !== "todos") {
+        constraints.push(where("categoria", "==", categoriaActiva));
       }
 
-      const snapshot = await getDocs(q);
+      constraints.push(orderBy(campo, dir));
+      constraints.push(limit(PAGE_SIZE));
+
+      if (ultimoDocRef.current) {
+        constraints.push(startAfter(ultimoDocRef.current));
+      }
+
+      const snapshot = await getDocs(query(col, ...constraints));
 
       if (snapshot.size < PAGE_SIZE) setTodoCargado(true);
 
@@ -229,13 +265,24 @@ const Home = () => {
     } finally {
       setCargando(false);
     }
-  }, [cargando, todoCargado, mostrarToast]);
+  }, [cargando, todoCargado, mostrarToast, orden, categoriaActiva]);
 
+  // ── Reiniciar y recargar cuando cambia el orden O la categoría ──
   useEffect(() => {
-    cargarMasProductos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setProductos([]);
+    setTodoCargado(false);
+    ultimoDocRef.current = null;
+  }, [orden, categoriaActiva]);
 
+  // ── Dispara la primera carga después del reset ──
+  useEffect(() => {
+    if (!todoCargado && productos.length === 0 && !cargando) {
+      cargarMasProductos();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productos, todoCargado]);
+
+  // ── Infinite scroll ──
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
     if (todoCargado || !sentinelRef.current) return;
@@ -249,11 +296,11 @@ const Home = () => {
     return () => observerRef.current?.disconnect();
   }, [cargarMasProductos, todoCargado]);
 
-  const productosFiltrados = productos.filter((p) => {
-    const matchBusqueda  = busqueda.trim() === "" || (p.titulo || "").toLowerCase().includes(busqueda.toLowerCase());
-    const matchCategoria = categoriaActiva === "todos" || (p.categoria || "").toLowerCase() === categoriaActiva;
-    return matchBusqueda && matchCategoria;
-  });
+  // ── Filtro de búsqueda (client-side, sobre la página ya cargada) ──
+  const productosFiltrados = productos.filter((p) =>
+    busqueda.trim() === "" ||
+    (p.titulo || "").toLowerCase().includes(busqueda.toLowerCase())
+  );
 
   const handleVerDetalle = (id) => navigate(`/producto?id=${id}`);
 
@@ -262,18 +309,13 @@ const Home = () => {
   // ──────────────────────────────────────────────────────────────
   return (
     <div className="app-shell">
-    {/* HEADER CENTRADO Y LOGO MÁS GRANDE */}
-      <header className="header" style={{ justifyContent: 'center', paddingBottom: '0' }}>
-        <div className="logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-          <img 
-            src="https://i.ibb.co/fzNKyX51/Dise-o-sin-t-tulo-1.png" 
-            alt="Mercado UNP" 
-            style={{ 
-              height: '56px', /* <-- Tamaño aumentado para que destaque */
-              width: 'auto', 
-              objectFit: 'contain',
-              mixBlendMode: 'multiply' 
-            }} 
+      {/* HEADER */}
+      <header className="header" style={{ justifyContent: "center", paddingBottom: "0" }}>
+        <div className="logo" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
+          <img
+            src="https://i.ibb.co/fzNKyX51/Dise-o-sin-t-tulo-1.png"
+            alt="Mercado UNP"
+            style={{ height: "56px", width: "auto", objectFit: "contain", mixBlendMode: "multiply" }}
           />
         </div>
       </header>
@@ -285,13 +327,24 @@ const Home = () => {
               <svg className="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
-              <input type="text" placeholder="Buscar postres, libros, tipeos..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+              <input
+                type="text"
+                placeholder="Buscar postres, libros, tipeos..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+              />
             </div>
           </div>
+
           <nav className="categories-scroll" aria-label="Categorías">
             {CATEGORIAS.map(({ key, label, icon, bg }) => (
-              <button key={key} className={`category-chip${categoriaActiva === key ? " active" : ""}`} onClick={() => setCategoriaActiva(key)}>
-                <span className="chip-icon" style={{ background: bg }}>{icon}</span><span className="chip-label">{label}</span>
+              <button
+                key={key}
+                className={`category-chip${categoriaActiva === key ? " active" : ""}`}
+                onClick={() => setCategoriaActiva(key)}
+              >
+                <span className="chip-icon" style={{ background: bg }}>{icon}</span>
+                <span className="chip-label">{label}</span>
               </button>
             ))}
           </nav>
@@ -300,15 +353,82 @@ const Home = () => {
 
       {tabActiva === "inicio" && (
         <section className="catalog">
-          <div className="catalog-header">
-            <h2 className="catalog-title">Destacados</h2><span className="catalog-see-all">Ver todo</span>
+         <div className="catalog-header">
+            <h2 className="catalog-title">Destacados</h2>
+
+            {/* DROPDOWN CUSTOMIZADO DE ORDENAMIENTO */}
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setMenuOrdenAbierto(!menuOrdenAbierto)}
+                style={{
+                  background: "rgba(46, 107, 78, 0.08)",
+                  color: "var(--verde-marca)",
+                  border: "none",
+                  padding: "6px 14px",
+                  borderRadius: "14px",
+                  fontSize: "0.85rem",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontFamily: "'Nunito', sans-serif",
+                  transition: "background 0.2s"
+                }}
+              >
+                {orden === "recientes" ? "Más recientes" : orden === "precio_asc" ? "Menor precio" : "Mayor precio"}
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: menuOrdenAbierto ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}>
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+
+              {menuOrdenAbierto && (
+                <>
+                  {/* Capa invisible para cerrar el menú al hacer clic afuera */}
+                  <div onClick={() => setMenuOrdenAbierto(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
+                  
+                  {/* Caja flotante de opciones */}
+                  <div style={{
+                    position: "absolute", top: "100%", right: 0, marginTop: "8px",
+                    background: "white", borderRadius: "14px",
+                    boxShadow: "0 8px 24px rgba(15,37,64,0.12)",
+                    border: "1px solid rgba(15,37,64,0.06)",
+                    overflow: "hidden", zIndex: 100, minWidth: "145px",
+                    display: "flex", flexDirection: "column"
+                  }}>
+                    {[
+                      { id: "recientes", label: "Más recientes" },
+                      { id: "precio_asc", label: "Menor precio" },
+                      { id: "precio_desc", label: "Mayor precio" }
+                    ].map(opt => (
+                      <button
+                        key={opt.id}
+                        onClick={() => { setOrden(opt.id); setMenuOrdenAbierto(false); }}
+                        style={{
+                          background: orden === opt.id ? "rgba(46, 107, 78, 0.05)" : "transparent",
+                          color: orden === opt.id ? "var(--verde-marca)" : "var(--text-mid)",
+                          border: "none", padding: "12px 16px", textAlign: "left",
+                          fontSize: "0.85rem", fontWeight: 800, cursor: "pointer",
+                          fontFamily: "'Nunito', sans-serif", transition: "background 0.2s"
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
+
           <div className="product-grid">
             {productosFiltrados.map((p) => (
               <ProductCard key={p.id} producto={p} onVerDetalle={handleVerDetalle} />
             ))}
           </div>
+
           {!todoCargado && <div ref={sentinelRef} className="sentinel" />}
+
           {cargando && (
             <div className="loading-more">
               <div className="loading-pill">
@@ -362,7 +482,10 @@ const Home = () => {
               {notificaciones.map((notif) => {
                 const esFav = notif.tipo === "favorito";
                 return (
-                  <div key={notif.id} className={`notif-item notif-item--${esFav ? "fav" : "msg"}${notif.leido ? " notif-item--leido" : ""}`}>
+                  <div
+                    key={notif.id}
+                    className={`notif-item notif-item--${esFav ? "fav" : "msg"}${notif.leido ? " notif-item--leido" : ""}`}
+                  >
                     <div className="notif-item-icon">{esFav ? "❤️" : "💬"}</div>
                     <div className="notif-item-body">
                       <p className="notif-item-text">
@@ -398,7 +521,9 @@ const Home = () => {
         <button className={`nav-item${tabActiva === "notifs" ? " active" : ""}`} onClick={() => navigate("/?tab=notifs")} aria-label="Notificaciones">
           <div className="nav-icon-wrap">
             <svg className="nav-icon" viewBox="0 0 24 24" fill="none" strokeWidth="2.2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            {notificaciones.some(n => !n.leido) && <span className="nav-notif-badge">{notificaciones.filter(n => !n.leido).length}</span>}
+            {notificaciones.some(n => !n.leido) && (
+              <span className="nav-notif-badge">{notificaciones.filter(n => !n.leido).length}</span>
+            )}
           </div>
           <span className="nav-label">Notifs</span>
         </button>
@@ -411,6 +536,7 @@ const Home = () => {
       <div className="toast-container">
         {toasts.map((t) => <Toast key={t.id} mensaje={t.mensaje} tipo={t.tipo} />)}
       </div>
+
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
