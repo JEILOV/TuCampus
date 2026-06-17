@@ -489,7 +489,29 @@ const Home = () => {
           ) : (
             <div className="notif-list">
               {notificaciones.map((notif) => {
-                const esFav = notif.tipo === "favorito";
+              const esFav = notif.tipo === "favorito";
+                const esSeguidor = notif.tipo === "seguidor"; 
+                const esNuevoProd = notif.tipo === "nuevo_producto"; // <-- NUEVO
+
+                // Asignamos el icono correcto
+                let icono = "💬";
+                if (esFav) icono = "❤️";
+                if (esSeguidor) icono = "👤";
+                if (esNuevoProd) icono = "📢"; // <-- NUEVO (Megáfono)
+
+                // Asignamos el texto correcto
+                let textoAccion = "quiere comprar";
+                let mostrarProducto = true;
+
+                if (esFav) {
+                  textoAccion = "guardó";
+                } else if (esSeguidor) {
+                  textoAccion = "empezó a seguirte";
+                  mostrarProducto = false; 
+                } else if (esNuevoProd) {
+                  textoAccion = "publicó un nuevo producto:"; // <-- NUEVO
+                }
+
                 return (
                   <div
                     key={notif.id}
@@ -497,12 +519,12 @@ const Home = () => {
                     style={{ cursor: "pointer" }}
                     onClick={() => handleNotifClick(notif)}
                   >
-                    <div className="notif-item-icon">{esFav ? "❤️" : "💬"}</div>
+                    <div className="notif-item-icon">{icono}</div>
                     <div className="notif-item-body">
                       <p className="notif-item-text">
                         <span className="notif-item-name">{notif.deNombre}</span>{" "}
-                        {esFav ? "guardó" : "quiere comprar"}{" "}
-                        <span className="notif-item-name">"{notif.productoTitulo}"</span>
+                        {textoAccion}{" "}
+                        {mostrarProducto && <span className="notif-item-name">"{notif.productoTitulo}"</span>}
                       </p>
                       <span className="notif-item-time">{formatearTiempo(notif.timestamp)}</span>
                     </div>

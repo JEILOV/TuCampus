@@ -19,7 +19,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate }                 from "react-router-dom";
 import {
   collection, addDoc, getDoc,
-  doc, serverTimestamp,
+  doc, serverTimestamp, writeBatch,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth }           from "../services/firebase";
@@ -207,6 +207,38 @@ const Publicar = () => {
         estado:         "disponible",
         fecha:          serverTimestamp(),
       });
+
+      // Paso 4: Notificar a los seguidores (Megáfono)
+      try {
+        const vendedorSnap = await getDoc(doc(db, "usuarios", currentUser.uid));
+
+        if (vendedorSnap.exists()) {
+          const datosVendedor = vendedorSnap.data();
+          const seguidores    = datosVendedor.seguidores;
+          const nombreVendedor = datosVendedor.nombre;
+
+          if (Array.isArray(seguidores) && seguidores.length > 0) {
+            const batch = writeBatch(db);
+
+            seguidores.forEach((seguidorUid) => {
+              const notifRef = doc(collection(db, "notificaciones"));
+              batch.set(notifRef, {
+                paraUid:        seguidorUid,
+                deUid:          currentUser.uid,
+                deNombre:       nombreVendedor || "Un vendedor",
+                tipo:           "nuevo_producto",
+                productoTitulo: titulo,
+                leido:          false,
+                timestamp:      serverTimestamp(),
+              });
+            });
+
+            await batch.commit();
+          }
+        }
+      } catch (notifErr) {
+        console.error("Error al notificar a los seguidores:", notifErr);
+      }
 
       // Navegar al home con señal de éxito
       navigate("/", { state: { toastPublicar: true } });

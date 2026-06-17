@@ -3,8 +3,10 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   doc, getDoc, collection, query, where, getDocs,
+  updateDoc, arrayUnion, arrayRemove, addDoc, serverTimestamp,
 } from "firebase/firestore";
-import { db } from "../services/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { db, auth } from "../services/firebase";
 
 const ICONOS_CAT = {
   dulces: "🍫", bebidas: "☕", salados: "🍔",
@@ -112,9 +114,19 @@ const Vendedor = () => {
   const [cargando,  setCargando]  = useState(true);
   const [noExiste,  setNoExiste]  = useState(false);
 
+  const [currentUser, setCurrentUser] = useState(null);
+  const [esSeguidor,  setEsSeguidor]  = useState(false);
+
   useEffect(() => {
     if (!uid) navigate("/", { replace: true });
   }, [uid, navigate]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!uid) return;
@@ -127,6 +139,10 @@ const Vendedor = () => {
         if (cancelado) return;
 
         let datosVendedor = userSnap.exists() ? userSnap.data() : null;
+
+        if (datosVendedor && currentUser && Array.isArray(datosVendedor.seguidores)) {
+          setEsSeguidor(datosVendedor.seguidores.includes(currentUser.uid));
+        }
 
         const q    = query(collection(db, "productos"), where("userUid", "==", uid));
         const snap = await getDocs(q);
@@ -159,9 +175,44 @@ const Vendedor = () => {
 
     cargar();
     return () => { cancelado = true; };
-  }, [uid]);
+  }, [uid, currentUser]);
 
   const handleVerDetalle = (id) => navigate(`/producto?id=${id}`);
+
+  const handleToggleSeguir = async () => {
+    if (!currentUser) {
+      alert('Debes iniciar sesión para seguir a un vendedor');
+      return;
+    }
+
+    const vendedorRef = doc(db, "usuarios", uid);
+
+    try {
+      if (esSeguidor) {
+        await updateDoc(vendedorRef, {
+          seguidores: arrayRemove(currentUser.uid),
+        });
+        setEsSeguidor(false);
+      } else {
+        await updateDoc(vendedorRef, {
+          seguidores: arrayUnion(currentUser.uid),
+        });
+        setEsSeguidor(true);
+
+        await addDoc(collection(db, "notificaciones"), {
+          paraUid: uid,
+          deUid: currentUser.uid,
+          deNombre: currentUser.displayName || "Un usuario",
+          tipo: "seguidor",
+          leido: false,
+          timestamp: serverTimestamp(),
+          productoTitulo: "tu perfil",
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   if (cargando) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center",
@@ -325,6 +376,45 @@ const Vendedor = () => {
           </a>
         </div>
       )}
+
+      {/* BOTÓN SEGUIR / SIGUIENDO VENDEDOR (NUEVO) */}
+      <div style={{ padding: "0 16px 20px" }}>
+        {esSeguidor ? (
+          <button
+            onClick={handleToggleSeguir}
+            style={{
+              background: "transparent",
+              color: "#5c5c7a",
+              border: "2px solid #c3c6d4",
+              padding: "12px",
+              borderRadius: "14px",
+              fontWeight: 800,
+              width: "100%",
+              cursor: "pointer",
+              fontFamily: "'Nunito', sans-serif",
+            }}
+          >
+            Siguiendo
+          </button>
+        ) : (
+          <button
+            onClick={handleToggleSeguir}
+            style={{
+              background: "var(--azul-oscuro)",
+              color: "white",
+              border: "none",
+              padding: "14px",
+              borderRadius: "14px",
+              fontWeight: 800,
+              width: "100%",
+              cursor: "pointer",
+              fontFamily: "'Nunito', sans-serif",
+            }}
+          >
+            Seguir Vendedor
+          </button>
+        )}
+      </div>
 
       {/* PUBLICACIONES */}
       <div style={{ padding: "0 16px 20px" }}></div>
