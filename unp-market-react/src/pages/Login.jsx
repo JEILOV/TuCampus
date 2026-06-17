@@ -20,18 +20,42 @@ const ILUSTRACION_CAMPUS = "https://i.ibb.co/qLmxNQTz/Chat-GPT-Image-16-may-2026
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: "select_account" });
 
+const Toast = ({ mensaje }) => (
+  <div style={{
+    background: "#fecaca", color: "#991b1b",
+    padding: "14px 18px", borderRadius: "16px", fontSize: "13.5px",
+    fontWeight: 700, boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+    fontFamily: "'Nunito', sans-serif",
+    display: "flex", alignItems: "center", gap: "10px"
+  }}>
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#dc2626" strokeWidth="3">
+      <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>
+    {mensaje}
+  </div>
+);
+
 // ──────────────────────────────────────────────────────────────
 //  COMPONENTE
 // ──────────────────────────────────────────────────────────────
 const Login = () => {
   const navigate = useNavigate();
   const [cargando, setCargando] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [toast, setToast] = useState(null);
   const [labelBtn, setLabelBtn] = useState("Continuar con correo institucional");
 
   useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+ useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      if (user) navigate("/", { replace: true });
+      // Solo te redirige automáticamente si tienes la cuenta correcta
+      if (user && user.email?.endsWith(DOMINIO_PERMITIDO)) {
+        navigate("/", { replace: true });
+      }
     });
     return () => unsub();
   }, [navigate]);
@@ -43,7 +67,6 @@ const Login = () => {
       .forEach((k) => localStorage.removeItem(k));
 
     setCargando(true);
-    setErrorMsg("");
     setLabelBtn("Conectando...");
 
     try {
@@ -52,7 +75,7 @@ const Login = () => {
 
       if (!user.email.endsWith(DOMINIO_PERMITIDO)) {
         await signOut(auth);
-        setErrorMsg(`Acceso exclusivo. Usa tu correo ${DOMINIO_PERMITIDO}`);
+        setToast({ mensaje: "Acceso denegado: Usa tu correo @alumnos.unp.edu.pe" });
         setLabelBtn("Continuar con correo institucional");
         setCargando(false);
         return;
@@ -86,7 +109,7 @@ const Login = () => {
     } catch (err) {
       console.error("Error de login:", err);
       if (err.code !== "auth/popup-closed-by-user") {
-        setErrorMsg("Error de conexión. Inténtalo nuevamente.");
+        setToast({ mensaje: "Error de conexión. Inténtalo nuevamente." });
       }
       setLabelBtn("Continuar con correo institucional");
       setCargando(false);
@@ -135,8 +158,6 @@ const Login = () => {
             <span className={cargando ? "btn-label-loading" : ""}>{labelBtn}</span>
           </button>
 
-          {errorMsg && <div className="login-error">⚠️ {errorMsg}</div>}
-
           <div className="login-features">
             <div className="login-feature-chip chip--verde"><span className="chip-check">✓</span> Gratis</div>
             <div className="login-feature-chip chip--verde"><span className="chip-check">✓</span> Seguro</div>
@@ -151,6 +172,15 @@ const Login = () => {
         </footer>
 
       </div>
+
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: "40px", left: "50%", transform: "translateX(-50%)",
+          zIndex: 1000, width: "calc(100% - 40px)", maxWidth: "390px", pointerEvents: "none",
+        }}>
+          <Toast mensaje={toast.mensaje}/>
+        </div>
+      )}
     </div>
   );
 };

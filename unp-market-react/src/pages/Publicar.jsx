@@ -195,8 +195,8 @@ const Publicar = () => {
     const perfil     = perfilSnap.exists() ? perfilSnap.data() : {};
 
     if (!perfil.telefono || perfil.telefono.trim().length < 7) {
-      alert("⚠️ Debes registrar tu WhatsApp en tu perfil para que los compradores puedan contactarte.");
-      navigate("/perfil");
+      setToast({ mensaje: "⚠️ Configura tu WhatsApp en el perfil para publicar.", tipo: "error" });
+      setTimeout(() => navigate("/perfil"), 2000);
       return;
     }
 

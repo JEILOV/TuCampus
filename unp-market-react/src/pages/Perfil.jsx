@@ -205,6 +205,7 @@ const Perfil = () => {
   const [modalOpen,    setModalOpen]    = useState(false);
   const [guardando,    setGuardando]    = useState(false);
   const [toasts,       setToasts]       = useState([]);
+  const [productoABorrar, setProductoABorrar] = useState(null);
 
   // ── Modal: campos controlados ──
   const [mNombre,    setMNombre]    = useState("");
@@ -425,16 +426,21 @@ const Perfil = () => {
     }
   };
 
-  const handleBorrar = async (prod) => {
-    const ok = window.confirm(`¿Eliminar "${prod.titulo}"? Esta acción no se puede deshacer.`);
-    if (!ok) return;
+  const handleBorrar = (prod) => {
+    setProductoABorrar(prod);
+  };
+
+  const confirmarBorrado = async () => {
+    if (!productoABorrar) return;
     try {
-      await deleteDoc(doc(db, "productos", prod.id));
-      setProductos((prev) => prev.filter((p) => p.id !== prod.id));
+      await deleteDoc(doc(db, "productos", productoABorrar.id));
+      setProductos((prev) => prev.filter((p) => p.id !== productoABorrar.id));
       mostrarToast("Producto eliminado");
     } catch (err) {
       console.error(err);
       mostrarToast("Error al eliminar", "error");
+    } finally {
+      setProductoABorrar(null);
     }
   };
 
@@ -876,6 +882,62 @@ const Perfil = () => {
                 }}
               >
                 {guardando ? "Guardando..." : "Guardar Perfil"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════
+           MODAL: CONFIRMAR BORRADO
+      ════════════════════════════════════════════════════ */}
+      {productoABorrar && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setProductoABorrar(null); }}
+          style={{
+            position: "fixed", inset: 0,
+            background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 600, padding: "20px", boxSizing: "border-box",
+          }}
+        >
+          <div style={{
+            width: "100%", maxWidth: "340px",
+            background: "white", borderRadius: "20px",
+            padding: "24px 22px", boxSizing: "border-box",
+            boxShadow: "0 12px 32px rgba(0,0,0,0.25)",
+            textAlign: "center",
+          }}>
+            <h2 style={{ margin: "0 0 10px", fontSize: "1.1rem", fontWeight: 700, color: "var(--azul-oscuro)" }}>
+              ¿Eliminar producto?
+            </h2>
+            <p style={{ margin: "0 0 22px", fontSize: "0.9rem", fontWeight: 600, color: "#5c5c7a", lineHeight: 1.4 }}>
+              {`Vas a eliminar "${productoABorrar.titulo}". Esta acción no se puede deshacer.`}
+            </p>
+
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button
+                onClick={() => setProductoABorrar(null)}
+                style={{
+                  flex: 1, padding: "13px", borderRadius: "14px",
+                  background: "#f1f3f5", border: "none", cursor: "pointer",
+                  fontWeight: 600, fontSize: "0.9rem", color: "#5c5c7a",
+                  fontFamily: "'Nunito', sans-serif",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarBorrado}
+                style={{
+                  flex: 1, padding: "13px", borderRadius: "14px",
+                  background: "#ef4444", border: "none", cursor: "pointer",
+                  fontWeight: 600, fontSize: "0.9rem", color: "white",
+                  fontFamily: "'Nunito', sans-serif",
+                  boxShadow: "0 4px 15px rgba(239,68,68,0.3)",
+                }}
+              >
+                Sí, eliminar
               </button>
             </div>
           </div>
