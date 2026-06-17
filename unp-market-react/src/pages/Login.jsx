@@ -14,7 +14,7 @@ import { db, auth } from "../services/firebase";
 //  CONSTANTES Y RECURSOS
 // ──────────────────────────────────────────────────────────────
 const DOMINIO_PERMITIDO  = "@alumnos.unp.edu.pe";
-const LOGO_HORIZONTAL    = "https://i.ibb.co/q37WWMD8/Chat-GPT-Image-16-jun-2026-03-27-59-p-m-removebg-preview.png";
+const LOGO_HORIZONTAL    = "https://i.ibb.co/R5wf8nn/Chat-GPT-Image-17-jun-2026-03-37-18-p-m-removebg-preview.png";
 const ILUSTRACION_CAMPUS = "https://i.ibb.co/qLmxNQTz/Chat-GPT-Image-16-may-2026-04-32-51-a-m.png";
 
 const provider = new GoogleAuthProvider();
@@ -104,10 +104,10 @@ const Login = () => {
             alt="Mercado UNP" 
             style={{ 
               width: '100%', 
-              maxWidth: '280px', 
+              maxWidth: '350px', 
               height: 'auto', 
               objectFit: 'contain',
-              borderRadius: '20px' /* <-- Redondeo para matar los picos filosos */
+              borderRadius: '50px' /* <-- Redondeo para matar los picos filosos */
             }} 
           />
         </header>

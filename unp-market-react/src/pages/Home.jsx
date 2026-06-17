@@ -322,7 +322,7 @@ const Home = () => {
       <header className="header" style={{ justifyContent: "center", paddingBottom: "0" }}>
         <div className="logo" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
           <img
-            src="https://i.ibb.co/fzNKyX51/Dise-o-sin-t-tulo-1.png"
+            src="https://i.ibb.co/XrLDwCBF/Chat-GPT-Image-17-jun-2026-03-37-28-p-m.png"
             alt="Mercado UNP"
             style={{ height: "56px", width: "auto", objectFit: "contain", mixBlendMode: "multiply" }}
           />
