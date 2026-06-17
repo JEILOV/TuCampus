@@ -135,6 +135,7 @@ const Home = () => {
   const [cargando,        setCargando]        = useState(false);
   const [todoCargado,     setTodoCargado]     = useState(false);
   const [busqueda,        setBusqueda]        = useState("");
+  const [busquedaFirebase, setBusquedaFirebase] = useState("");
   const [categoriaActiva, setCategoriaActiva] = useState("todos");
   const [toasts,          setToasts]          = useState([]);
 
@@ -217,6 +218,15 @@ const Home = () => {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
   }, []);
 
+  // ── Debounce (500ms): solo dispara la búsqueda en Firebase cuando
+  //    el usuario deja de escribir, evitando una consulta por cada tecla ──
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBusquedaFirebase(busqueda);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [busqueda]);
+
   // ──────────────────────────────────────────────────────────────
   //  CARGA DE PRODUCTOS — combina categoría (where) + orden (orderBy)
   //
@@ -241,11 +251,11 @@ const Home = () => {
       // Construir constraints dinámicamente para poder combinar
       // where + orderBy sin repetir la query base dos veces.
       const constraints = [];
-
-      if (categoriaActiva !== "todos") {
+      if (busquedaFirebase.trim() !== "") {
+        constraints.push(where("keywords", "array-contains", busquedaFirebase.toLowerCase().trim()));
+      } else if (categoriaActiva !== "todos") {
         constraints.push(where("categoria", "==", categoriaActiva));
       }
-
       constraints.push(orderBy(campo, dir));
       constraints.push(limit(PAGE_SIZE));
 
@@ -274,14 +284,14 @@ const Home = () => {
     } finally {
       setCargando(false);
     }
-  }, [cargando, todoCargado, mostrarToast, orden, categoriaActiva]);
+  }, [cargando, todoCargado, mostrarToast, orden, categoriaActiva, busquedaFirebase]);
 
-  // ── Reiniciar y recargar cuando cambia el orden O la categoría ──
+  // ── Reiniciar y recargar cuando cambia el orden, la categoría O la búsqueda ──
   useEffect(() => {
     setProductos([]);
     setTodoCargado(false);
     ultimoDocRef.current = null;
-  }, [orden, categoriaActiva]);
+  }, [orden, categoriaActiva, busquedaFirebase]);
 
   // ── Dispara la primera carga después del reset ──
   useEffect(() => {

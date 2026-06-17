@@ -19,6 +19,7 @@ import {
   doc, getDoc, setDoc, getDocs,
   collection, query, where,
   updateDoc, deleteDoc, serverTimestamp,
+  onSnapshot, orderBy,
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth }                    from "../services/firebase";
@@ -197,6 +198,7 @@ const Perfil = () => {
   const [perfil,       setPerfil]       = useState(null);
   const [productos,    setProductos]    = useState([]);
   const [cargando,     setCargando]     = useState(true);
+  const [notificaciones, setNotificaciones] = useState([]);
 
   // ── UI ──
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -237,16 +239,19 @@ const Perfil = () => {
       setCurrentUser(user);
 
       try {
-        // Perfil de usuario
-        const snap = await getDoc(doc(db, "usuarios", user.uid));
+        // Perfil de usuario + Mis publicaciones, en paralelo (sin waterfall)
+        const q = query(collection(db, "productos"), where("userUid", "==", user.uid));
+
+        const [snap, pSnap] = await Promise.all([
+          getDoc(doc(db, "usuarios", user.uid)),
+          getDocs(q),
+        ]);
+
         const data = snap.exists()
           ? snap.data()
           : JSON.parse(localStorage.getItem("unp_user_profile") || "{}");
         setPerfil(data);
 
-        // Mis publicaciones
-        const q   = query(collection(db, "productos"), where("userUid", "==", user.uid));
-        const pSnap = await getDocs(q);
         setProductos(pSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
       } catch (err) {
         console.error(err);
@@ -257,6 +262,23 @@ const Perfil = () => {
     });
     return () => unsub();
   }, [navigate]);
+
+  // ──────────────────────────────────────────────────────────────
+  //  Notificaciones en tiempo real (puntito/globo rojo)
+  // ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, "notificaciones"),
+      where("paraUid", "==", currentUser.uid),
+      orderBy("timestamp", "desc")
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notifs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setNotificaciones(notifs);
+    });
+    return () => unsubscribe();
+  }, [currentUser]);
 
   // ── Cerrar dropdown al hacer clic fuera ──
   useEffect(() => {
@@ -689,11 +711,18 @@ const Perfil = () => {
         </button>
 
         <button className="nav-item" onClick={() => navigate("/?tab=notifs")} aria-label="Notificaciones">
-          <div className="nav-icon-wrap">
+          <div className="nav-icon-wrap" style={{ position: "relative", display: "inline-flex" }}>
             <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
               <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
             </svg>
+            {notificaciones.some(n => !n.leido) && (
+              <span className="nav-notif-badge" style={{
+                position: "absolute", top: "-4px", right: "-6px", background: "#ef4444", color: "white", fontSize: "0.65rem", fontWeight: 800, minWidth: "16px", height: "16px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #1e293b", padding: "0 4px", lineHeight: 1
+              }}>
+                {notificaciones.filter(n => !n.leido).length}
+              </span>
+            )}
           </div>
           <span className="nav-label">Notifs</span>
         </button>

@@ -226,6 +226,7 @@ const Publicar = () => {
         userUid:        currentUser.uid,
         estado:         "disponible",
         fecha:          serverTimestamp(),
+        keywords:       generarPrefijos(titulo),
       });
 
       // Paso 4: Notificar a los seguidores (Megáfono)

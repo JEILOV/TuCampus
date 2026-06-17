@@ -27,6 +27,22 @@ const MAX_DIMENSION = 1080;
 const CALIDAD_JPEG  = 0.70;
 
 // ──────────────────────────────────────────────────────────────
+//  UTILIDAD: Generador de Prefijos para el buscador (idéntica a Publicar.jsx)
+// ──────────────────────────────────────────────────────────────
+const generarPrefijos = (texto) => {
+  const palabras = (texto || "").toLowerCase().split(/\s+/).filter(w => w.length > 0);
+  const prefijos = new Set();
+  palabras.forEach(palabra => {
+    let prefijo = "";
+    for (let i = 0; i < palabra.length; i++) {
+      prefijo += palabra[i];
+      prefijos.add(prefijo);
+    }
+  });
+  return Array.from(prefijos);
+};
+
+// ──────────────────────────────────────────────────────────────
 //  UTILIDAD: Compresión Canvas (idéntica a Publicar.jsx)
 // ──────────────────────────────────────────────────────────────
 const comprimirImagen = (file) =>
@@ -233,6 +249,7 @@ const EditarProducto = () => {
         descripcion,
         imagen:      imagenFinal,
         fechaEdicion: serverTimestamp(),
+        keywords:    generarPrefijos(titulo),
       });
 
       navigate("/perfil", { state: { toastEditar: true } });
