@@ -198,6 +198,12 @@ const EditarProducto = () => {
   // ──────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // ── NUEVA VALIDACIÓN DE ESPACIOS EN BLANCO ──
+    if (titulo.trim() === "" || descripcion.trim() === "") {
+      setToast({ mensaje: "El título y la descripción deben contener texto real.", tipo: "error" });
+      return;
+    }
+    // ────────────────────────────────────────────
     if (!currentUser) {
       setToast({ mensaje: "Debes iniciar sesión para editar.", tipo: "error" });
       return;

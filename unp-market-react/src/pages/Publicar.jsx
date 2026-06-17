@@ -30,7 +30,21 @@ import { db, auth }           from "../services/firebase";
 const IMGBB_API_KEY  = "44396363d77b09fc503f8a3b50898ea7";
 const MAX_DIMENSION  = 1080;
 const CALIDAD_JPEG   = 0.70;
-
+// ──────────────────────────────────────────────────────────────
+//  UTILIDAD: Generador de Prefijos para el buscador
+// ──────────────────────────────────────────────────────────────
+const generarPrefijos = (texto) => {
+  const palabras = (texto || "").toLowerCase().split(/\s+/).filter(w => w.length > 0);
+  const prefijos = new Set();
+  palabras.forEach(palabra => {
+    let prefijo = "";
+    for (let i = 0; i < palabra.length; i++) {
+      prefijo += palabra[i];
+      prefijos.add(prefijo);
+    }
+  });
+  return Array.from(prefijos);
+};
 // ──────────────────────────────────────────────────────────────
 //  UTILIDAD: Compresión Canvas
 //  Misma lógica que comprimirImagen() en app.js §11B.
@@ -165,6 +179,12 @@ const Publicar = () => {
   // ──────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // ── NUEVA VALIDACIÓN DE ESPACIOS EN BLANCO ──
+    if (titulo.trim() === "" || descripcion.trim() === "") {
+      setToast({ mensaje: "El título y la descripción deben contener texto real.", tipo: "error" });
+      return;
+    }
+    // ────────────────────────────────────────────
     if (!currentUser) {
       setToast({ mensaje: "Debes iniciar sesión para publicar.", tipo: "error" });
       return;
