@@ -244,16 +244,14 @@ const Home = () => {
   //    - categoria (asc) + precio (asc)
   //    - categoria (asc) + precio (desc)
   // ──────────────────────────────────────────────────────────────
-  const cargarMasProductos = useCallback(async () => {
-    if (cargando || todoCargado) return;
+const cargarMasProductos = useCallback(async (esNuevoFiltro = false) => {
+    if (cargando || (todoCargado && !esNuevoFiltro)) return;
     setCargando(true);
 
     try {
       const { campo, dir } = ORDEN_CONFIG[orden];
       const col            = collection(db, "productos");
 
-      // Construir constraints dinámicamente para poder combinar
-      // where + orderBy sin repetir la query base dos veces.
       const constraints = [];
       if (busquedaFirebase.trim() !== "") {
         constraints.push(where("keywords", "array-contains", busquedaFirebase.toLowerCase().trim()));
@@ -263,7 +261,7 @@ const Home = () => {
       constraints.push(orderBy(campo, dir));
       constraints.push(limit(PAGE_SIZE));
 
-      if (ultimoDocRef.current) {
+      if (ultimoDocRef.current && !esNuevoFiltro) {
         constraints.push(startAfter(ultimoDocRef.current));
       }
 
@@ -274,6 +272,7 @@ const Home = () => {
       const nuevos = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
       setProductos((prev) => {
+        if (esNuevoFiltro) return nuevos; // Si cambió la categoría, sobreescribimos fluido
         const idsExistentes = new Set(prev.map((p) => p.id));
         const sinDuplicados = nuevos.filter((p) => !idsExistentes.has(p.id));
         return [...prev, ...sinDuplicados];
@@ -290,11 +289,12 @@ const Home = () => {
     }
   }, [cargando, todoCargado, mostrarToast, orden, categoriaActiva, busquedaFirebase]);
 
-  // ── Reiniciar y recargar cuando cambia el orden, la categoría O la búsqueda ──
+// ── Reiniciar cursores cuando cambia el filtro (sin vaciar la pantalla de golpe) ──
   useEffect(() => {
-    setProductos([]);
     setTodoCargado(false);
     ultimoDocRef.current = null;
+    // Disparamos la carga inmediatamente con los nuevos filtros
+    cargarMasProductos(true); 
   }, [orden, categoriaActiva, busquedaFirebase]);
 
   // ── Dispara la primera carga después del reset ──
