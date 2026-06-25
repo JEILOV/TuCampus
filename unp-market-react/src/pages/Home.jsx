@@ -1,9 +1,10 @@
 // src/pages/Home.jsx
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef }              from "react";
 import { useNavigate, useSearchParams }             from "react-router-dom";
 import { useAuth }                                  from "../context/AuthContext";
 import { useProducts }                              from "../hooks/useProducts";
 import { useNotifications }                         from "../hooks/useNotifications";
+import { useToast, ToastContainer }                 from "../components/Toast"; // ✅ Nuevos imports
 
 // ── Constantes ───────────────────────────────────────────────
 const CATEGORIAS = [
@@ -80,16 +81,6 @@ const ProductCard = ({ producto, onVerDetalle }) => {
   );
 };
 
-const Toast = ({ mensaje, tipo }) => (
-  <div className={`toast toast--${tipo}`}>
-    {tipo === "success"
-      ? <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#22c55e" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-      : <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#dc2626" strokeWidth="3"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-    }
-    <span className="toast-text">{mensaje}</span>
-  </div>
-);
-
 // ── Componente principal ─────────────────────────────────────
 const Home = () => {
   const navigate       = useNavigate();
@@ -112,12 +103,8 @@ const Home = () => {
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
 
-  // ── Toast helper ─────────────────────────────────────────
-  const mostrarToast = useCallback((mensaje, tipo = "success") => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, mensaje, tipo }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
-  }, []);
+  // ✅ Toast helper unificado (modo array)
+  const mostrarToast = useToast(setToasts);
 
   // ── Debounce búsqueda ────────────────────────────────────
   useEffect(() => {
@@ -410,9 +397,8 @@ const Home = () => {
         </button>
       </nav>
 
-      <div className="toast-container">
-        {toasts.map((t) => <Toast key={t.id} mensaje={t.mensaje} tipo={t.tipo} />)}
-      </div>
+      {/* ✅ TOAST CONTAINER LIMPIO */}
+      <ToastContainer toasts={toasts} />
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>

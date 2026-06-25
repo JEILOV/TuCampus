@@ -1,35 +1,5 @@
 // src/pages/Perfil.jsx
-// ============================================================
-//  TuCampus — Dashboard del usuario autenticado
-//
-//  CAMBIOS DE REFACTORIZACIÓN (vs versión anterior):
-//
-//  ❌ ELIMINADO — onAuthStateChanged propio (línea 250 original)
-//     → Ya lo gestiona AuthContext. Esta página recibe user y
-//       perfil directamente via useAuth(), sin abrir un listener.
-//
-//  ❌ ELIMINADO — signOut directo + localStorage.removeItem manual
-//     → Se reemplaza por cerrarSesion() del contexto, que lo hace
-//       de forma centralizada y consistente en toda la app.
-//
-//  ❌ ELIMINADO — comprimirImagen() local (líneas 42-60 originales)
-//  ❌ ELIMINADO — subirImgBB() local (líneas 65-72 originales)
-//  ❌ ELIMINADO — constantes IMGBB_API_KEY / MAX_DIM / CALIDAD
-//     → Todos importados de utils/imageUtils.js, una sola fuente.
-//
-//  ❌ ELIMINADO — localStorage.getItem("unp_user_profile") como
-//     fallback al cargar perfil. El contexto ya tiene el perfil;
-//     no necesitamos parches de localStorage.
-//
-//  ✅ AGREGADO — actualizarPerfil() del contexto, para que el
-//     estado global se sincronice tras cada guardado sin refetch.
-//
-//  ✅ CONSERVADO — toda la lógica de negocio:
-//     Phone Auth / SMS, propagación a productos, notificaciones
-//     en tiempo real, modal de edición, tarjetas, etc.
-// ============================================================
-
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef }              from "react";
 import { useNavigate, useLocation }                 from "react-router-dom";
 import {
   doc, setDoc, getDocs,
@@ -43,21 +13,8 @@ import {
 import { db, auth }                    from "../services/firebase";
 import { useAuth }                     from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
-
-// ──────────────────────────────────────────────────────────────
-//  SUB-COMPONENTE: Toast
-// ──────────────────────────────────────────────────────────────
-const Toast = ({ mensaje, tipo }) => (
-  <div style={{
-    background: tipo === "error" ? "#fecaca" : "#1e293b",
-    color:      tipo === "error" ? "#991b1b"  : "white",
-    padding: "14px 18px", borderRadius: "16px", fontSize: "13.5px",
-    fontWeight: 700, boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
-    fontFamily: "'Nunito', sans-serif",
-  }}>
-    {mensaje}
-  </div>
-);
+import Spinner                         from "../components/Spinner"; // ✅ Nuevo import
+import { useToast, ToastContainer }    from "../components/Toast";   // ✅ Nuevo import
 
 // ──────────────────────────────────────────────────────────────
 //  SUB-COMPONENTE: Tarjeta de producto en modo perfil
@@ -172,11 +129,6 @@ const Perfil = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ useAuth reemplaza el onAuthStateChanged local.
-  //    - user: objeto Firebase Auth (uid, email, etc.)
-  //    - perfil: documento Firestore del usuario
-  //    - cerrarSesion: centralizado en AuthContext
-  //    - actualizarPerfil: sincroniza el estado global tras guardar
   const { user, perfil, cerrarSesion, actualizarPerfil } = useAuth();
 
   // ── Datos locales de esta página ──
@@ -211,21 +163,9 @@ const Perfil = () => {
   const portadaInputRef = useRef(null);
   const dropdownRef     = useRef(null);
 
-  // ──────────────────────────────────────────────────────────────
-  //  Toast helper
-  // ──────────────────────────────────────────────────────────────
-  const mostrarToast = useCallback((mensaje, tipo = "success") => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, mensaje, tipo }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
-  }, []);
+  // ✅ Toast helper unificado (modo array)
+  const mostrarToast = useToast(setToasts);
 
-  // ──────────────────────────────────────────────────────────────
-  //  Cargar productos del usuario
-  //  Antes: vivía dentro del onAuthStateChanged local.
-  //  Ahora: se dispara cuando user está disponible (viene del contexto).
-  //  RutaProtegida garantiza que user nunca es null aquí.
-  // ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
 
@@ -244,9 +184,6 @@ const Perfil = () => {
     cargarProductos();
   }, [user]);
 
-  // ──────────────────────────────────────────────────────────────
-  //  Notificaciones en tiempo real
-  // ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -260,9 +197,6 @@ const Perfil = () => {
     return () => unsub();
   }, [user]);
 
-  // ──────────────────────────────────────────────────────────────
-  //  Abrir modal automáticamente si viene de Publicar
-  // ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!cargando && location.state?.abrirModalEdicion) {
       abrirModal();
@@ -270,7 +204,6 @@ const Perfil = () => {
     }
   }, [location, cargando]);
 
-  // ── Cerrar dropdown al hacer clic fuera ──
   useEffect(() => {
     const handler = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -281,11 +214,6 @@ const Perfil = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ──────────────────────────────────────────────────────────────
-  //  Cerrar sesión — delega al contexto
-  //  ANTES: hacía localStorage.removeItem x4 + signOut(auth) aquí.
-  //  AHORA: cerrarSesion() del AuthContext lo hace todo en un lugar.
-  // ──────────────────────────────────────────────────────────────
   const handleSignOut = async () => {
     try {
       await cerrarSesion();
@@ -295,9 +223,6 @@ const Perfil = () => {
     }
   };
 
-  // ──────────────────────────────────────────────────────────────
-  //  Abrir modal (pre-rellenar con datos actuales del contexto)
-  // ──────────────────────────────────────────────────────────────
   const abrirModal = () => {
     const p = perfil || {};
     setMNombre(p.nombre       || "");
@@ -316,9 +241,6 @@ const Perfil = () => {
     setModalOpen(true);
   };
 
-  // ──────────────────────────────────────────────────────────────
-  //  Selección de imagen en modal
-  // ──────────────────────────────────────────────────────────────
   const handleFileSelect = (tipo, file) => {
     if (!file) return;
     const url = URL.createObjectURL(file);
@@ -326,10 +248,6 @@ const Perfil = () => {
     if (tipo === "portada") { setMPortadaFile(file); setMPortadaPrev(url); }
   };
 
-  // ──────────────────────────────────────────────────────────────
-  //  Guardado real — usa comprimirImagen y subirImagenImgBB
-  //  importados de utils/imageUtils.js (ya no están duplicados aquí)
-  // ──────────────────────────────────────────────────────────────
   const ejecutarGuardadoReal = async () => {
     const perfilPrev = perfil || {};
 
@@ -357,20 +275,13 @@ const Perfil = () => {
       portada:   portadaFinal,
     };
 
-    // Persistir en Firestore
     await setDoc(doc(db, "usuarios", user.uid), nuevoPerfil, { merge: true });
-
-    // ✅ Actualizar el estado global del AuthContext.
-    //    Antes se guardaba en localStorage("unp_user_profile") como parche.
-    //    Ahora el contexto ES la fuente de verdad; todos los componentes
-    //    que consumen useAuth() verán los nuevos datos automáticamente.
     actualizarPerfil(nuevoPerfil);
 
     setModalOpen(false);
     setEsperandoSMS(false);
     mostrarToast("¡Perfil guardado correctamente!");
 
-    // Propagar avatar, nombre y teléfono a todos los productos del usuario
     try {
       const q    = query(collection(db, "productos"), where("userUid", "==", user.uid));
       const snap = await getDocs(q);
@@ -397,16 +308,12 @@ const Perfil = () => {
     }
   };
 
-  // ──────────────────────────────────────────────────────────────
-  //  handleGuardar — decide entre guardado directo o flujo SMS
-  // ──────────────────────────────────────────────────────────────
   const handleGuardar = async () => {
     if (!user) return;
 
     const telefonoActual = (perfil?.telefono || "").trim();
     const telefonoNuevo  = mTelefono.trim();
 
-    // Si el teléfono no cambió o está vacío → guardar directo
     if (!telefonoNuevo || telefonoNuevo === telefonoActual) {
       setGuardando(true);
       try {
@@ -420,7 +327,6 @@ const Perfil = () => {
       return;
     }
 
-    // Teléfono nuevo → verificar por SMS
     setGuardando(true);
     try {
       if (window.recaptchaVerifier) {
@@ -448,9 +354,6 @@ const Perfil = () => {
     }
   };
 
-  // ──────────────────────────────────────────────────────────────
-  //  Verificar código SMS y guardar
-  // ──────────────────────────────────────────────────────────────
   const confirmarSMSYGuardar = async () => {
     if (!user || !verificationId || !codigoSMS.trim()) {
       mostrarToast("Ingresa el código de 6 dígitos", "error");
@@ -481,9 +384,6 @@ const Perfil = () => {
     }
   };
 
-  // ──────────────────────────────────────────────────────────────
-  //  Acciones sobre productos
-  // ──────────────────────────────────────────────────────────────
   const handleAgotar = async (prod) => {
     const nuevoEstado = (prod.estado || "").toLowerCase() === "agotado" ? "disponible" : "agotado";
     try {
@@ -516,26 +416,11 @@ const Perfil = () => {
 
   const handleEditar = (prod) => navigate(`/editar?id=${prod.id}`);
 
-  // ──────────────────────────────────────────────────────────────
-  //  Render: cargando productos (no de auth — eso lo maneja RutaProtegida)
-  // ──────────────────────────────────────────────────────────────
-  if (cargando) {
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
-        height: "100vh", fontFamily: "'Nunito', sans-serif",
-        fontWeight: 600, color: "#5c5c7a", background: "var(--bg-crema)",
-      }}>
-        Cargando perfil...
-      </div>
-    );
-  }
+  // ✅ Pantalla de carga limpia utilizando el nuevo Spinner
+  if (cargando) return <Spinner mensaje="Cargando perfil..." />;
 
   const p = perfil || {};
 
-  // ──────────────────────────────────────────────────────────────
-  //  RENDER PRINCIPAL
-  // ──────────────────────────────────────────────────────────────
   return (
     <div className="app-shell" style={{ background: "var(--bg-crema)", paddingBottom: "90px" }}>
 
@@ -1078,16 +963,8 @@ const Perfil = () => {
         </div>
       )}
 
-      {/* TOASTS */}
-      <div style={{
-        position: "fixed", bottom: "84px", left: "50%",
-        transform: "translateX(-50%)", zIndex: 1000,
-        display: "flex", flexDirection: "column", gap: "8px",
-        width: "calc(100% - 40px)", maxWidth: "390px",
-        pointerEvents: "none",
-      }}>
-        {toasts.map((t) => <Toast key={t.id} mensaje={t.mensaje} tipo={t.tipo} />)}
-      </div>
+      {/* ✅ TOAST CONTAINER LIMPIO */}
+      <ToastContainer toasts={toasts} />
 
     </div>
   );
