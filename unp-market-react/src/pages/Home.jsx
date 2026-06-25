@@ -4,14 +4,13 @@ import { useNavigate, useSearchParams }             from "react-router-dom";
 import {
   collection, getDocs, query,
   orderBy, limit, startAfter,
-  where, onSnapshot, writeBatch, doc, updateDoc
+  where, onSnapshot, writeBatch, doc, updateDoc,
 } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
-import { db, auth }           from "../services/firebase";
+import { db }              from "../services/firebase";
+import { useAuth }         from "../context/AuthContext";
+import { sincronizarFavoritos } from "../services/userService";
 
-// ──────────────────────────────────────────────────────────────
-//  CONSTANTES Y UTILIDADES
-// ──────────────────────────────────────────────────────────────
+// ── Constantes ───────────────────────────────────────────────
 const PAGE_SIZE = 20;
 
 const CATEGORIAS = [
@@ -28,11 +27,10 @@ const ICONOS_CAT = {
   servicios: "🔧", materiales: "📚",
 };
 
-// ── Mapeo orden → campo y dirección para Firestore ──
 const ORDEN_CONFIG = {
-  recientes:     { campo: "fecha",  dir: "desc" },
-  precio_asc:    { campo: "precio", dir: "asc"  },
-  precio_desc:   { campo: "precio", dir: "desc" },
+  recientes:   { campo: "fecha",  dir: "desc" },
+  precio_asc:  { campo: "precio", dir: "asc"  },
+  precio_desc: { campo: "precio", dir: "desc" },
 };
 
 const formatearTiempo = (timestamp) => {
@@ -43,13 +41,10 @@ const formatearTiempo = (timestamp) => {
   if (minutos < 60) return `Hace ${minutos} min`;
   const horas = Math.floor(minutos / 60);
   if (horas < 24) return `Hace ${horas} h`;
-  const dias = Math.floor(horas / 24);
-  return `Hace ${dias} d`;
+  return `Hace ${Math.floor(horas / 24)} d`;
 };
 
-// ──────────────────────────────────────────────────────────────
-//  SUB-COMPONENTE: Tarjeta de Producto
-// ──────────────────────────────────────────────────────────────
+// ── Sub-componentes ──────────────────────────────────────────
 const ProductCard = ({ producto, onVerDetalle }) => {
   const { id, titulo, precio, imagen, categoria, vendedorNombre, avatarVendedor, estado } = producto;
   const estaAgotado = estado === "agotado";
@@ -72,23 +67,15 @@ const ProductCard = ({ producto, onVerDetalle }) => {
             {emoji}
           </span>
         )}
-
         <span className={`card-price-badge${estaAgotado ? " card-price-badge--agotado" : ""}`}>
           S/ {(precio || 0).toFixed(2)}
         </span>
-
-        {estaAgotado && (
-          <div className="card-sold-out-overlay">
-            AGOTADO
-          </div>
-        )}
+        {estaAgotado && <div className="card-sold-out-overlay">AGOTADO</div>}
       </div>
-
       <div className="card-body">
         <h3 className={`card-title${estaAgotado ? " card-title--agotado" : ""}`}>
           {titulo || "Sin título"}
         </h3>
-
         {vendedorNombre && (
           <div className="card-seller">
             <div className="seller-avatar seller-avatar--gradient">
@@ -98,9 +85,7 @@ const ProductCard = ({ producto, onVerDetalle }) => {
                 (vendedorNombre || "?")[0].toUpperCase()
               )}
             </div>
-            <span className="seller-name">
-              {vendedorNombre}
-            </span>
+            <span className="seller-name">{vendedorNombre}</span>
           </div>
         )}
       </div>
@@ -108,9 +93,6 @@ const ProductCard = ({ producto, onVerDetalle }) => {
   );
 };
 
-// ──────────────────────────────────────────────────────────────
-//  SUB-COMPONENTE: Toast
-// ──────────────────────────────────────────────────────────────
 const Toast = ({ mensaje, tipo }) => (
   <div className={`toast toast--${tipo}`}>
     {tipo === "success"
@@ -121,100 +103,47 @@ const Toast = ({ mensaje, tipo }) => (
   </div>
 );
 
-// ──────────────────────────────────────────────────────────────
-//  COMPONENTE PRINCIPAL: Home
-// ──────────────────────────────────────────────────────────────
+// ── Componente principal ─────────────────────────────────────
 const Home = () => {
-  const navigate = useNavigate();
+  const navigate       = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [currentUser,    setCurrentUser]    = useState(null);
-  const [notificaciones, setNotificaciones] = useState([]);
+  // ✅ FASE 2: useAuth reemplaza onAuthStateChanged local + localStorage de favoritos
+  const { user, favoritos, actualizarFavoritos } = useAuth();
 
-  const [productos,       setProductos]       = useState([]);
-  const [cargando,        setCargando]        = useState(false);
-  const [todoCargado,     setTodoCargado]     = useState(false);
-  const [busqueda,        setBusqueda]        = useState("");
+  const [notificaciones,   setNotificaciones]   = useState([]);
+  const [productos,        setProductos]        = useState([]);
+  const [cargando,         setCargando]         = useState(false);
+  const [todoCargado,      setTodoCargado]      = useState(false);
+  const [busqueda,         setBusqueda]         = useState("");
   const [busquedaFirebase, setBusquedaFirebase] = useState("");
-  const [categoriaActiva, setCategoriaActiva] = useState("todos");
-  const [toasts,          setToasts]          = useState([]);
-
-  // ── NUEVO: estado de ordenamiento ──
-  const [orden, setOrden] = useState("recientes");
+  const [categoriaActiva,  setCategoriaActiva]  = useState("todos");
+  const [toasts,           setToasts]           = useState([]);
+  const [orden,            setOrden]            = useState("recientes");
   const [menuOrdenAbierto, setMenuOrdenAbierto] = useState(false);
 
-  const tabUrl = searchParams.get("tab") || "inicio";
+  const tabUrl                  = searchParams.get("tab") || "inicio";
   const [tabActiva, setTabActiva] = useState(tabUrl);
-
-  const [favoritos, setFavoritos] = useState(() => {
-    try {
-      const guardados = localStorage.getItem("listaFavoritos");
-      return new Set(guardados ? JSON.parse(guardados) : []);
-    } catch {
-      return new Set();
-    }
-  });
 
   const sentinelRef  = useRef(null);
   const ultimoDocRef = useRef(null);
   const observerRef  = useRef(null);
 
-  useEffect(() => {
-    setTabActiva(tabUrl);
-  }, [tabUrl]);
+  useEffect(() => { setTabActiva(tabUrl); }, [tabUrl]);
 
+  // Listener de notificaciones — depende de user del contexto
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (!user) navigate("/login", { replace: true });
-      else setCurrentUser(user);
-    });
-    return () => unsub();
-  }, [navigate]);
-
-  useEffect(() => {
-    if (!currentUser) return;
+    if (!user) return;
     const q = query(
       collection(db, "notificaciones"),
-      where("paraUid", "==", currentUser.uid),
+      where("paraUid", "==", user.uid),
       orderBy("timestamp", "desc")
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const notifs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setNotificaciones(notifs);
+    const unsub = onSnapshot(q, (snapshot) => {
+      setNotificaciones(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return () => unsubscribe();
-  }, [currentUser]);
-
-  const handleLimpiarNotificaciones = async () => {
-    if (notificaciones.length === 0) return;
-    try {
-      const batch = writeBatch(db);
-      notificaciones.forEach(n => {
-        batch.delete(doc(db, "notificaciones", n.id));
-      });
-      await batch.commit();
-      mostrarToast("Notificaciones eliminadas");
-    } catch (error) {
-      console.error("Error al limpiar notificaciones:", error);
-      mostrarToast("Error al procesar", "error");
-    }
-  };
-
-  const handleNotifClick = async (notif) => {
-    try {
-      if (!notif.leido) {
-        await updateDoc(doc(db, "notificaciones", notif.id), { leido: true });
-      }
-    } catch (error) {
-      console.error("Error al marcar notificación:", error);
-    } finally {
-      if (notif.tipo === "nuevo_producto" && notif.productoId) {
-        navigate(`/producto?id=${notif.productoId}`);
-      } else {
-        navigate(`/vendedor?uid=${notif.deUid}`);
-      }
-    }
-  };
+    return () => unsub();
+  }, [user]);
 
   const mostrarToast = useCallback((mensaje, tipo = "success") => {
     const id = Date.now();
@@ -222,37 +151,21 @@ const Home = () => {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
   }, []);
 
-  // ── Debounce (500ms): solo dispara la búsqueda en Firebase cuando
-  //    el usuario deja de escribir, evitando una consulta por cada tecla ──
+  // Debounce búsqueda
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setBusquedaFirebase(busqueda);
-    }, 500);
+    const timer = setTimeout(() => setBusquedaFirebase(busqueda), 500);
     return () => clearTimeout(timer);
   }, [busqueda]);
 
-  // ──────────────────────────────────────────────────────────────
-  //  CARGA DE PRODUCTOS — combina categoría (where) + orden (orderBy)
-  //
-  //  Nota sobre índices compuestos:
-  //  Cuando categoriaActiva !== "todos", Firestore combina un where()
-  //  con un orderBy() en un campo distinto, lo que requiere un índice
-  //  compuesto. Si la consola arroja un error con un enlace de Firebase,
-  //  haz clic en él para crearlo en un paso.
-  //  Las combinaciones necesarias son:
-  //    - categoria (asc) + fecha (desc)
-  //    - categoria (asc) + precio (asc)
-  //    - categoria (asc) + precio (desc)
-  // ──────────────────────────────────────────────────────────────
-const cargarMasProductos = useCallback(async (esNuevoFiltro = false) => {
+  // Carga paginada de productos
+  const cargarMasProductos = useCallback(async (esNuevoFiltro = false) => {
     if (cargando || (todoCargado && !esNuevoFiltro)) return;
     setCargando(true);
-
     try {
       const { campo, dir } = ORDEN_CONFIG[orden];
       const col            = collection(db, "productos");
+      const constraints    = [];
 
-      const constraints = [];
       if (busquedaFirebase.trim() !== "") {
         constraints.push(where("keywords", "array-contains", busquedaFirebase.toLowerCase().trim()));
       } else if (categoriaActiva !== "todos") {
@@ -260,24 +173,19 @@ const cargarMasProductos = useCallback(async (esNuevoFiltro = false) => {
       }
       constraints.push(orderBy(campo, dir));
       constraints.push(limit(PAGE_SIZE));
-
       if (ultimoDocRef.current && !esNuevoFiltro) {
         constraints.push(startAfter(ultimoDocRef.current));
       }
 
       const snapshot = await getDocs(query(col, ...constraints));
-
       if (snapshot.size < PAGE_SIZE) setTodoCargado(true);
 
       const nuevos = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-
       setProductos((prev) => {
-        if (esNuevoFiltro) return nuevos; // Si cambió la categoría, sobreescribimos fluido
-        const idsExistentes = new Set(prev.map((p) => p.id));
-        const sinDuplicados = nuevos.filter((p) => !idsExistentes.has(p.id));
-        return [...prev, ...sinDuplicados];
+        if (esNuevoFiltro) return nuevos;
+        const ids = new Set(prev.map((p) => p.id));
+        return [...prev, ...nuevos.filter((p) => !ids.has(p.id))];
       });
-
       if (!snapshot.empty) {
         ultimoDocRef.current = snapshot.docs[snapshot.docs.length - 1];
       }
@@ -289,37 +197,29 @@ const cargarMasProductos = useCallback(async (esNuevoFiltro = false) => {
     }
   }, [cargando, todoCargado, mostrarToast, orden, categoriaActiva, busquedaFirebase]);
 
-// ── Reiniciar cursores cuando cambia el filtro (sin vaciar la pantalla de golpe) ──
   useEffect(() => {
     setTodoCargado(false);
     ultimoDocRef.current = null;
-    // Disparamos la carga inmediatamente con los nuevos filtros
-    cargarMasProductos(true); 
+    cargarMasProductos(true);
   }, [orden, categoriaActiva, busquedaFirebase]);
 
-  // ── Dispara la primera carga después del reset ──
   useEffect(() => {
-    if (!todoCargado && productos.length === 0 && !cargando) {
-      cargarMasProductos();
-    }
+    if (!todoCargado && productos.length === 0 && !cargando) cargarMasProductos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productos, todoCargado]);
 
-  // ── Infinite scroll ──
+  // Infinite scroll
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
     if (todoCargado || !sentinelRef.current) return;
-
     observerRef.current = new IntersectionObserver(
       (entries) => { if (entries[0].isIntersecting) cargarMasProductos(); },
       { root: null, rootMargin: "200px", threshold: 0.1 }
     );
-
     observerRef.current.observe(sentinelRef.current);
     return () => observerRef.current?.disconnect();
   }, [cargarMasProductos, todoCargado]);
 
-  // ── Filtro de búsqueda (client-side, sobre la página ya cargada) ──
   const productosFiltrados = productos.filter((p) =>
     busqueda.trim() === "" ||
     (p.titulo || "").toLowerCase().includes(busqueda.toLowerCase())
@@ -327,12 +227,35 @@ const cargarMasProductos = useCallback(async (esNuevoFiltro = false) => {
 
   const handleVerDetalle = (id) => navigate(`/producto?id=${id}`);
 
-  // ──────────────────────────────────────────────────────────────
-  //  RENDER
-  // ──────────────────────────────────────────────────────────────
+  const handleLimpiarNotificaciones = async () => {
+    if (notificaciones.length === 0) return;
+    try {
+      const batch = writeBatch(db);
+      notificaciones.forEach(n => batch.delete(doc(db, "notificaciones", n.id)));
+      await batch.commit();
+      mostrarToast("Notificaciones eliminadas");
+    } catch {
+      mostrarToast("Error al procesar", "error");
+    }
+  };
+
+  const handleNotifClick = async (notif) => {
+    try {
+      if (!notif.leido) {
+        await updateDoc(doc(db, "notificaciones", notif.id), { leido: true });
+      }
+    } finally {
+      if (notif.tipo === "nuevo_producto" && notif.productoId) {
+        navigate(`/producto?id=${notif.productoId}`);
+      } else {
+        navigate(`/vendedor?uid=${notif.deUid}`);
+      }
+    }
+  };
+
+  // ── Render ───────────────────────────────────────────────
   return (
     <div className="app-shell">
-      {/* HEADER */}
       <header className="header" style={{ justifyContent: "center", paddingBottom: "0" }}>
         <div className="logo" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
           <img
@@ -347,7 +270,7 @@ const cargarMasProductos = useCallback(async (esNuevoFiltro = false) => {
         <>
           <div className="search-wrapper">
             <div className="search-bar">
-              <svg className="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
               <input
@@ -376,53 +299,38 @@ const cargarMasProductos = useCallback(async (esNuevoFiltro = false) => {
 
       {tabActiva === "inicio" && (
         <section className="catalog">
-         <div className="catalog-header">
+          <div className="catalog-header">
             <h2 className="catalog-title">Destacados</h2>
-
-            {/* DROPDOWN CUSTOMIZADO DE ORDENAMIENTO */}
             <div style={{ position: "relative" }}>
               <button
                 onClick={() => setMenuOrdenAbierto(!menuOrdenAbierto)}
                 style={{
-                  background: "rgba(46, 107, 78, 0.08)",
-                  color: "var(--verde-marca)",
-                  border: "none",
-                  padding: "6px 14px",
-                  borderRadius: "14px",
-                  fontSize: "0.85rem",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
+                  background: "rgba(46, 107, 78, 0.08)", color: "var(--verde-marca)",
+                  border: "none", padding: "6px 14px", borderRadius: "14px",
+                  fontSize: "0.85rem", fontWeight: 800, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: "6px",
                   fontFamily: "'Nunito', sans-serif",
-                  transition: "background 0.2s"
                 }}
               >
                 {orden === "recientes" ? "Más recientes" : orden === "precio_asc" ? "Menor precio" : "Mayor precio"}
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: menuOrdenAbierto ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transform: menuOrdenAbierto ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}>
                   <polyline points="6 9 12 15 18 9"/>
                 </svg>
               </button>
-
               {menuOrdenAbierto && (
                 <>
-                  {/* Capa invisible para cerrar el menú al hacer clic afuera */}
                   <div onClick={() => setMenuOrdenAbierto(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
-                  
-                  {/* Caja flotante de opciones */}
                   <div style={{
                     position: "absolute", top: "100%", right: 0, marginTop: "8px",
                     background: "white", borderRadius: "14px",
                     boxShadow: "0 8px 24px rgba(15,37,64,0.12)",
-                    border: "1px solid rgba(15,37,64,0.06)",
-                    overflow: "hidden", zIndex: 100, minWidth: "145px",
-                    display: "flex", flexDirection: "column"
+                    overflow: "hidden", zIndex: 100, minWidth: "145px", display: "flex", flexDirection: "column",
                   }}>
                     {[
-                      { id: "recientes", label: "Más recientes" },
-                      { id: "precio_asc", label: "Menor precio" },
-                      { id: "precio_desc", label: "Mayor precio" }
+                      { id: "recientes",   label: "Más recientes" },
+                      { id: "precio_asc",  label: "Menor precio"  },
+                      { id: "precio_desc", label: "Mayor precio"  },
                     ].map(opt => (
                       <button
                         key={opt.id}
@@ -432,7 +340,7 @@ const cargarMasProductos = useCallback(async (esNuevoFiltro = false) => {
                           color: orden === opt.id ? "var(--verde-marca)" : "var(--text-mid)",
                           border: "none", padding: "12px 16px", textAlign: "left",
                           fontSize: "0.85rem", fontWeight: 800, cursor: "pointer",
-                          fontFamily: "'Nunito', sans-serif", transition: "background 0.2s"
+                          fontFamily: "'Nunito', sans-serif",
                         }}
                       >
                         {opt.label}
@@ -493,7 +401,6 @@ const cargarMasProductos = useCallback(async (esNuevoFiltro = false) => {
               </button>
             )}
           </div>
-
           {notificaciones.length === 0 ? (
             <div className="notif-empty">
               <span className="notif-empty-icon">🔔</span>
@@ -503,28 +410,18 @@ const cargarMasProductos = useCallback(async (esNuevoFiltro = false) => {
           ) : (
             <div className="notif-list">
               {notificaciones.map((notif) => {
-              const esFav = notif.tipo === "favorito";
-                const esSeguidor = notif.tipo === "seguidor"; 
-                const esNuevoProd = notif.tipo === "nuevo_producto"; // <-- NUEVO
-
-                // Asignamos el icono correcto
+                const esFav      = notif.tipo === "favorito";
+                const esSeguidor = notif.tipo === "seguidor";
+                const esNuevoProd = notif.tipo === "nuevo_producto";
                 let icono = "💬";
                 if (esFav) icono = "❤️";
                 if (esSeguidor) icono = "👤";
-                if (esNuevoProd) icono = "📢"; // <-- NUEVO (Megáfono)
-
-                // Asignamos el texto correcto
-                let textoAccion = "quiere comprar";
+                if (esNuevoProd) icono = "📢";
+                let textoAccion   = "quiere comprar";
                 let mostrarProducto = true;
-
-                if (esFav) {
-                  textoAccion = "guardó";
-                } else if (esSeguidor) {
-                  textoAccion = "empezó a seguirte";
-                  mostrarProducto = false; 
-                } else if (esNuevoProd) {
-                  textoAccion = "publicó un nuevo producto:"; // <-- NUEVO
-                }
+                if (esFav)       { textoAccion = "guardó"; }
+                else if (esSeguidor) { textoAccion = "empezó a seguirte"; mostrarProducto = false; }
+                else if (esNuevoProd) { textoAccion = "publicó un nuevo producto:"; }
 
                 return (
                   <div
@@ -568,26 +465,14 @@ const cargarMasProductos = useCallback(async (esNuevoFiltro = false) => {
         <button className={`nav-item${tabActiva === "notifs" ? " active" : ""}`} onClick={() => navigate("/?tab=notifs")} aria-label="Notificaciones">
           <div className="nav-icon-wrap" style={{ position: "relative", display: "inline-flex" }}>
             <svg className="nav-icon" viewBox="0 0 24 24" fill="none" strokeWidth="2.2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            
-            {/* BADGE ROJO FORZADO */}
             {notificaciones.some(n => !n.leido) && (
               <span className="nav-notif-badge" style={{
-                position: "absolute", 
-                top: "-4px", 
-                right: "-6px",
-                background: "#ef4444", 
-                color: "white", 
-                fontSize: "0.65rem",
-                fontWeight: 800, 
-                minWidth: "16px", 
-                height: "16px",
-                borderRadius: "50%", 
-                display: "flex", 
-                alignItems: "center",
-                justifyContent: "center", 
-                border: "2px solid #16a34a", /* O usa el color de fondo de tu nav si es azul oscuro: #1e293b */
-                padding: "0 4px",
-                lineHeight: 1
+                position: "absolute", top: "-4px", right: "-6px",
+                background: "#ef4444", color: "white", fontSize: "0.65rem",
+                fontWeight: 800, minWidth: "16px", height: "16px",
+                borderRadius: "50%", display: "flex", alignItems: "center",
+                justifyContent: "center", border: "2px solid #16a34a",
+                padding: "0 4px", lineHeight: 1,
               }}>
                 {notificaciones.filter(n => !n.leido).length}
               </span>
