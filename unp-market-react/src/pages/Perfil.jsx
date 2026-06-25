@@ -1,76 +1,48 @@
 // src/pages/Perfil.jsx
 // ============================================================
-//  UNP Market — Perfil: Dashboard del usuario autenticado
+//  TuCampus — Dashboard del usuario autenticado
 //
-//  Migra perfil.html + secciones 8-10, 12 de app.js:
-//    - onAuthStateChanged → guard sesión + fetch usuario
-//    - Banner + avatar circular con edición
-//    - Dropdown ⚙️ → Editar perfil | Cerrar sesión
-//    - Info: ubicación, teléfono, acerca de mí
-//    - Mis Publicaciones Activas (query donde userUid == uid)
-//    - Tarjetas con botones Editar / Agotar / Borrar
-//    - Modal edición de perfil (campos + imgBB + canvas)
-//    - Bottom nav con "Perfil" activo
-//    - [NUEVO] Verificación de celular por SMS (Firebase Phone Auth)
+//  CAMBIOS DE REFACTORIZACIÓN (vs versión anterior):
+//
+//  ❌ ELIMINADO — onAuthStateChanged propio (línea 250 original)
+//     → Ya lo gestiona AuthContext. Esta página recibe user y
+//       perfil directamente via useAuth(), sin abrir un listener.
+//
+//  ❌ ELIMINADO — signOut directo + localStorage.removeItem manual
+//     → Se reemplaza por cerrarSesion() del contexto, que lo hace
+//       de forma centralizada y consistente en toda la app.
+//
+//  ❌ ELIMINADO — comprimirImagen() local (líneas 42-60 originales)
+//  ❌ ELIMINADO — subirImgBB() local (líneas 65-72 originales)
+//  ❌ ELIMINADO — constantes IMGBB_API_KEY / MAX_DIM / CALIDAD
+//     → Todos importados de utils/imageUtils.js, una sola fuente.
+//
+//  ❌ ELIMINADO — localStorage.getItem("unp_user_profile") como
+//     fallback al cargar perfil. El contexto ya tiene el perfil;
+//     no necesitamos parches de localStorage.
+//
+//  ✅ AGREGADO — actualizarPerfil() del contexto, para que el
+//     estado global se sincronice tras cada guardado sin refetch.
+//
+//  ✅ CONSERVADO — toda la lógica de negocio:
+//     Phone Auth / SMS, propagación a productos, notificaciones
+//     en tiempo real, modal de edición, tarjetas, etc.
 // ============================================================
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation }                 from "react-router-dom";
 import {
-  doc, getDoc, setDoc, getDocs,
+  doc, setDoc, getDocs,
   collection, query, where,
-  updateDoc, deleteDoc, serverTimestamp,
+  updateDoc, deleteDoc,
   onSnapshot, orderBy,
 } from "firebase/firestore";
-// PASO 1: Se añaden RecaptchaVerifier, PhoneAuthProvider y linkWithCredential
 import {
-  onAuthStateChanged, signOut,
   RecaptchaVerifier, PhoneAuthProvider, linkWithCredential,
 } from "firebase/auth";
 import { db, auth }                    from "../services/firebase";
-
-// ──────────────────────────────────────────────────────────────
-//  CONSTANTES
-// ──────────────────────────────────────────────────────────────
-const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
-const MAX_DIM       = 1080;
-const CALIDAD       = 0.70;
-
-// ──────────────────────────────────────────────────────────────
-//  UTILIDADES: compresión canvas + subida ImgBB
-// ──────────────────────────────────────────────────────────────
-const comprimirImagen = (file) =>
-  new Promise((resolve, reject) => {
-    const reader   = new FileReader();
-    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
-    reader.onload  = (e) => {
-      const img   = new Image();
-      img.onerror = () => reject(new Error("No se pudo cargar la imagen"));
-      img.onload  = () => {
-        let { width, height } = img;
-        if (width > MAX_DIM || height > MAX_DIM) {
-          if (width > height) { height = Math.round(height * MAX_DIM / width);  width  = MAX_DIM; }
-          else                { width  = Math.round(width  * MAX_DIM / height); height = MAX_DIM; }
-        }
-        const canvas  = document.createElement("canvas");
-        canvas.width  = width; canvas.height = height;
-        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-        canvas.toBlob((blob) => resolve(blob ?? file), "image/jpeg", CALIDAD);
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-
-const subirImgBB = async (file) => {
-  if (!file) return "";
-  const fd = new FormData();
-  fd.append("image", file);
-  const res  = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: "POST", body: fd });
-  const data = await res.json();
-  if (!data.success) throw new Error("ImgBB rechazó la imagen");
-  return data.data.url;
-};
+import { useAuth }                     from "../context/AuthContext";
+import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
 
 // ──────────────────────────────────────────────────────────────
 //  SUB-COMPONENTE: Toast
@@ -92,8 +64,8 @@ const Toast = ({ mensaje, tipo }) => (
 // ──────────────────────────────────────────────────────────────
 const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
   const { titulo, precio, imagen, vendedorNombre, vendedor, avatarVendedor, estado } = producto;
-  const agotado     = (estado || "").toLowerCase() === "agotado";
-  const nombreVend  = vendedorNombre || vendedor || "Yo";
+  const agotado    = (estado || "").toLowerCase() === "agotado";
+  const nombreVend = vendedorNombre || vendedor || "Yo";
 
   return (
     <article style={{
@@ -200,18 +172,23 @@ const Perfil = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ── Datos ──
-  const [currentUser,  setCurrentUser]  = useState(null);
-  const [perfil,       setPerfil]       = useState(null);
-  const [productos,    setProductos]    = useState([]);
-  const [cargando,     setCargando]     = useState(true);
+  // ✅ useAuth reemplaza el onAuthStateChanged local.
+  //    - user: objeto Firebase Auth (uid, email, etc.)
+  //    - perfil: documento Firestore del usuario
+  //    - cerrarSesion: centralizado en AuthContext
+  //    - actualizarPerfil: sincroniza el estado global tras guardar
+  const { user, perfil, cerrarSesion, actualizarPerfil } = useAuth();
+
+  // ── Datos locales de esta página ──
+  const [productos,      setProductos]      = useState([]);
+  const [cargando,       setCargando]       = useState(true);
   const [notificaciones, setNotificaciones] = useState([]);
 
   // ── UI ──
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [modalOpen,    setModalOpen]    = useState(false);
-  const [guardando,    setGuardando]    = useState(false);
-  const [toasts,       setToasts]       = useState([]);
+  const [dropdownOpen,    setDropdownOpen]    = useState(false);
+  const [modalOpen,       setModalOpen]       = useState(false);
+  const [guardando,       setGuardando]       = useState(false);
+  const [toasts,          setToasts]          = useState([]);
   const [productoABorrar, setProductoABorrar] = useState(null);
 
   // ── Modal: campos controlados ──
@@ -225,7 +202,7 @@ const Perfil = () => {
   const [mAvatarPrev,  setMAvatarPrev]  = useState(null);
   const [mPortadaPrev, setMPortadaPrev] = useState(null);
 
-  // PASO 2: Estados para verificación SMS
+  // ── Phone Auth / SMS ──
   const [esperandoSMS,   setEsperandoSMS]   = useState(false);
   const [codigoSMS,      setCodigoSMS]      = useState("");
   const [verificationId, setVerificationId] = useState(null);
@@ -244,63 +221,51 @@ const Perfil = () => {
   }, []);
 
   // ──────────────────────────────────────────────────────────────
-  //  Guard sesión + fetch perfil + fetch productos
+  //  Cargar productos del usuario
+  //  Antes: vivía dentro del onAuthStateChanged local.
+  //  Ahora: se dispara cuando user está disponible (viene del contexto).
+  //  RutaProtegida garantiza que user nunca es null aquí.
   // ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) { navigate("/login", { replace: true }); return; }
-      setCurrentUser(user);
+    if (!user) return;
 
+    const cargarProductos = async () => {
       try {
-        // Perfil de usuario + Mis publicaciones, en paralelo (sin waterfall)
-        const q = query(collection(db, "productos"), where("userUid", "==", user.uid));
-
-        const [snap, pSnap] = await Promise.all([
-          getDoc(doc(db, "usuarios", user.uid)),
-          getDocs(q),
-        ]);
-
-        const data = snap.exists()
-          ? snap.data()
-          : JSON.parse(localStorage.getItem("unp_user_profile") || "{}");
-        setPerfil(data);
-
-        setProductos(pSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        const q    = query(collection(db, "productos"), where("userUid", "==", user.uid));
+        const snap = await getDocs(q);
+        setProductos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       } catch (err) {
-        console.error(err);
-        setPerfil(JSON.parse(localStorage.getItem("unp_user_profile") || "{}"));
+        console.error("[Perfil] Error al cargar productos:", err);
       } finally {
         setCargando(false);
       }
-    });
-    return () => unsub();
-  }, [navigate]);
+    };
+
+    cargarProductos();
+  }, [user]);
 
   // ──────────────────────────────────────────────────────────────
-  //  Notificaciones en tiempo real (puntito/globo rojo)
+  //  Notificaciones en tiempo real
   // ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!currentUser) return;
+    if (!user) return;
     const q = query(
       collection(db, "notificaciones"),
-      where("paraUid", "==", currentUser.uid),
+      where("paraUid", "==", user.uid),
       orderBy("timestamp", "desc")
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const notifs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setNotificaciones(notifs);
+    const unsub = onSnapshot(q, (snapshot) => {
+      setNotificaciones(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-    return () => unsubscribe();
-  }, [currentUser]);
+    return () => unsub();
+  }, [user]);
 
-// ──────────────────────────────────────────────────────────────
-  //  OBJETIVO 1: Abrir modal automáticamente si viene de Publicar
+  // ──────────────────────────────────────────────────────────────
+  //  Abrir modal automáticamente si viene de Publicar
   // ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    // Solo intentamos abrir el modal SI ya terminó de cargar la base de datos
     if (!cargando && location.state?.abrirModalEdicion) {
       abrirModal();
-      // Limpiar el estado de la historia para que no se reabra al recargar
       window.history.replaceState({}, document.title);
     }
   }, [location, cargando]);
@@ -317,24 +282,27 @@ const Perfil = () => {
   }, []);
 
   // ──────────────────────────────────────────────────────────────
-  //  Cerrar sesión
+  //  Cerrar sesión — delega al contexto
+  //  ANTES: hacía localStorage.removeItem x4 + signOut(auth) aquí.
+  //  AHORA: cerrarSesion() del AuthContext lo hace todo en un lugar.
   // ──────────────────────────────────────────────────────────────
   const handleSignOut = async () => {
-    ["unp_user_profile", "listaFavoritos",
-     "mostrarToastPublicar", "productoSeleccionado"
-    ].forEach((k) => localStorage.removeItem(k));
-    await signOut(auth);
-    navigate("/login", { replace: true });
+    try {
+      await cerrarSesion();
+      navigate("/login", { replace: true });
+    } catch (err) {
+      mostrarToast("Error al cerrar sesión", "error");
+    }
   };
 
   // ──────────────────────────────────────────────────────────────
-  //  Abrir modal (pre-rellenar con datos actuales)
+  //  Abrir modal (pre-rellenar con datos actuales del contexto)
   // ──────────────────────────────────────────────────────────────
   const abrirModal = () => {
     const p = perfil || {};
-    setMNombre(p.nombre    || "");
-    setMBio(p.bio          || "");
-    setMAcerca(p.acercaDe  || "");
+    setMNombre(p.nombre       || "");
+    setMBio(p.bio             || "");
+    setMAcerca(p.acercaDe     || "");
     setMUbicacion(p.ubicacion || "");
     setMTelefono(p.telefono   || "");
     setMAvatarFile(null);
@@ -342,7 +310,6 @@ const Perfil = () => {
     setMAvatarPrev(p.avatar  || null);
     setMPortadaPrev(p.portada || null);
     setDropdownOpen(false);
-    // Resetear estado SMS al abrir
     setEsperandoSMS(false);
     setCodigoSMS("");
     setVerificationId(null);
@@ -360,27 +327,27 @@ const Perfil = () => {
   };
 
   // ──────────────────────────────────────────────────────────────
-  //  Lógica de guardado real (extraída para reutilizarse)
+  //  Guardado real — usa comprimirImagen y subirImagenImgBB
+  //  importados de utils/imageUtils.js (ya no están duplicados aquí)
   // ──────────────────────────────────────────────────────────────
   const ejecutarGuardadoReal = async () => {
     const perfilPrev = perfil || {};
 
-    // Subir imágenes solo si hay archivo nuevo
     let avatarFinal  = perfilPrev.avatar  || "";
     let portadaFinal = perfilPrev.portada || "";
 
     if (mAvatarFile) {
       const blob = await comprimirImagen(mAvatarFile);
-      avatarFinal = await subirImgBB(blob);
+      avatarFinal = await subirImagenImgBB(blob);
     }
     if (mPortadaFile) {
       const blob = await comprimirImagen(mPortadaFile);
-      portadaFinal = await subirImgBB(blob);
+      portadaFinal = await subirImagenImgBB(blob);
     }
 
     const nuevoPerfil = {
       ...perfilPrev,
-      uid:       currentUser.uid,
+      uid:       user.uid,
       nombre:    mNombre    || perfilPrev.nombre    || "",
       bio:       mBio       || perfilPrev.bio       || "",
       acercaDe:  mAcerca    || perfilPrev.acercaDe  || "",
@@ -390,29 +357,32 @@ const Perfil = () => {
       portada:   portadaFinal,
     };
 
-    await setDoc(doc(db, "usuarios", currentUser.uid), nuevoPerfil, { merge: true });
-    localStorage.setItem("unp_user_profile", JSON.stringify(nuevoPerfil));
-    setPerfil(nuevoPerfil);
+    // Persistir en Firestore
+    await setDoc(doc(db, "usuarios", user.uid), nuevoPerfil, { merge: true });
+
+    // ✅ Actualizar el estado global del AuthContext.
+    //    Antes se guardaba en localStorage("unp_user_profile") como parche.
+    //    Ahora el contexto ES la fuente de verdad; todos los componentes
+    //    que consumen useAuth() verán los nuevos datos automáticamente.
+    actualizarPerfil(nuevoPerfil);
+
     setModalOpen(false);
     setEsperandoSMS(false);
     mostrarToast("¡Perfil guardado correctamente!");
 
-    // PARCHE 3 — Propagar avatar, vendedorNombre y telefono a todos los productos del usuario.
-    // Se ejecuta siempre (no solo cuando cambia el avatar) para mantener los datos de vendedor
-    // sincronizados en el feed cuando el usuario edita su nombre o WhatsApp.
+    // Propagar avatar, nombre y teléfono a todos los productos del usuario
     try {
-      const q    = query(collection(db, "productos"), where("userUid", "==", currentUser.uid));
+      const q    = query(collection(db, "productos"), where("userUid", "==", user.uid));
       const snap = await getDocs(q);
       if (!snap.empty) {
         await Promise.all(snap.docs.map((d) =>
           updateDoc(doc(db, "productos", d.id), {
             avatarVendedor: avatarFinal,
             vendedorNombre: nuevoPerfil.nombre   || "",
-            vendedor:       nuevoPerfil.nombre   || "",   // campo legacy
+            vendedor:       nuevoPerfil.nombre   || "",
             telefono:       nuevoPerfil.telefono || "",
           })
         ));
-        // Reflejar los cambios en el estado local sin re-fetch
         setProductos((prev) => prev.map((p) => ({
           ...p,
           avatarVendedor: avatarFinal,
@@ -423,20 +393,20 @@ const Perfil = () => {
         mostrarToast(`✓ Perfil actualizado en ${snap.size} publicación${snap.size !== 1 ? "es" : ""}`);
       }
     } catch (syncErr) {
-      console.warn("Error al sincronizar productos:", syncErr);
+      console.warn("[Perfil] Error al sincronizar productos:", syncErr);
     }
   };
 
   // ──────────────────────────────────────────────────────────────
-  //  PASO 3: handleGuardar refactorizado
+  //  handleGuardar — decide entre guardado directo o flujo SMS
   // ──────────────────────────────────────────────────────────────
   const handleGuardar = async () => {
-    if (!currentUser) return;
+    if (!user) return;
 
     const telefonoActual = (perfil?.telefono || "").trim();
     const telefonoNuevo  = mTelefono.trim();
 
-    // Si el teléfono está vacío o no cambió → guardado normal
+    // Si el teléfono no cambió o está vacío → guardar directo
     if (!telefonoNuevo || telefonoNuevo === telefonoActual) {
       setGuardando(true);
       try {
@@ -450,36 +420,25 @@ const Perfil = () => {
       return;
     }
 
-    // El teléfono es nuevo o ha cambiado → verificar por SMS primero
+    // Teléfono nuevo → verificar por SMS
     setGuardando(true);
     try {
-      // Limpiar instancia anterior si existe
       if (window.recaptchaVerifier) {
         window.recaptchaVerifier.clear();
         window.recaptchaVerifier = null;
       }
-
-     // Limpiar cualquier reCAPTCHA anterior atrapado en la memoria
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = null;
-      }
-      
-      // Crear uno nuevo fresco
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
 
       const provider = new PhoneAuthProvider(auth);
       const verId    = await provider.verifyPhoneNumber(
         "+51" + telefonoNuevo,
         window.recaptchaVerifier
       );
-
       setVerificationId(verId);
       setEsperandoSMS(true);
     } catch (err) {
-      console.error("Error al enviar SMS:", err);
+      console.error("[Perfil] Error al enviar SMS:", err);
       mostrarToast("No se pudo enviar el SMS. Verifica el número.", "error");
-      // Limpiar recaptcha si falla
       if (window.recaptchaVerifier) {
         window.recaptchaVerifier.clear();
         window.recaptchaVerifier = null;
@@ -490,30 +449,24 @@ const Perfil = () => {
   };
 
   // ──────────────────────────────────────────────────────────────
-  //  PASO 4: Verificar código SMS y guardar
+  //  Verificar código SMS y guardar
   // ──────────────────────────────────────────────────────────────
   const confirmarSMSYGuardar = async () => {
-    if (!currentUser || !verificationId || !codigoSMS.trim()) {
+    if (!user || !verificationId || !codigoSMS.trim()) {
       mostrarToast("Ingresa el código de 6 dígitos", "error");
       return;
     }
     setGuardando(true);
     try {
-      // 1. Crear la credencial con el código ingresado
       const credential = PhoneAuthProvider.credential(verificationId, codigoSMS.trim());
-
-      // 2. Vincular el teléfono a la cuenta de Google actual
-      await linkWithCredential(currentUser, credential);
-
-      // 3. Si el vínculo es exitoso, ejecutar el guardado real
+      await linkWithCredential(user, credential);
       await ejecutarGuardadoReal();
       mostrarToast("📱 Teléfono verificado y perfil guardado");
     } catch (err) {
-      console.error("Error al verificar SMS:", err);
+      console.error("[Perfil] Error al verificar SMS:", err);
       if (err.code === "auth/invalid-verification-code") {
         mostrarToast("Código incorrecto. Inténtalo de nuevo.", "error");
       } else if (err.code === "auth/provider-already-linked") {
-        // El teléfono ya está vinculado → guardar igual
         try {
           await ejecutarGuardadoReal();
         } catch (saveErr) {
@@ -545,9 +498,7 @@ const Perfil = () => {
     }
   };
 
-  const handleBorrar = (prod) => {
-    setProductoABorrar(prod);
-  };
+  const handleBorrar = (prod) => setProductoABorrar(prod);
 
   const confirmarBorrado = async () => {
     if (!productoABorrar) return;
@@ -566,7 +517,7 @@ const Perfil = () => {
   const handleEditar = (prod) => navigate(`/editar?id=${prod.id}`);
 
   // ──────────────────────────────────────────────────────────────
-  //  Render: cargando
+  //  Render: cargando productos (no de auth — eso lo maneja RutaProtegida)
   // ──────────────────────────────────────────────────────────────
   if (cargando) {
     return (
@@ -588,9 +539,9 @@ const Perfil = () => {
   return (
     <div className="app-shell" style={{ background: "var(--bg-crema)", paddingBottom: "90px" }}>
 
-    {/* ════════════════════════════════════════════════════
-           CABECERA — Banner + Avatar + Nombre
-      ════════════════════════════════════════════════════ */}
+      {/* ════════════════════════════════════════════════════
+             CABECERA — Banner + Avatar + Nombre
+        ════════════════════════════════════════════════════ */}
       <div
         className="up-header"
         style={{
@@ -600,14 +551,14 @@ const Perfil = () => {
             : "linear-gradient(135deg,#c8a97a 0%,#a07850 100%)",
           display: "flex", flexDirection: "column",
           alignItems: "center", justifyContent: "center",
-          padding: "60px 20px 30px", boxSizing: "border-box"
+          padding: "60px 20px 30px", boxSizing: "border-box",
         }}
       >
-        {/* Capa oscura (Overlay) para asegurar que el texto blanco siempre se lea bien */}
+        {/* Overlay */}
         <div style={{
           position: "absolute", inset: 0,
           background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.85) 100%)",
-          zIndex: 1
+          zIndex: 1,
         }} />
 
         {/* Botón volver */}
@@ -648,15 +599,15 @@ const Perfil = () => {
               position: "absolute", top: "46px", right: 0, background: "white", borderRadius: "14px",
               boxShadow: "0 8px 30px rgba(0,0,0,0.15)", border: "1px solid #f1f3f5", minWidth: "180px", overflow: "hidden", zIndex: 200,
             }}>
-              <button onClick={abrirModal} style={dropItemStyle("var(--azul-oscuro)")}>Editar perfil</button>
-              <button onClick={handleSignOut} style={dropItemStyle("#ef4444")}>Cerrar sesión</button>
+              <button onClick={abrirModal}      style={dropItemStyle("var(--azul-oscuro)")}>Editar perfil</button>
+              <button onClick={handleSignOut}   style={dropItemStyle("#ef4444")}>Cerrar sesión</button>
             </div>
           )}
         </div>
 
-        {/* Contenedor Central Flex (Avatar + Textos) */}
+        {/* Contenedor Central: Avatar + Textos */}
         <div style={{ position: "relative", zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
-          
+
           {/* Avatar circular con botón de edición */}
           <div style={{ position: "relative", marginBottom: "4px" }}>
             <div style={{
@@ -667,7 +618,7 @@ const Perfil = () => {
             }}>
               {p.avatar?.trim() ? <img src={p.avatar} alt={p.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (p.nombre || "U")[0].toUpperCase()}
             </div>
-            
+
             {/* Lápiz naranja */}
             <button onClick={abrirModal} aria-label="Editar foto" style={{
               position: "absolute", bottom: "4px", right: "0px",
@@ -682,7 +633,6 @@ const Perfil = () => {
             </button>
           </div>
 
-          {/* Textos */}
           <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 700, color: "white", textAlign: "center", textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
             {p.nombre || "Estudiante UNP"}
           </h1>
@@ -702,21 +652,17 @@ const Perfil = () => {
         </div>
       </div>
 
-     {/* ════════════════════════════════════════════════════
-           INFO: UBICACIÓN + TELÉFONO (ESTILO BURBUJAS)
-      ════════════════════════════════════════════════════ */}
+      {/* ════════════════════════════════════════════════════
+             INFO: UBICACIÓN + TELÉFONO
+        ════════════════════════════════════════════════════ */}
       <div style={{
-        display: "flex",
-        justifyContent: "center",
-        gap: "12px",
-        background: "transparent",
-        margin: "16px 16px 20px",
+        display: "flex", justifyContent: "center", gap: "12px",
+        background: "transparent", margin: "16px 16px 20px",
       }}>
-        {/* Burbuja Ubicación */}
         <div style={{
           flex: 1, display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "8px",
           padding: "10px 16px", background: "var(--blanco-puro)", borderRadius: "24px",
-          border: "1px solid rgba(15, 37, 64, 0.06)", boxShadow: "0 4px 12px rgba(15, 37, 64, 0.04)"
+          border: "1px solid rgba(15, 37, 64, 0.06)", boxShadow: "0 4px 12px rgba(15, 37, 64, 0.04)",
         }}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--verde-marca)" strokeWidth="2.2" strokeLinecap="round">
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
@@ -727,11 +673,10 @@ const Perfil = () => {
           </span>
         </div>
 
-        {/* Burbuja Teléfono */}
         <div style={{
           flex: 1, display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "8px",
           padding: "10px 16px", background: "var(--blanco-puro)", borderRadius: "24px",
-          border: "1px solid rgba(15, 37, 64, 0.06)", boxShadow: "0 4px 12px rgba(15, 37, 64, 0.04)"
+          border: "1px solid rgba(15, 37, 64, 0.06)", boxShadow: "0 4px 12px rgba(15, 37, 64, 0.04)",
         }}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--verde-marca)" strokeWidth="2.2" strokeLinecap="round">
             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.5 2 2 0 0 1 3.6 1.32h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
@@ -743,8 +688,8 @@ const Perfil = () => {
       </div>
 
       {/* ════════════════════════════════════════════════════
-           ACERCA DE MÍ
-      ════════════════════════════════════════════════════ */}
+             ACERCA DE MÍ
+        ════════════════════════════════════════════════════ */}
       <div style={{ padding: "0 16px", marginBottom: "8px" }}>
         <div style={{
           background: "white", borderRadius: "16px",
@@ -759,15 +704,15 @@ const Perfil = () => {
             </svg>
             <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--azul-oscuro)" }}>Acerca de mí</span>
           </div>
-         <p style={{ margin: 0, fontSize: "0.88rem", color: "#5c5c7a", fontWeight: 600, lineHeight: 1.5, wordBreak: "break-word" }}>
+          <p style={{ margin: 0, fontSize: "0.88rem", color: "#5c5c7a", fontWeight: 600, lineHeight: 1.5, wordBreak: "break-word" }}>
             {p.acercaDe || "¡Hola! Bienvenido a mi tienda en el campus."}
           </p>
         </div>
       </div>
 
       {/* ════════════════════════════════════════════════════
-           MIS PUBLICACIONES ACTIVAS
-      ════════════════════════════════════════════════════ */}
+             MIS PUBLICACIONES ACTIVAS
+        ════════════════════════════════════════════════════ */}
       <div style={{ padding: "0 16px 20px" }}>
         <div style={{
           display: "flex", alignItems: "center", gap: "8px",
@@ -789,9 +734,7 @@ const Perfil = () => {
             Aún no tienes publicaciones.
           </p>
         ) : (
-          <div style={{
-            display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px",
-          }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
             {productos.map((prod) => (
               <TarjetaPerfil
                 key={prod.id}
@@ -806,8 +749,8 @@ const Perfil = () => {
       </div>
 
       {/* ════════════════════════════════════════════════════
-           BOTTOM NAVIGATION
-      ════════════════════════════════════════════════════ */}
+             BOTTOM NAVIGATION
+        ════════════════════════════════════════════════════ */}
       <nav className="bottom-nav">
         <button className="nav-item" onClick={() => navigate("/")} aria-label="Inicio">
           <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -839,11 +782,14 @@ const Perfil = () => {
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
               <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
             </svg>
-            {notificaciones.some(n => !n.leido) && (
+            {notificaciones.some((n) => !n.leido) && (
               <span className="nav-notif-badge" style={{
-                position: "absolute", top: "-4px", right: "-6px", background: "#ef4444", color: "white", fontSize: "0.65rem", fontWeight: 800, minWidth: "16px", height: "16px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #1e293b", padding: "0 4px", lineHeight: 1
+                position: "absolute", top: "-4px", right: "-6px", background: "#ef4444", color: "white",
+                fontSize: "0.65rem", fontWeight: 800, minWidth: "16px", height: "16px", borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                border: "2px solid #1e293b", padding: "0 4px", lineHeight: 1,
               }}>
-                {notificaciones.filter(n => !n.leido).length}
+                {notificaciones.filter((n) => !n.leido).length}
               </span>
             )}
           </div>
@@ -865,8 +811,8 @@ const Perfil = () => {
       </nav>
 
       {/* ════════════════════════════════════════════════════
-           MODAL: EDITAR PERFIL
-      ════════════════════════════════════════════════════ */}
+             MODAL: EDITAR PERFIL
+        ════════════════════════════════════════════════════ */}
       {modalOpen && (
         <div
           onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}
@@ -884,55 +830,44 @@ const Perfil = () => {
             maxHeight: "90vh", overflowY: "auto",
             boxSizing: "border-box",
           }}>
-            {/* PASO 5: div invisible para reCAPTCHA */}
+            {/* div invisible para reCAPTCHA */}
             <div id="recaptcha-container"></div>
 
-            {/* ── PASO 5: Renderizado condicional ── */}
             {!esperandoSMS ? (
-              /* ══ VISTA NORMAL: formulario de perfil ══ */
+              /* ══ FORMULARIO DE PERFIL ══ */
               <>
                 <h2 style={{ margin: "0 0 20px", fontSize: "1.2rem", fontWeight: 700, color: "var(--azul-oscuro)" }}>
                   Editar Mi Perfil
                 </h2>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-
-                  {/* Nombre */}
                   <div>
                     <label style={labelStyle}>Nombre Completo</label>
                     <input value={mNombre} onChange={(e) => setMNombre(e.target.value)}
                       style={{ ...inputStyle, marginTop: "6px" }} />
                   </div>
-
-                  {/* Bio / Carrera */}
                   <div>
                     <label style={labelStyle}>Carrera / Título corto</label>
                     <input value={mBio} onChange={(e) => setMBio(e.target.value)}
                       placeholder="Ej: Ing. Informático"
                       style={{ ...inputStyle, marginTop: "6px" }} />
                   </div>
-
-                  {/* Acerca de mí */}
                   <div>
                     <label style={labelStyle}>Acerca de mí</label>
                     <textarea value={mAcerca} onChange={(e) => setMAcerca(e.target.value)}
                       rows={3} style={{ ...inputStyle, marginTop: "6px", resize: "none" }} />
                   </div>
-
-                  {/* Ubicación */}
                   <div>
                     <label style={labelStyle}>Ubicación actual</label>
                     <input value={mUbicacion} onChange={(e) => setMUbicacion(e.target.value)}
                       style={{ ...inputStyle, marginTop: "6px" }} />
                   </div>
-
-                  {/* WhatsApp */}
                   <div>
                     <label style={labelStyle}>WhatsApp (sin +51)</label>
                     <input
                       value={mTelefono}
                       onChange={(e) => {
-                        const soloNumeros = e.target.value.replace(/\D/g, '');
+                        const soloNumeros = e.target.value.replace(/\D/g, "");
                         if (soloNumeros.length <= 9) setMTelefono(soloNumeros);
                       }}
                       placeholder="Ej: 987654321"
@@ -977,10 +912,8 @@ const Perfil = () => {
                       </span>
                     </button>
                   </div>
-
                 </div>
 
-                {/* Botones del formulario normal */}
                 <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
                   <button
                     onClick={() => setModalOpen(false)}
@@ -1012,7 +945,6 @@ const Perfil = () => {
             ) : (
               /* ══ VISTA SMS: verificar código ══ */
               <>
-                {/* Icono de teléfono */}
                 <div style={{
                   width: "60px", height: "60px", borderRadius: "50%",
                   background: "var(--bg-crema)", border: "2px solid var(--verde-marca)",
@@ -1028,7 +960,6 @@ const Perfil = () => {
                 <h2 style={{ margin: "0 0 8px", fontSize: "1.15rem", fontWeight: 700, color: "var(--azul-oscuro)", textAlign: "center" }}>
                   Verifica tu número
                 </h2>
-
                 <p style={{
                   margin: "0 0 24px", fontSize: "0.88rem", fontWeight: 600,
                   color: "#5c5c7a", textAlign: "center", lineHeight: 1.5,
@@ -1039,7 +970,6 @@ const Perfil = () => {
                   </span>
                 </p>
 
-                {/* Input código SMS */}
                 <div style={{ marginBottom: "20px" }}>
                   <label style={labelStyle}>Código de 6 dígitos</label>
                   <input
@@ -1052,24 +982,16 @@ const Perfil = () => {
                     type="tel"
                     maxLength={6}
                     style={{
-                      ...inputStyle,
-                      marginTop: "8px",
-                      fontSize: "1.4rem",
-                      letterSpacing: "0.35em",
-                      textAlign: "center",
+                      ...inputStyle, marginTop: "8px",
+                      fontSize: "1.4rem", letterSpacing: "0.35em", textAlign: "center",
                     }}
                     autoFocus
                   />
                 </div>
 
-                {/* Botones verificación */}
                 <div style={{ display: "flex", gap: "12px" }}>
                   <button
-                    onClick={() => {
-                      setEsperandoSMS(false);
-                      setCodigoSMS("");
-                      setVerificationId(null);
-                    }}
+                    onClick={() => { setEsperandoSMS(false); setCodigoSMS(""); setVerificationId(null); }}
                     style={{
                       flex: 1, padding: "14px", borderRadius: "14px",
                       background: "#f1f3f5", border: "none", cursor: "pointer",
@@ -1102,8 +1024,8 @@ const Perfil = () => {
       )}
 
       {/* ════════════════════════════════════════════════════
-           MODAL: CONFIRMAR BORRADO
-      ════════════════════════════════════════════════════ */}
+             MODAL: CONFIRMAR BORRADO
+        ════════════════════════════════════════════════════ */}
       {productoABorrar && (
         <div
           onClick={(e) => { if (e.target === e.currentTarget) setProductoABorrar(null); }}
@@ -1118,8 +1040,7 @@ const Perfil = () => {
             width: "100%", maxWidth: "340px",
             background: "white", borderRadius: "20px",
             padding: "24px 22px", boxSizing: "border-box",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.25)",
-            textAlign: "center",
+            boxShadow: "0 12px 32px rgba(0,0,0,0.25)", textAlign: "center",
           }}>
             <h2 style={{ margin: "0 0 10px", fontSize: "1.1rem", fontWeight: 700, color: "var(--azul-oscuro)" }}>
               ¿Eliminar producto?
@@ -1175,11 +1096,6 @@ const Perfil = () => {
 // ──────────────────────────────────────────────────────────────
 //  Estilos auxiliares
 // ──────────────────────────────────────────────────────────────
-const infoColStyle = {
-  flex: 1, display: "flex", flexDirection: "column",
-  alignItems: "center", gap: "6px", padding: "16px 8px",
-};
-
 const dropItemStyle = (color) => ({
   width: "100%", padding: "13px 16px", border: "none",
   background: "none", cursor: "pointer", textAlign: "left",
