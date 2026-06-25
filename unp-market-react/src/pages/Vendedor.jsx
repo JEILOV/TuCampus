@@ -9,6 +9,7 @@ import {
   seguirVendedor,
   dejarDeSeguirVendedor,
 } from "../services/userService";
+import Spinner from "../components/Spinner";
 
 const ICONOS_CAT = {
   dulces: "🍫", bebidas: "☕", salados: "🍔",
@@ -183,13 +184,7 @@ const Vendedor = () => {
     }
   };
 
-  if (cargando) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center",
-      height: "100vh", fontFamily: "'Nunito', sans-serif", fontWeight: 600,
-      color: "#5c5c7a", background: "var(--bg-crema)" }}>
-      Cargando perfil del vendedor...
-    </div>
-  );
+  if (cargando) return <Spinner mensaje="Cargando perfil del vendedor..." />;
 
   if (noExiste || !vendedor) return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center",

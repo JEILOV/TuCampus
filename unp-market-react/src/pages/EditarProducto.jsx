@@ -6,6 +6,9 @@ import { db }                           from "../services/firebase";
 import { useAuth }                      from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
 import { actualizarProducto }           from "../services/productService";
+import Spinner                          from "../components/Spinner"; // ✅ Nuevo import
+import Toast, { useToast }              from "../components/Toast";   // ✅ Nuevo import
+
 // ── Estilos reutilizables ────────────────────────────────────
 const inputStyle = {
   background: "var(--bg-crema)", border: "1.5px solid #e8e8f0",
@@ -25,10 +28,6 @@ const EditarProducto = () => {
   const [searchParams] = useSearchParams();
   const productoId     = searchParams.get("id");
 
-  // ✅ FASE 2: useAuth reemplaza el onAuthStateChanged local.
-  //    Nota: esta ruta ya está protegida por <RutaProtegida>,
-  //    así que user nunca será null aquí. Solo necesitamos el uid
-  //    para verificar que el producto pertenece al usuario.
   const { user } = useAuth();
 
   const [titulo,         setTitulo]         = useState("");
@@ -41,17 +40,19 @@ const EditarProducto = () => {
   const [btnTexto,       setBtnTexto]       = useState("Guardar Cambios");
   const [enviando,       setEnviando]       = useState(false);
   const [cargando,       setCargando]       = useState(true);
-  const [toast,          setToast]          = useState(null);
+  
+  // ✅ Nuevo manejo de Toasts centralizado
+  const [toast, setToast] = useState(null);
+  const mostrarToast = useToast(setToast, { single: true });
 
   const fileInputRef = useRef(null);
 
-  // Carga del producto — ahora depende de user del contexto
+  // Carga del producto
   useEffect(() => {
     if (!productoId) {
       navigate("/", { replace: true });
       return;
     }
-    // Si aún no tenemos user (AuthContext cargando), esperar
     if (!user) return;
 
     const cargar = async () => {
@@ -65,7 +66,6 @@ const EditarProducto = () => {
 
         const data = snap.data();
 
-        // Protección de ruta: solo el dueño puede editar
         if (data.userUid !== user.uid) {
           navigate("/", { replace: true });
           return;
@@ -79,7 +79,7 @@ const EditarProducto = () => {
         setPreviewUrl(data.imagen       || null);
       } catch (err) {
         console.error("Error al cargar el producto:", err);
-        setToast({ mensaje: "No se pudo cargar el producto.", tipo: "error" });
+        mostrarToast("No se pudo cargar el producto.", "error");
       } finally {
         setCargando(false);
       }
@@ -87,13 +87,6 @@ const EditarProducto = () => {
 
     cargar();
   }, [productoId, user, navigate]);
-
-  // Toast auto-dismiss
-  useEffect(() => {
-    if (!toast) return;
-    const id = setTimeout(() => setToast(null), 3000);
-    return () => clearTimeout(id);
-  }, [toast]);
 
   // Limpiar object URL al desmontar
   useEffect(() => {
@@ -111,44 +104,43 @@ const EditarProducto = () => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (titulo.trim() === "" || descripcion.trim() === "") {
-    setToast({ mensaje: "El título y la descripción deben contener texto real.", tipo: "error" });
-    return;
-  }
-  if (!user) {
-    setToast({ mensaje: "Debes iniciar sesión para editar.", tipo: "error" });
-    return;
-  }
-
-  setEnviando(true);
-  try {
-    let imagenFinal = imagenOriginal;
-
-    if (archivo) {
-      setBtnTexto("Comprimiendo imagen...");
-      const fileComprimido = await comprimirImagen(archivo);
-      setBtnTexto("Subiendo imagen...");
-      imagenFinal = await subirImagenImgBB(fileComprimido);
+    if (titulo.trim() === "" || descripcion.trim() === "") {
+      mostrarToast("El título y la descripción deben contener texto real.", "error");
+      return;
+    }
+    if (!user) {
+      mostrarToast("Debes iniciar sesión para editar.", "error");
+      return;
     }
 
-    setBtnTexto("Guardando...");
-    // ✅ Lógica de Firestore delegada al servicio
-    await actualizarProducto(productoId, {
-      titulo, precio, categoria, descripcion,
-      imagen: imagenFinal,
-      imagenOriginal,
-    });
+    setEnviando(true);
+    try {
+      let imagenFinal = imagenOriginal;
 
-    navigate("/perfil", { state: { toastEditar: true } });
-  } catch (err) {
-    console.error("[EditarProducto] Error:", err);
-    setToast({ mensaje: "Error al guardar. Intenta de nuevo.", tipo: "error" });
-    setBtnTexto("Guardar Cambios");
-    setEnviando(false);
-  }
-};
+      if (archivo) {
+        setBtnTexto("Comprimiendo imagen...");
+        const fileComprimido = await comprimirImagen(archivo);
+        setBtnTexto("Subiendo imagen...");
+        imagenFinal = await subirImagenImgBB(fileComprimido);
+      }
+
+      setBtnTexto("Guardando...");
+      await actualizarProducto(productoId, {
+        titulo, precio, categoria, descripcion,
+        imagen: imagenFinal,
+        imagenOriginal,
+      });
+
+      navigate("/perfil", { state: { toastEditar: true } });
+    } catch (err) {
+      console.error("[EditarProducto] Error:", err);
+      mostrarToast("Error al guardar. Intenta de nuevo.", "error");
+      setBtnTexto("Guardar Cambios");
+      setEnviando(false);
+    }
+  };
 
   const imagenAreaTexto = () => {
     if (!archivo) {
@@ -161,15 +153,8 @@ const EditarProducto = () => {
     return `Imagen seleccionada ✓  ${nombre} · ${tamanoMB}MB → se comprimirá al subir`;
   };
 
-  if (cargando) {
-    return (
-      <div className="app-shell" style={{ background: "var(--bg-crema)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-        <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: "#5c5c7a" }}>
-          Cargando producto...
-        </p>
-      </div>
-    );
-  }
+  // ✅ Pantalla de carga limpia utilizando el nuevo Spinner
+  if (cargando) return <Spinner mensaje="Cargando producto..." />;
 
   return (
     <div className="app-shell" style={{ background: "var(--bg-crema)", margin: "0 auto", padding: 0 }}>
@@ -276,26 +261,13 @@ const EditarProducto = () => {
         </button>
       </nav>
 
-      {/* TOAST */}
+      {/* ✅ TOAST LIMPIO */}
       {toast && (
         <div style={{
           position: "fixed", bottom: "84px", left: "50%", transform: "translateX(-50%)",
           zIndex: 1000, width: "calc(100% - 40px)", maxWidth: "390px", pointerEvents: "none",
         }}>
-          <div style={{
-            background: toast.tipo === "success" ? "#1e293b" : "#fecaca",
-            color: toast.tipo === "success" ? "#ffffff" : "#991b1b",
-            padding: "14px 18px", borderRadius: "16px", fontSize: "13.5px",
-            fontFamily: "'Nunito', sans-serif", fontWeight: 700,
-            boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
-            display: "flex", alignItems: "center", gap: "10px",
-          }}>
-            {toast.tipo === "success"
-              ? <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#22c55e" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-              : <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#dc2626" strokeWidth="3"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-            }
-            <span style={{ flex: 1 }}>{toast.mensaje}</span>
-          </div>
+          <Toast mensaje={toast.mensaje} tipo={toast.tipo} />
         </div>
       )}
     </div>

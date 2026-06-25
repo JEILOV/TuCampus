@@ -1,11 +1,12 @@
 // src/pages/Publicar.jsx
-import { useState, useEffect, useRef }         from "react";
+import { useState, useEffect, useRef }          from "react";
 import { useNavigate }                          from "react-router-dom";
 import { doc, getDoc, collection, writeBatch, serverTimestamp } from "firebase/firestore";
 import { db }                                   from "../services/firebase";
 import { useAuth }                              from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB }    from "../utils/imageUtils";
 import { crearProducto }                        from "../services/productService";
+import Toast, { useToast }                      from "../components/Toast"; // ✅ Nuevo import
 
 // ── Estilos reutilizables ────────────────────────────────────
 const inputStyle = {
@@ -23,10 +24,6 @@ const labelStyle = {
 // ── Componente principal ─────────────────────────────────────
 const Publicar = () => {
   const navigate   = useNavigate();
-
-  // ✅ FASE 2: useAuth reemplaza el onAuthStateChanged local.
-  //    Además usamos `perfil` del contexto para la validación
-  //    de WhatsApp — ya no necesitamos un getDoc extra al hacer submit.
   const { user, perfil } = useAuth();
 
   const [titulo,      setTitulo]      = useState("");
@@ -37,16 +34,12 @@ const Publicar = () => {
   const [previewUrl,  setPreviewUrl]  = useState(null);
   const [btnTexto,    setBtnTexto]    = useState("Publicar Producto");
   const [enviando,    setEnviando]    = useState(false);
-  const [toast,       setToast]       = useState(null);
+  
+  // ✅ Nuevo manejo de Toasts centralizado
+  const [toast, setToast] = useState(null);
+  const mostrarToast = useToast(setToast, { single: true });
 
   const fileInputRef = useRef(null);
-
-  // Toast auto-dismiss
-  useEffect(() => {
-    if (!toast) return;
-    const id = setTimeout(() => setToast(null), 3000);
-    return () => clearTimeout(id);
-  }, [toast]);
 
   // Limpiar object URL al desmontar
   useEffect(() => {
@@ -62,72 +55,71 @@ const Publicar = () => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (titulo.trim() === "" || descripcion.trim() === "") {
-    setToast({ mensaje: "El título y la descripción deben contener texto real.", tipo: "error" });
-    return;
-  }
-  if (!user) {
-    setToast({ mensaje: "Debes iniciar sesión para publicar.", tipo: "error" });
-    return;
-  }
-  if (!perfil?.telefono || perfil.telefono.trim().length < 7) {
-    setToast({ mensaje: "⚠️ Configura tu WhatsApp en el perfil para publicar.", tipo: "error" });
-    setTimeout(() => navigate("/perfil", { state: { abrirModalEdicion: true } }), 2000);
-    return;
-  }
-
-  setEnviando(true);
-  try {
-    setBtnTexto("Comprimiendo imagen...");
-    const fileComprimido = archivo ? await comprimirImagen(archivo) : null;
-
-    setBtnTexto("Subiendo imagen...");
-    const imagenFinal = await subirImagenImgBB(fileComprimido);
-
-    setBtnTexto("Publicando...");
-    // ✅ Lógica de Firestore delegada al servicio
-    const nuevoId = await crearProducto({
-      titulo, precio, categoria, descripcion,
-      imagen: imagenFinal, user, perfil,
-    });
-
-    // Notificar a seguidores (lógica específica de esta página, se queda aquí)
-    try {
-      const vendedorSnap = await getDoc(doc(db, "usuarios", user.uid));
-      if (vendedorSnap.exists()) {
-        const { seguidores, nombre: nombreVendedor } = vendedorSnap.data();
-        if (Array.isArray(seguidores) && seguidores.length > 0) {
-          const batch = writeBatch(db);
-          seguidores.forEach((seguidorUid) => {
-            const notifRef = doc(collection(db, "notificaciones"));
-            batch.set(notifRef, {
-              paraUid:        seguidorUid,
-              deUid:          user.uid,
-              deNombre:       nombreVendedor || "Un vendedor",
-              tipo:           "nuevo_producto",
-              productoTitulo: titulo,
-              productoId:     nuevoId,
-              leido:          false,
-              timestamp:      serverTimestamp(),
-            });
-          });
-          await batch.commit();
-        }
-      }
-    } catch (notifErr) {
-      console.warn("[Publicar] Error al notificar seguidores:", notifErr);
+    if (titulo.trim() === "" || descripcion.trim() === "") {
+      mostrarToast("El título y la descripción deben contener texto real.", "error");
+      return;
+    }
+    if (!user) {
+      mostrarToast("Debes iniciar sesión para publicar.", "error");
+      return;
+    }
+    if (!perfil?.telefono || perfil.telefono.trim().length < 7) {
+      mostrarToast("⚠️ Configura tu WhatsApp en el perfil para publicar.", "error");
+      setTimeout(() => navigate("/perfil", { state: { abrirModalEdicion: true } }), 2000);
+      return;
     }
 
-    navigate("/", { state: { toastPublicar: true } });
-  } catch (err) {
-    console.error("[Publicar] Error:", err);
-    setToast({ mensaje: "Error al publicar. Intenta de nuevo.", tipo: "error" });
-    setBtnTexto("Publicar Producto");
-    setEnviando(false);
-  }
-};
+    setEnviando(true);
+    try {
+      setBtnTexto("Comprimiendo imagen...");
+      const fileComprimido = archivo ? await comprimirImagen(archivo) : null;
+
+      setBtnTexto("Subiendo imagen...");
+      const imagenFinal = await subirImagenImgBB(fileComprimido);
+
+      setBtnTexto("Publicando...");
+      const nuevoId = await crearProducto({
+        titulo, precio, categoria, descripcion,
+        imagen: imagenFinal, user, perfil,
+      });
+
+      // Notificar a seguidores
+      try {
+        const vendedorSnap = await getDoc(doc(db, "usuarios", user.uid));
+        if (vendedorSnap.exists()) {
+          const { seguidores, nombre: nombreVendedor } = vendedorSnap.data();
+          if (Array.isArray(seguidores) && seguidores.length > 0) {
+            const batch = writeBatch(db);
+            seguidores.forEach((seguidorUid) => {
+              const notifRef = doc(collection(db, "notificaciones"));
+              batch.set(notifRef, {
+                paraUid:        seguidorUid,
+                deUid:          user.uid,
+                deNombre:       nombreVendedor || "Un vendedor",
+                tipo:           "nuevo_producto",
+                productoTitulo: titulo,
+                productoId:     nuevoId,
+                leido:          false,
+                timestamp:      serverTimestamp(),
+              });
+            });
+            await batch.commit();
+          }
+        }
+      } catch (notifErr) {
+        console.warn("[Publicar] Error al notificar seguidores:", notifErr);
+      }
+
+      navigate("/", { state: { toastPublicar: true } });
+    } catch (err) {
+      console.error("[Publicar] Error:", err);
+      mostrarToast("Error al publicar. Intenta de nuevo.", "error");
+      setBtnTexto("Publicar Producto");
+      setEnviando(false);
+    }
+  };
 
   const imagenAreaTexto = () => {
     if (!archivo) return "Toca para abrir la cámara o galería";
@@ -241,26 +233,13 @@ const Publicar = () => {
         </button>
       </nav>
 
-      {/* TOAST */}
+      {/* ✅ TOAST LIMPIO */}
       {toast && (
         <div style={{
           position: "fixed", bottom: "84px", left: "50%", transform: "translateX(-50%)",
           zIndex: 1000, width: "calc(100% - 40px)", maxWidth: "390px", pointerEvents: "none",
         }}>
-          <div style={{
-            background: toast.tipo === "success" ? "#1e293b" : "#fecaca",
-            color: toast.tipo === "success" ? "#ffffff" : "#991b1b",
-            padding: "14px 18px", borderRadius: "16px", fontSize: "13.5px",
-            fontFamily: "'Nunito', sans-serif", fontWeight: 700,
-            boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
-            display: "flex", alignItems: "center", gap: "10px",
-          }}>
-            {toast.tipo === "success"
-              ? <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#22c55e" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-              : <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#dc2626" strokeWidth="3"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-            }
-            <span style={{ flex: 1 }}>{toast.mensaje}</span>
-          </div>
+          <Toast mensaje={toast.mensaje} tipo={toast.tipo} />
         </div>
       )}
     </div>

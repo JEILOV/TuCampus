@@ -13,24 +13,14 @@
 
 import { Navigate }  from "react-router-dom";
 import { useAuth }   from "../context/AuthContext";
+import Spinner from "../components/Spinner";
 
 const RutaProtegida = ({ children }) => {
   const { user, cargando } = useAuth();
 
   // El estado cargando solo es true durante la hidratación inicial.
   // Una vez que AuthContext lo resuelve, nunca vuelve a ser true.
-  if (cargando) {
-    return (
-      <div style={{
-        display: "flex", justifyContent: "center", alignItems: "center",
-        height: "100vh", background: "var(--bg-crema)",
-      }}>
-        <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: "#5c5c7a" }}>
-          Verificando acceso...
-        </p>
-      </div>
-    );
-  }
+ if (cargando) return <Spinner mensaje="Verificando acceso..." />;
 
   // Sin usuario → redirigir al login
   if (!user) {
