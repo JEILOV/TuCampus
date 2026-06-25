@@ -3,10 +3,11 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   doc, getDoc, collection, query, where, getDocs,
-  updateDoc, arrayUnion, arrayRemove, addDoc, serverTimestamp,
+  updateDoc, arrayUnion, arrayRemove,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "../services/firebase";
+import { crearNotificacion } from "../services/notificationService";
 
 const ICONOS_CAT = {
   dulces: "🍫", bebidas: "☕", salados: "🍔",
@@ -199,15 +200,12 @@ const Vendedor = () => {
         });
         setEsSeguidor(true);
 
-        await addDoc(collection(db, "notificaciones"), {
-          paraUid: uid,
-          deUid: currentUser.uid,
-          deNombre: currentUser.displayName || "Un usuario",
-          tipo: "seguidor",
-          leido: false,
-          timestamp: serverTimestamp(),
-          productoTitulo: "tu perfil",
-        });
+      await crearNotificacion({
+  paraUid: uid,
+  deUid: currentUser.uid,
+  deNombre: currentUser.displayName,
+  tipo: "seguidor",
+});
       }
     } catch (err) {
       console.error(err);

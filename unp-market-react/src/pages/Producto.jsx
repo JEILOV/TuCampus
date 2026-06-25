@@ -20,12 +20,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams }      from "react-router-dom";
-import {
-  doc, getDoc, setDoc,
-  addDoc, collection, serverTimestamp,
-} from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { db, auth }       from "../services/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { obtenerProductoPorId } from "../services/productService";
+import { crearNotificacion } from "../services/notificationService";
 
 // ──────────────────────────────────────────────────────────────
 //  CONSTANTES
@@ -42,28 +41,6 @@ const getFavs  = ()       => JSON.parse(localStorage.getItem("listaFavoritos") |
 const saveFavs = (favs)   => localStorage.setItem("listaFavoritos", JSON.stringify(favs));
 const isFav    = (id)     => getFavs().includes(id);
 
-// ──────────────────────────────────────────────────────────────
-//  UTILIDAD: enviar notificación a Firestore (idéntica al original)
-// ──────────────────────────────────────────────────────────────
-const enviarNotificacion = async ({ paraUid, tipo, productoId, productoTitulo }) => {
-  if (!paraUid) return;
-  const perfil = JSON.parse(localStorage.getItem("unp_user_profile") || "{}");
-  if (perfil.uid === paraUid) return;
-  try {
-    await addDoc(collection(db, "notificaciones"), {
-      paraUid,
-      deUid:          perfil.uid    || "anon",
-      deNombre:       perfil.nombre || "Un usuario",
-      tipo,
-      productoId,
-      productoTitulo: productoTitulo || "un producto",
-      leido:          false,
-      timestamp:      serverTimestamp(),
-    });
-  } catch (err) {
-    console.warn("Notificación no enviada:", err);
-  }
-};
 
 // ──────────────────────────────────────────────────────────────
 //  SUB-COMPONENTE: Toast
@@ -115,14 +92,14 @@ const Producto = () => {
     const cargar = async () => {
       setCargando(true);
       try {
-        const snap = await getDoc(doc(db, "productos", productoId));
-        if (cancelado) return;
-        if (snap.exists()) {
-          setProducto({ id: snap.id, ...snap.data() });
-          setEsFavorito(isFav(snap.id));
-        } else {
-          setNoExiste(true);
-        }
+       const data = await obtenerProductoPorId(productoId);
+if (cancelado) return;
+if (data) {
+  setProducto(data);
+  setEsFavorito(isFav(data.id));
+} else {
+  setNoExiste(true);
+}
       } catch (err) {
         console.error(err);
         setNoExiste(true);
@@ -165,10 +142,14 @@ const Producto = () => {
     }
 
     if (!eraFav && producto?.userUid) {
-      await enviarNotificacion({
-        paraUid: producto.userUid, tipo: "favorito",
-        productoId, productoTitulo: producto.titulo,
-      });
+    await crearNotificacion({
+  paraUid: producto.userUid,
+  deUid: currentUser?.uid,
+  deNombre: currentUser?.displayName,
+  tipo: "favorito",
+  productoId,
+  productoTitulo: producto.titulo,
+});
     }
   };
 
@@ -180,10 +161,14 @@ const Producto = () => {
     const msg    = `¡Hola ${producto.vendedor || ""}! Vi tu publicación de "${producto.titulo}" en UNP Market y me gustaría comprarlo.`;
     window.open(`https://wa.me/${final}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
 
-    await enviarNotificacion({
-      paraUid: producto.userUid, tipo: "contacto",
-      productoId, productoTitulo: producto.titulo,
-    });
+  await crearNotificacion({
+  paraUid: producto.userUid,
+  deUid: currentUser?.uid,
+  deNombre: currentUser?.displayName,
+  tipo: "contacto",
+  productoId,
+  productoTitulo: producto.titulo,
+});
   };
 
   // ── Compartir ──
