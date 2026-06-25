@@ -27,7 +27,7 @@ import { db, auth }           from "../services/firebase";
 // ──────────────────────────────────────────────────────────────
 //  CONSTANTES (idénticas a app.js original)
 // ──────────────────────────────────────────────────────────────
-const IMGBB_API_KEY  = "44396363d77b09fc503f8a3b50898ea7";
+const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
 const MAX_DIMENSION  = 1080;
 const CALIDAD_JPEG   = 0.70;
 // ──────────────────────────────────────────────────────────────

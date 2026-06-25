@@ -32,7 +32,7 @@ import { db, auth }                    from "../services/firebase";
 // ──────────────────────────────────────────────────────────────
 //  CONSTANTES
 // ──────────────────────────────────────────────────────────────
-const IMGBB_API_KEY = "44396363d77b09fc503f8a3b50898ea7";
+const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
 const MAX_DIM       = 1080;
 const CALIDAD       = 0.70;
 
