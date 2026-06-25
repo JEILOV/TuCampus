@@ -20,12 +20,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams }      from "react-router-dom";
-import { doc, setDoc } from "firebase/firestore";
-import { db, auth }       from "../services/firebase";
-import { onAuthStateChanged } from "firebase/auth";
-import { obtenerProductoPorId } from "../services/productService";
-import { crearNotificacion } from "../services/notificationService";
-
+import { doc, setDoc }                       from "firebase/firestore";
+import { db }                                from "../services/firebase";
+import { useAuth }                           from "../context/AuthContext";
+import { obtenerProductoPorId }              from "../services/productService";
+import { crearNotificacion }                 from "../services/notificationService";
 // ──────────────────────────────────────────────────────────────
 //  CONSTANTES
 // ──────────────────────────────────────────────────────────────
@@ -71,13 +70,7 @@ const Producto = () => {
   const [noExiste,   setNoExiste]   = useState(false);
   const [esFavorito, setEsFavorito] = useState(false);
   const [toasts,     setToasts]     = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
-
-  // ── Guard sesión (para sincronizar favoritos a Firestore) ──
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setCurrentUser(u));
-    return () => unsub();
-  }, []);
+const { user: currentUser, favoritos, actualizarFavoritos } = useAuth();
 
   // ── Redirigir si no hay id en URL ──
   useEffect(() => {
@@ -96,7 +89,7 @@ const Producto = () => {
 if (cancelado) return;
 if (data) {
   setProducto(data);
-  setEsFavorito(isFav(data.id));
+  setEsFavorito(favoritos.has(data.id));
 } else {
   setNoExiste(true);
 }
@@ -121,37 +114,39 @@ if (data) {
 
   // ── Toggle Favorito ──
   const handleFavorito = async () => {
-    const favs    = getFavs();
-    const eraFav  = favs.includes(productoId);
-    const nuevos  = eraFav
-      ? favs.filter((f) => f !== productoId)
-      : [...favs, productoId];
+  const eraFav  = favoritos.has(productoId);
+  const nuevos  = new Set(favoritos);
+  eraFav ? nuevos.delete(productoId) : nuevos.add(productoId);
 
-    saveFavs(nuevos);
-    setEsFavorito(!eraFav);
-    mostrarToast(eraFav ? "Eliminado de favoritos" : "¡Guardado en favoritos! ❤️");
+  // ✅ Contexto actualiza localStorage + estado global
+  actualizarFavoritos(nuevos);
+  setEsFavorito(!eraFav);
+  mostrarToast(eraFav ? "Eliminado de favoritos" : "¡Guardado en favoritos! ❤️");
 
-    // Sincronizar con Firestore si hay sesión activa
-    const perfil = JSON.parse(localStorage.getItem("unp_user_profile") || "{}");
-    if (perfil.uid) {
-      try {
-        await setDoc(doc(db, "usuarios", perfil.uid), { favoritos: nuevos }, { merge: true });
-      } catch (err) {
-        console.warn("Error al sincronizar favoritos:", err);
-      }
+  // Sincronizar con Firestore si hay sesión
+  if (currentUser) {
+    try {
+      await setDoc(
+        doc(db, "usuarios", currentUser.uid),
+        { favoritos: [...nuevos] },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn("[Producto] Error al sincronizar favoritos:", err);
     }
+  }
 
-    if (!eraFav && producto?.userUid) {
+  if (!eraFav && producto?.userUid) {
     await crearNotificacion({
-  paraUid: producto.userUid,
-  deUid: currentUser?.uid,
-  deNombre: currentUser?.displayName,
-  tipo: "favorito",
-  productoId,
-  productoTitulo: producto.titulo,
-});
-    }
-  };
+      paraUid:        producto.userUid,
+      deUid:          currentUser?.uid,
+      deNombre:       currentUser?.displayName,
+      tipo:           "favorito",
+      productoId,
+      productoTitulo: producto.titulo,
+    });
+  }
+};
 
   // ── WhatsApp ──
   const handleWhatsApp = async () => {

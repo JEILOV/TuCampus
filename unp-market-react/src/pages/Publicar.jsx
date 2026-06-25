@@ -1,13 +1,11 @@
 // src/pages/Publicar.jsx
-import { useState, useEffect, useRef }  from "react";
-import { useNavigate }                  from "react-router-dom";
-import {
-  collection, addDoc, getDoc,
-  doc, serverTimestamp, writeBatch,
-} from "firebase/firestore";
-import { db }                           from "../services/firebase";
-import { useAuth }                      from "../context/AuthContext";
-import { comprimirImagen, subirImagenImgBB, generarPrefijos } from "../utils/imageUtils";
+import { useState, useEffect, useRef }         from "react";
+import { useNavigate }                          from "react-router-dom";
+import { doc, getDoc, collection, writeBatch, serverTimestamp } from "firebase/firestore";
+import { db }                                   from "../services/firebase";
+import { useAuth }                              from "../context/AuthContext";
+import { comprimirImagen, subirImagenImgBB }    from "../utils/imageUtils";
+import { crearProducto }                        from "../services/productService";
 
 // ── Estilos reutilizables ────────────────────────────────────
 const inputStyle = {
@@ -64,84 +62,72 @@ const Publicar = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (titulo.trim() === "" || descripcion.trim() === "") {
-      setToast({ mensaje: "El título y la descripción deben contener texto real.", tipo: "error" });
-      return;
-    }
-    if (!user) {
-      setToast({ mensaje: "Debes iniciar sesión para publicar.", tipo: "error" });
-      return;
-    }
+  if (titulo.trim() === "" || descripcion.trim() === "") {
+    setToast({ mensaje: "El título y la descripción deben contener texto real.", tipo: "error" });
+    return;
+  }
+  if (!user) {
+    setToast({ mensaje: "Debes iniciar sesión para publicar.", tipo: "error" });
+    return;
+  }
+  if (!perfil?.telefono || perfil.telefono.trim().length < 7) {
+    setToast({ mensaje: "⚠️ Configura tu WhatsApp en el perfil para publicar.", tipo: "error" });
+    setTimeout(() => navigate("/perfil", { state: { abrirModalEdicion: true } }), 2000);
+    return;
+  }
 
-    // ✅ Validación de WhatsApp usando perfil del contexto en lugar de un getDoc
-    if (!perfil?.telefono || perfil.telefono.trim().length < 7) {
-      setToast({ mensaje: "⚠️ Configura tu WhatsApp en el perfil para publicar.", tipo: "error" });
-      setTimeout(() => navigate("/perfil", { state: { abrirModalEdicion: true } }), 2000);
-      return;
-    }
+  setEnviando(true);
+  try {
+    setBtnTexto("Comprimiendo imagen...");
+    const fileComprimido = archivo ? await comprimirImagen(archivo) : null;
 
-    setEnviando(true);
+    setBtnTexto("Subiendo imagen...");
+    const imagenFinal = await subirImagenImgBB(fileComprimido);
+
+    setBtnTexto("Publicando...");
+    // ✅ Lógica de Firestore delegada al servicio
+    const nuevoId = await crearProducto({
+      titulo, precio, categoria, descripcion,
+      imagen: imagenFinal, user, perfil,
+    });
+
+    // Notificar a seguidores (lógica específica de esta página, se queda aquí)
     try {
-      setBtnTexto("Comprimiendo imagen...");
-      const fileComprimido = archivo ? await comprimirImagen(archivo) : null;
-
-      setBtnTexto("Subiendo imagen...");
-      const imagenFinal = await subirImagenImgBB(fileComprimido);
-
-      setBtnTexto("Publicando...");
-      const nuevoProdRef = await addDoc(collection(db, "productos"), {
-        titulo,
-        precio:         parseFloat(precio),
-        categoria,
-        descripcion,
-        imagen:         imagenFinal,
-        vendedor:       perfil.nombre        || user.displayName || "Vendedor UNP",
-        vendedorNombre: perfil.nombre        || user.displayName || "Vendedor UNP",
-        avatarVendedor: perfil.avatar        || user.photoURL    || "",
-        telefono:       perfil.telefono      || "",
-        userUid:        user.uid,
-        estado:         "disponible",
-        fecha:          serverTimestamp(),
-        keywords:       generarPrefijos(titulo),
-      });
-
-      // Notificar a seguidores
-      try {
-        const vendedorSnap = await getDoc(doc(db, "usuarios", user.uid));
-        if (vendedorSnap.exists()) {
-          const { seguidores, nombre: nombreVendedor } = vendedorSnap.data();
-          if (Array.isArray(seguidores) && seguidores.length > 0) {
-            const batch = writeBatch(db);
-            seguidores.forEach((seguidorUid) => {
-              const notifRef = doc(collection(db, "notificaciones"));
-              batch.set(notifRef, {
-                paraUid:        seguidorUid,
-                deUid:          user.uid,
-                deNombre:       nombreVendedor || "Un vendedor",
-                tipo:           "nuevo_producto",
-                productoTitulo: titulo,
-                productoId:     nuevoProdRef.id,
-                leido:          false,
-                timestamp:      serverTimestamp(),
-              });
+      const vendedorSnap = await getDoc(doc(db, "usuarios", user.uid));
+      if (vendedorSnap.exists()) {
+        const { seguidores, nombre: nombreVendedor } = vendedorSnap.data();
+        if (Array.isArray(seguidores) && seguidores.length > 0) {
+          const batch = writeBatch(db);
+          seguidores.forEach((seguidorUid) => {
+            const notifRef = doc(collection(db, "notificaciones"));
+            batch.set(notifRef, {
+              paraUid:        seguidorUid,
+              deUid:          user.uid,
+              deNombre:       nombreVendedor || "Un vendedor",
+              tipo:           "nuevo_producto",
+              productoTitulo: titulo,
+              productoId:     nuevoId,
+              leido:          false,
+              timestamp:      serverTimestamp(),
             });
-            await batch.commit();
-          }
+          });
+          await batch.commit();
         }
-      } catch (notifErr) {
-        console.error("Error al notificar a seguidores:", notifErr);
       }
-
-      navigate("/", { state: { toastPublicar: true } });
-    } catch (err) {
-      console.error(err);
-      setToast({ mensaje: "Error al publicar. Intenta de nuevo.", tipo: "error" });
-      setBtnTexto("Publicar Producto");
-      setEnviando(false);
+    } catch (notifErr) {
+      console.warn("[Publicar] Error al notificar seguidores:", notifErr);
     }
-  };
+
+    navigate("/", { state: { toastPublicar: true } });
+  } catch (err) {
+    console.error("[Publicar] Error:", err);
+    setToast({ mensaje: "Error al publicar. Intenta de nuevo.", tipo: "error" });
+    setBtnTexto("Publicar Producto");
+    setEnviando(false);
+  }
+};
 
   const imagenAreaTexto = () => {
     if (!archivo) return "Toca para abrir la cámara o galería";

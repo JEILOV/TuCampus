@@ -1,11 +1,11 @@
 // src/pages/EditarProducto.jsx
 import { useState, useEffect, useRef }  from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { db }           from "../services/firebase";
-import { useAuth }      from "../context/AuthContext";
-import { comprimirImagen, subirImagenImgBB, generarPrefijos } from "../utils/imageUtils";
-
+import { doc, getDoc }                  from "firebase/firestore";
+import { db }                           from "../services/firebase";
+import { useAuth }                      from "../context/AuthContext";
+import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
+import { actualizarProducto }           from "../services/productService";
 // ── Estilos reutilizables ────────────────────────────────────
 const inputStyle = {
   background: "var(--bg-crema)", border: "1.5px solid #e8e8f0",
@@ -111,47 +111,44 @@ const EditarProducto = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (titulo.trim() === "" || descripcion.trim() === "") {
-      setToast({ mensaje: "El título y la descripción deben contener texto real.", tipo: "error" });
-      return;
+  if (titulo.trim() === "" || descripcion.trim() === "") {
+    setToast({ mensaje: "El título y la descripción deben contener texto real.", tipo: "error" });
+    return;
+  }
+  if (!user) {
+    setToast({ mensaje: "Debes iniciar sesión para editar.", tipo: "error" });
+    return;
+  }
+
+  setEnviando(true);
+  try {
+    let imagenFinal = imagenOriginal;
+
+    if (archivo) {
+      setBtnTexto("Comprimiendo imagen...");
+      const fileComprimido = await comprimirImagen(archivo);
+      setBtnTexto("Subiendo imagen...");
+      imagenFinal = await subirImagenImgBB(fileComprimido);
     }
-    if (!user) {
-      setToast({ mensaje: "Debes iniciar sesión para editar.", tipo: "error" });
-      return;
-    }
 
-    setEnviando(true);
-    try {
-      let imagenFinal = imagenOriginal; // conservar si no cambia foto
+    setBtnTexto("Guardando...");
+    // ✅ Lógica de Firestore delegada al servicio
+    await actualizarProducto(productoId, {
+      titulo, precio, categoria, descripcion,
+      imagen: imagenFinal,
+      imagenOriginal,
+    });
 
-      if (archivo) {
-        setBtnTexto("Comprimiendo imagen...");
-        const fileComprimido = await comprimirImagen(archivo);
-        setBtnTexto("Subiendo imagen...");
-        imagenFinal = await subirImagenImgBB(fileComprimido);
-      }
-
-      setBtnTexto("Guardando...");
-      await updateDoc(doc(db, "productos", productoId), {
-        titulo,
-        precio:       parseFloat(precio),
-        categoria,
-        descripcion,
-        imagen:       imagenFinal,
-        fechaEdicion: serverTimestamp(),
-        keywords:     generarPrefijos(titulo),
-      });
-
-      navigate("/perfil", { state: { toastEditar: true } });
-    } catch (err) {
-      console.error(err);
-      setToast({ mensaje: "Error al guardar. Intenta de nuevo.", tipo: "error" });
-      setBtnTexto("Guardar Cambios");
-      setEnviando(false);
-    }
-  };
+    navigate("/perfil", { state: { toastEditar: true } });
+  } catch (err) {
+    console.error("[EditarProducto] Error:", err);
+    setToast({ mensaje: "Error al guardar. Intenta de nuevo.", tipo: "error" });
+    setBtnTexto("Guardar Cambios");
+    setEnviando(false);
+  }
+};
 
   const imagenAreaTexto = () => {
     if (!archivo) {
