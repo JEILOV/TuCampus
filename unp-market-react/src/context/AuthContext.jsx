@@ -44,7 +44,7 @@ export const AuthProvider = ({ children }) => {
   const [favoritos, setFavoritos] = useState(new Set());
   const [cargando,  setCargando]  = useState(true); // empieza en true: aún no sabemos
 
-  // ── 3. Listener único de autenticación ───────────────────
+ // ── 3. Listener único de autenticación ───────────────────
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
@@ -56,6 +56,21 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
+      // 🚨 BLOQUEO DE SEGURIDAD ABSOLUTO 🚨
+      // Si el correo no es de la UNP, lo expulsamos inmediatamente
+      if (!firebaseUser.email?.endsWith("@alumnos.unp.edu.pe")) {
+        console.warn("[AuthContext] Intento de acceso con correo no permitido:", firebaseUser.email);
+        await signOut(auth); // Destruye la sesión en Firebase
+        
+        // Mantenemos el estado limpio para que la app no reaccione
+        setUser(null);
+        setPerfil(null);
+        setFavoritos(new Set());
+        setCargando(false);
+        return; // ⛔ DETENEMOS LA EJECUCIÓN AQUÍ
+      }
+
+      // ✅ Si pasa el bloqueo, continuamos con el flujo normal de la app
       try {
         // Recuperar favoritos que el usuario marcó como invitado
         const favoritosInvitado = obtenerFavoritos();

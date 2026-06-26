@@ -62,8 +62,9 @@ const Login = () => {
 
   // Redirección reactiva: si AuthContext ya tiene un usuario válido
   // (sesión previa o login recién completado), ir al home.
+// Redirección reactiva: solo redirige si el usuario es de la UNP
   useEffect(() => {
-    if (!cargando && user) {
+    if (!cargando && user && user.email?.endsWith(DOMINIO_PERMITIDO)) {
       navigate("/", { replace: true });
     }
   }, [user, cargando, navigate]);
