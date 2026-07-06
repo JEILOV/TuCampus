@@ -316,9 +316,10 @@ html, body {
 .card-photo--agotado { filter: grayscale(100%) opacity(0.55); }
 
 .card-emoji-placeholder {
-  font-size: 3rem;
+  display: flex;
   filter: drop-shadow(0 3px 8px rgba(0,0,0,.15));
 }
+.card-emoji-placeholder svg { width: 46px; height: 46px; }
 .card-emoji-placeholder--agotado { filter: grayscale(100%) opacity(0.55); }
 
 /* --- Precio: Esquina superior derecha, translúcido oscuro --- */
@@ -3072,4 +3073,3 @@ body {
 
 .btn-publish-final:hover { background: #255c41; }
 .btn-publish-final:active { transform: scale(0.97); }
-
