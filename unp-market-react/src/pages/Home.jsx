@@ -5,21 +5,17 @@ import { useAuth }                                  from "../context/AuthContext
 import { useProducts }                              from "../hooks/useProducts";
 import { useNotifications }                         from "../hooks/useNotifications";
 import { useToast, ToastContainer }                 from "../components/Toast"; // ✅ Nuevos imports
+import { CATEGORY_ICON_MAP }                        from "../components/CategoryIcons";
 
 // ── Constantes ───────────────────────────────────────────────
 const CATEGORIAS = [
-  { key: "todos",      label: "Todos",      icon: "🌟", bg: "#f1f3f5" },
-  { key: "dulces",     label: "Dulces",     icon: "🍰", bg: "#ffeaea" },
-  { key: "salados",    label: "Salados",    icon: "🍔", bg: "#e8f4ff" },
-  { key: "bebidas",    label: "Bebidas",    icon: "🥤", bg: "#e6faf0" },
-  { key: "servicios",  label: "Servicios",  icon: "🔧", bg: "#fff6e0" },
-  { key: "materiales", label: "Materiales", icon: "📚", bg: "#f0eaff" },
+  { key: "todos",      label: "Todos",      bg: "#f1f3f5", accent: "#5c5c7a" },
+  { key: "dulces",     label: "Dulces",     bg: "#ffeaea", accent: "#e0607a" },
+  { key: "salados",    label: "Salados",    bg: "#e8f4ff", accent: "#2f7bc9" },
+  { key: "bebidas",    label: "Bebidas",    bg: "#e6faf0", accent: "#2e9e6f" },
+  { key: "servicios",  label: "Servicios",  bg: "#fff6e0", accent: "#c98a1f" },
+  { key: "materiales", label: "Materiales", bg: "#f0eaff", accent: "#7b5bc9" },
 ];
-
-const ICONOS_CAT = {
-  dulces: "🍫", bebidas: "☕", salados: "🍔",
-  servicios: "🔧", materiales: "📚",
-};
 
 const formatearTiempo = (timestamp) => {
   if (!timestamp) return "Hace un momento";
@@ -36,7 +32,8 @@ const formatearTiempo = (timestamp) => {
 const ProductCard = ({ producto, onVerDetalle }) => {
   const { id, titulo, precio, imagen, categoria, vendedorNombre, avatarVendedor, estado } = producto;
   const estaAgotado = estado === "agotado";
-  const emoji       = ICONOS_CAT[(categoria || "").toLowerCase()] || "📦";
+  const catKey       = (categoria || "").toLowerCase();
+  const IconPlaceholder = CATEGORY_ICON_MAP[catKey] || CATEGORY_ICON_MAP.materiales;
 
   return (
     <article
@@ -52,7 +49,7 @@ const ProductCard = ({ producto, onVerDetalle }) => {
           />
         ) : (
           <span className={`card-emoji-placeholder${estaAgotado ? " card-emoji-placeholder--agotado" : ""}`}>
-            {emoji}
+            <IconPlaceholder color="#a07850" />
           </span>
         )}
         <span className={`card-price-badge${estaAgotado ? " card-price-badge--agotado" : ""}`}>
@@ -194,16 +191,21 @@ const Home = () => {
           </div>
 
           <nav className="categories-scroll" aria-label="Categorías">
-            {CATEGORIAS.map(({ key, label, icon, bg }) => (
-              <button
-                key={key}
-                className={`category-chip${categoriaActiva === key ? " active" : ""}`}
-                onClick={() => setCategoriaActiva(key)}
-              >
-                <span className="chip-icon" style={{ background: bg }}>{icon}</span>
-                <span className="chip-label">{label}</span>
-              </button>
-            ))}
+            {CATEGORIAS.map(({ key, label, bg, accent }) => {
+              const Icon = CATEGORY_ICON_MAP[key];
+              return (
+                <button
+                  key={key}
+                  className={`category-chip${categoriaActiva === key ? " active" : ""}`}
+                  onClick={() => setCategoriaActiva(key)}
+                >
+                  <span className="chip-icon" style={{ background: bg }}>
+                    <Icon color={accent} />
+                  </span>
+                  <span className="chip-label">{label}</span>
+                </button>
+              );
+            })}
           </nav>
         </>
       )}
