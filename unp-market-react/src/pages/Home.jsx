@@ -9,12 +9,12 @@ import { CATEGORY_ICON_MAP, IconPackage }           from "../components/Category
 
 // ── Constantes ───────────────────────────────────────────────
 const CATEGORIAS = [
-  { key: "todos",      label: "Todos",      bg: "#f1f3f5", accent: "#5c5c7a" },
-  { key: "dulces",     label: "Dulces",     bg: "#ffeaea", accent: "#5c5c7a" },
-  { key: "salados",    label: "Salados",    bg: "#e8f4ff", accent: "#5c5c7a" },
-  { key: "bebidas",    label: "Bebidas",    bg: "#e6faf0", accent: "#5c5c7a" },
-  { key: "servicios",  label: "Servicios",  bg: "#fff6e0", accent: "#5c5c7a" },
-  { key: "materiales", label: "Materiales", bg: "#f0eaff", accent: "#5c5c7a" },
+ { key: "todos",      label: "Todos",      bg: "#f1f3f5", accent: "#5c5c7a" },
+  { key: "dulces",     label: "Dulces",     bg: "#ffeaea", accent: "#e0607a" },
+  { key: "salados",    label: "Salados",    bg: "#e8f4ff", accent: "#2f7bc9" },
+  { key: "bebidas",    label: "Bebidas",    bg: "#e6faf0", accent: "#2e9e6f" },
+  { key: "servicios",  label: "Servicios",  bg: "#fff6e0", accent: "#c98a1f" },
+  { key: "materiales", label: "Materiales", bg: "#f0eaff", accent: "#7b5bc9" },
 ];
 
 const formatearTiempo = (timestamp) => {
