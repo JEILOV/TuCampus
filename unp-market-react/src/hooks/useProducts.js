@@ -70,7 +70,7 @@ export const useProducts = ({ orden, categoriaActiva, busquedaFirebase, onError 
       const constraints    = [];
 
       if (busquedaFirebase.trim() !== "") {
-        constraints.push(where("prefijos", "array-contains", busquedaFirebase.toLowerCase().trim()));
+        constraints.push(where("keywords", "array-contains", busquedaFirebase.toLowerCase().trim()));
       } else if (categoriaActiva !== "todos") {
         constraints.push(where("categoria", "==", categoriaActiva));
       }
