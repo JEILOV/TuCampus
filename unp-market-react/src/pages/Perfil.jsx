@@ -7,10 +7,7 @@ import {
   updateDoc, deleteDoc,
   onSnapshot, orderBy,
 } from "firebase/firestore";
-import {
-  RecaptchaVerifier, PhoneAuthProvider, linkWithCredential,
-} from "firebase/auth";
-import { db, auth }                    from "../services/firebase";
+import { db }                          from "../services/firebase";
 import { useAuth }                     from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
 import Spinner                         from "../components/Spinner"; // ✅ Nuevo import
@@ -154,11 +151,6 @@ const Perfil = () => {
   const [mAvatarPrev,  setMAvatarPrev]  = useState(null);
   const [mPortadaPrev, setMPortadaPrev] = useState(null);
 
-  // ── Phone Auth / SMS ──
-  const [esperandoSMS,   setEsperandoSMS]   = useState(false);
-  const [codigoSMS,      setCodigoSMS]      = useState("");
-  const [verificationId, setVerificationId] = useState(null);
-
   const avatarInputRef  = useRef(null);
   const portadaInputRef = useRef(null);
   const dropdownRef     = useRef(null);
@@ -235,9 +227,6 @@ const Perfil = () => {
     setMAvatarPrev(p.avatar  || null);
     setMPortadaPrev(p.portada || null);
     setDropdownOpen(false);
-    setEsperandoSMS(false);
-    setCodigoSMS("");
-    setVerificationId(null);
     setModalOpen(true);
   };
 
@@ -279,7 +268,6 @@ const Perfil = () => {
     actualizarPerfil(nuevoPerfil);
 
     setModalOpen(false);
-    setEsperandoSMS(false);
     mostrarToast("¡Perfil guardado correctamente!");
 
     try {
@@ -310,75 +298,12 @@ const Perfil = () => {
 
   const handleGuardar = async () => {
     if (!user) return;
-
-    const telefonoActual = (perfil?.telefono || "").trim();
-    const telefonoNuevo  = mTelefono.trim();
-
-    if (!telefonoNuevo || telefonoNuevo === telefonoActual) {
-      setGuardando(true);
-      try {
-        await ejecutarGuardadoReal();
-      } catch (err) {
-        console.error(err);
-        mostrarToast("Error al guardar el perfil", "error");
-      } finally {
-        setGuardando(false);
-      }
-      return;
-    }
-
     setGuardando(true);
     try {
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = null;
-      }
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
-
-      const provider = new PhoneAuthProvider(auth);
-      const verId    = await provider.verifyPhoneNumber(
-        "+51" + telefonoNuevo,
-        window.recaptchaVerifier
-      );
-      setVerificationId(verId);
-      setEsperandoSMS(true);
-    } catch (err) {
-      console.error("[Perfil] Error al enviar SMS:", err);
-      mostrarToast("No se pudo enviar el SMS. Verifica el número.", "error");
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = null;
-      }
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  const confirmarSMSYGuardar = async () => {
-    if (!user || !verificationId || !codigoSMS.trim()) {
-      mostrarToast("Ingresa el código de 6 dígitos", "error");
-      return;
-    }
-    setGuardando(true);
-    try {
-      const credential = PhoneAuthProvider.credential(verificationId, codigoSMS.trim());
-      await linkWithCredential(user, credential);
       await ejecutarGuardadoReal();
-      mostrarToast("📱 Teléfono verificado y perfil guardado");
     } catch (err) {
-      console.error("[Perfil] Error al verificar SMS:", err);
-      if (err.code === "auth/invalid-verification-code") {
-        mostrarToast("Código incorrecto. Inténtalo de nuevo.", "error");
-      } else if (err.code === "auth/provider-already-linked") {
-        try {
-          await ejecutarGuardadoReal();
-        } catch (saveErr) {
-          console.error(saveErr);
-          mostrarToast("Error al guardar el perfil", "error");
-        }
-      } else {
-        mostrarToast("Error al verificar. Intenta enviar el SMS de nuevo.", "error");
-      }
+      console.error(err);
+      mostrarToast("Error al guardar el perfil", "error");
     } finally {
       setGuardando(false);
     }
@@ -715,10 +640,6 @@ const Perfil = () => {
             maxHeight: "90vh", overflowY: "auto",
             boxSizing: "border-box",
           }}>
-            {/* div invisible para reCAPTCHA */}
-            <div id="recaptcha-container"></div>
-
-            {!esperandoSMS ? (
               /* ══ FORMULARIO DE PERFIL ══ */
               <>
                 <h2 style={{ margin: "0 0 20px", fontSize: "1.2rem", fontWeight: 700, color: "var(--azul-oscuro)" }}>
@@ -823,87 +744,10 @@ const Perfil = () => {
                       boxShadow: "0 4px 15px rgba(58,125,68,0.3)",
                     }}
                   >
-                    {guardando ? "Enviando SMS..." : "Guardar Perfil"}
+                    {guardando ? "Guardando..." : "Guardar Perfil"}
                   </button>
                 </div>
               </>
-            ) : (
-              /* ══ VISTA SMS: verificar código ══ */
-              <>
-                <div style={{
-                  width: "60px", height: "60px", borderRadius: "50%",
-                  background: "var(--bg-crema)", border: "2px solid var(--verde-marca)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  margin: "0 auto 16px",
-                }}>
-                  <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--verde-marca)" strokeWidth="2.2" strokeLinecap="round">
-                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
-                    <line x1="12" y1="18" x2="12.01" y2="18"/>
-                  </svg>
-                </div>
-
-                <h2 style={{ margin: "0 0 8px", fontSize: "1.15rem", fontWeight: 700, color: "var(--azul-oscuro)", textAlign: "center" }}>
-                  Verifica tu número
-                </h2>
-                <p style={{
-                  margin: "0 0 24px", fontSize: "0.88rem", fontWeight: 600,
-                  color: "#5c5c7a", textAlign: "center", lineHeight: 1.5,
-                }}>
-                  Te enviamos un código por SMS al{" "}
-                  <span style={{ color: "var(--azul-oscuro)", fontWeight: 800 }}>
-                    +51 {mTelefono}
-                  </span>
-                </p>
-
-                <div style={{ marginBottom: "20px" }}>
-                  <label style={labelStyle}>Código de 6 dígitos</label>
-                  <input
-                    value={codigoSMS}
-                    onChange={(e) => {
-                      const soloNums = e.target.value.replace(/\D/g, "");
-                      if (soloNums.length <= 6) setCodigoSMS(soloNums);
-                    }}
-                    placeholder="_ _ _ _ _ _"
-                    type="tel"
-                    maxLength={6}
-                    style={{
-                      ...inputStyle, marginTop: "8px",
-                      fontSize: "1.4rem", letterSpacing: "0.35em", textAlign: "center",
-                    }}
-                    autoFocus
-                  />
-                </div>
-
-                <div style={{ display: "flex", gap: "12px" }}>
-                  <button
-                    onClick={() => { setEsperandoSMS(false); setCodigoSMS(""); setVerificationId(null); }}
-                    style={{
-                      flex: 1, padding: "14px", borderRadius: "14px",
-                      background: "#f1f3f5", border: "none", cursor: "pointer",
-                      fontWeight: 600, fontSize: "0.95rem", color: "#5c5c7a",
-                      fontFamily: "'Nunito', sans-serif",
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={confirmarSMSYGuardar}
-                    disabled={guardando || codigoSMS.length < 6}
-                    style={{
-                      flex: 1.5, padding: "14px", borderRadius: "14px",
-                      background: (guardando || codigoSMS.length < 6) ? "#6b9e74" : "var(--verde-marca)",
-                      border: "none",
-                      cursor: (guardando || codigoSMS.length < 6) ? "not-allowed" : "pointer",
-                      fontWeight: 600, fontSize: "0.95rem", color: "white",
-                      fontFamily: "'Nunito', sans-serif",
-                      boxShadow: "0 4px 15px rgba(58,125,68,0.3)",
-                    }}
-                  >
-                    {guardando ? "Verificando..." : "Verificar y Guardar"}
-                  </button>
-                </div>
-              </>
-            )}
           </div>
         </div>
       )}
