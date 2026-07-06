@@ -1,7 +1,7 @@
 import {
   doc, getDoc, setDoc,
   collection, query, where, getDocs,
-  updateDoc, arrayUnion, arrayRemove,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
@@ -36,9 +36,15 @@ export const obtenerProductosPorVendedor = async (uid) => {
  */
 export const seguirVendedor = async (vendedorUid, miUid) => {
   try {
-    await updateDoc(doc(db, "usuarios", vendedorUid), {
-      seguidores: arrayUnion(miUid),
-    });
+    const ref  = doc(db, "usuarios", vendedorUid);
+    const snap = await getDoc(ref);
+    const actuales = (snap.exists() && Array.isArray(snap.data().seguidores))
+      ? snap.data().seguidores
+      : [];
+
+    if (actuales.includes(miUid)) return; // ya lo sigue, nada que hacer
+
+    await updateDoc(ref, { seguidores: [...actuales, miUid] });
   } catch (err) {
     logError("[userService.seguirVendedor]", err);
     throw new Error(traducirError(err, "firestore"));
@@ -48,9 +54,15 @@ export const seguirVendedor = async (vendedorUid, miUid) => {
 
 export const dejarDeSeguirVendedor = async (vendedorUid, miUid) => {
   try {
-    await updateDoc(doc(db, "usuarios", vendedorUid), {
-      seguidores: arrayRemove(miUid),
-    });
+    const ref  = doc(db, "usuarios", vendedorUid);
+    const snap = await getDoc(ref);
+    const actuales = (snap.exists() && Array.isArray(snap.data().seguidores))
+      ? snap.data().seguidores
+      : [];
+
+    if (!actuales.includes(miUid)) return; // ya no lo sigue, nada que hacer
+
+    await updateDoc(ref, { seguidores: actuales.filter((uid) => uid !== miUid) });
   } catch (err) {
     logError("[userService.dejarDeSeguirVendedor]", err);
     throw new Error(traducirError(err, "firestore"));
