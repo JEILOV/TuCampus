@@ -179,14 +179,34 @@ html, body {
   width: 58px;
   height: 58px;
   border-radius: 16px;
-  font-size: 26px;
   line-height: 1;
   transition: box-shadow 0.18s, transform 0.18s;
   border: 1.5px solid rgba(0,0,0,.05);
 }
+.chip-icon svg { transition: transform 0.28s ease; }
+
 .category-chip:hover .chip-icon {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0,0,0,.13);
+}
+.category-chip:hover .chip-icon svg {
+  animation: iconWiggle 0.5s ease;
+}
+
+.category-chip.active .chip-icon svg {
+  animation: iconPop 0.35s ease;
+}
+
+@keyframes iconWiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25%      { transform: rotate(-10deg) scale(1.08); }
+  75%      { transform: rotate(10deg) scale(1.08); }
+}
+
+@keyframes iconPop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.28); }
+  100% { transform: scale(1); }
 }
 
 .chip-label {

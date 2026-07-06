@@ -5,7 +5,7 @@ import { useAuth }                                  from "../context/AuthContext
 import { useProducts }                              from "../hooks/useProducts";
 import { useNotifications }                         from "../hooks/useNotifications";
 import { useToast, ToastContainer }                 from "../components/Toast"; // ✅ Nuevos imports
-import { CATEGORY_ICON_MAP }                        from "../components/CategoryIcons";
+import { CATEGORY_ICON_MAP, IconPackage }           from "../components/CategoryIcons";
 
 // ── Constantes ───────────────────────────────────────────────
 const CATEGORIAS = [
@@ -33,7 +33,7 @@ const ProductCard = ({ producto, onVerDetalle }) => {
   const { id, titulo, precio, imagen, categoria, vendedorNombre, avatarVendedor, estado } = producto;
   const estaAgotado = estado === "agotado";
   const catKey       = (categoria || "").toLowerCase();
-  const IconPlaceholder = CATEGORY_ICON_MAP[catKey] || CATEGORY_ICON_MAP.materiales;
+  const IconPlaceholder = CATEGORY_ICON_MAP[catKey] || IconPackage;
 
   return (
     <article
