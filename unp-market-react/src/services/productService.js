@@ -37,7 +37,7 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
       userUid:        user.uid,
       fecha:          serverTimestamp(),
       estado:         "disponible",
-      prefijos,
+      keywords:       prefijos,
     });
 
     const userRef = doc(db, "usuarios", user.uid);
@@ -65,7 +65,7 @@ export const actualizarProducto = async (productoId, { titulo, precio, categoria
       categoria,
       descripcion,
       imagen:       imagen || imagenOriginal || "",
-      prefijos,
+      keywords:     prefijos,
       fechaEdicion: serverTimestamp(),
     });
   } catch (err) {
