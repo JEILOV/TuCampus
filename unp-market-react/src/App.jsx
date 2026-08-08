@@ -7,6 +7,7 @@ import Producto       from "./pages/Producto";
 import Vendedor       from "./pages/Vendedor";
 import EditarProducto from "./pages/EditarProducto";
 import Chat           from "./pages/Chat";
+import Terminos       from "./pages/Terminos";
 import RutaProtegida  from "./components/RutaProtegida";
 
 const App = () => (
@@ -17,6 +18,7 @@ const App = () => (
       <Route path="/login"     element={<Login />} />
       <Route path="/producto"  element={<Producto />} />
       <Route path="/vendedor"  element={<Vendedor />} />
+      <Route path="/terminos"  element={<Terminos />} />
 
       {/* Rutas Protegidas */}
       <Route path="/perfil"   element={<RutaProtegida><Perfil /></RutaProtegida>} />

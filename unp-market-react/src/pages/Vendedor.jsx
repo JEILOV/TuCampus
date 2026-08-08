@@ -6,9 +6,11 @@ import { crearNotificacion }           from "../services/notificationService";
 import {
   obtenerPerfilVendedor,
   obtenerProductosPorVendedor,
+  obtenerContactoPrivado,
   seguirVendedor,
   dejarDeSeguirVendedor,
 } from "../services/userService";
+import { obtenerOCrearChat } from "../services/chatService";
 import {
   obtenerMiResena,
   obtenerResenasDeVendedor,
@@ -172,6 +174,12 @@ const Vendedor = () => {
   const [noExiste,   setNoExiste]   = useState(false);
   const [esSeguidor, setEsSeguidor] = useState(false);
 
+  // 🔒 Número real de WhatsApp: viene SOLO de /usuarios/{uid}/privado/contacto,
+  // nunca del documento público del vendedor. Se usa exclusivamente para
+  // construir el enlace de "Contactar por WhatsApp" — jamás se pinta en pantalla.
+  const [contactoPrivado, setContactoPrivado] = useState(null);
+  const [iniciandoChat,   setIniciandoChat]   = useState(false);
+
   // ── Fase 3 (Opción B): reseña única/editable por vendedor ──
   const [toasts, setToasts] = useState([]);
   const mostrarToast        = useToast(setToasts);
@@ -237,6 +245,16 @@ const Vendedor = () => {
 
         setVendedor(datosVendedor);
         setProductos(lista);
+
+        // 🔒 El contacto privado exige sesión iniciada (regla de Firestore).
+        // Si falla o el usuario no está logueado, obtenerContactoPrivado
+        // resuelve null y simplemente no se muestra el botón de WhatsApp.
+        if (user) {
+          const contacto = await obtenerContactoPrivado(uid);
+          if (!cancelado) setContactoPrivado(contacto);
+        } else if (!cancelado) {
+          setContactoPrivado(null);
+        }
       } catch (err) {
         console.error(err);
         if (!cancelado) setNoExiste(true);
@@ -266,6 +284,30 @@ const Vendedor = () => {
   const handleAbrirModalResena = () => {
     if (!user) { navigate("/login"); return; }
     setModalResenaAbierto(true);
+  };
+
+  const handleChatInterno = async () => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    if (!uid || uid === user.uid || iniciandoChat) return;
+
+    setIniciandoChat(true);
+    try {
+      const chat = await obtenerOCrearChat(user.uid, uid, {
+        compradorNombre: user.displayName,
+        compradorAvatar: user.photoURL,
+        vendedorNombre:  vendedor?.nombre,
+        vendedorAvatar:  vendedor?.avatar,
+      });
+      navigate(`/chat?id=${chat.id}`);
+    } catch (err) {
+      console.error(err);
+      mostrarToast(err.message || "No se pudo abrir el chat");
+    } finally {
+      setIniciandoChat(false);
+    }
   };
 
   const handleToggleSeguir = async () => {
@@ -421,11 +463,57 @@ const Vendedor = () => {
         </div>
       </div>
 
-      {/* CONTACTAR POR WHATSAPP */}
-      {v.telefono && (
-        <div style={{ padding: "0 16px 20px" }}>
+      {/* MÉTODOS DE PAGO ACEPTADOS — solo insignias, nunca el número */}
+      {(v.aceptaYape || v.aceptaPlin) && (
+        <div style={{ padding: "0 16px 12px", display: "flex", gap: "8px", justifyContent: "center" }}>
+          {v.aceptaYape && (
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: "6px",
+              background: "#f3e8ff", color: "#7c3aed", padding: "6px 14px",
+              borderRadius: "20px", fontSize: "0.78rem", fontWeight: 800,
+            }}>
+              💜 Acepta Yape
+            </span>
+          )}
+          {v.aceptaPlin && (
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: "6px",
+              background: "#e0f2fe", color: "#0284c7", padding: "6px 14px",
+              borderRadius: "20px", fontSize: "0.78rem", fontWeight: 800,
+            }}>
+              💙 Acepta Plin
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* CONTACTO: CHAT INTERNO + WHATSAPP */}
+      <div style={{ padding: "0 16px 20px", display: "flex", flexDirection: "column", gap: "10px" }}>
+        {user?.uid !== uid && (
+          <button
+            onClick={handleChatInterno}
+            disabled={iniciandoChat}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+              background: "var(--azul-oscuro)", color: "white", border: "none",
+              padding: "14px", borderRadius: "14px", fontWeight: 800, fontSize: "1rem",
+              cursor: iniciandoChat ? "not-allowed" : "pointer",
+              opacity: iniciandoChat ? 0.7 : 1,
+              fontFamily: "'Nunito', sans-serif", width: "100%", boxSizing: "border-box",
+            }}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+            </svg>
+            {iniciandoChat ? "Abriendo chat..." : "Chat interno"}
+          </button>
+        )}
+
+        {/* El número real solo llega desde /usuarios/{uid}/privado/contacto,
+            jamás se imprime como texto: únicamente arma el enlace de WhatsApp. */}
+        {contactoPrivado?.telefono && (
           <a
-            href={`https://wa.me/51${String(v.telefono).replace(/\s+/g, "")}?text=${encodeURIComponent(`Hola ${v.nombre || "vendedor"}, vi tu perfil en Mercado UNP y me gustaría hacerte una consulta.`)}`}
+            href={`https://wa.me/51${String(contactoPrivado.telefono).replace(/\s+/g, "")}?text=${encodeURIComponent(`Hola ${v.nombre || "vendedor"}, vi tu perfil en TuCampus y me gustaría hacerte una consulta.`)}`}
             target="_blank"
             rel="noopener noreferrer"
             style={{
@@ -441,8 +529,8 @@ const Vendedor = () => {
             </svg>
             Contactar por WhatsApp
           </a>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* SEGUIR / DEJAR DE SEGUIR */}
       <div style={{ padding: "0 16px 12px", display: "flex", gap: "10px" }}>

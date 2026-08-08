@@ -19,7 +19,7 @@
 // ============================================================
 
 import { useState, useEffect }       from "react";
-import { useNavigate }               from "react-router-dom";
+import { useNavigate, Link }         from "react-router-dom";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { auth }                      from "../services/firebase";
 import { useAuth }                   from "../context/AuthContext";
@@ -156,7 +156,7 @@ const Login = () => {
         {/* FOOTER */}
         <footer className="login-footer">
           Al continuar aceptas registrarte con tu correo institucional y los{" "}
-          <a href="#">Términos y Condiciones</a>.
+          <Link to="/terminos">Términos y Privacidad</Link>.
         </footer>
 
       </div>

@@ -6,9 +6,11 @@ import {
   collection, query, where,
   updateDoc, deleteDoc,
 } from "firebase/firestore";
+import { Link }                        from "react-router-dom";
 import { db }                          from "../services/firebase";
 import { useAuth }                     from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
+import { obtenerContactoPrivado, guardarContactoPrivado } from "../services/userService";
 import Spinner                         from "../components/Spinner"; // ✅ Nuevo import
 import { useToast, ToastContainer }    from "../components/Toast";   // ✅ Nuevo import
 import BottomNav                       from "../components/BottomNav";
@@ -145,6 +147,8 @@ const Perfil = () => {
   const [mAcerca,    setMAcerca]    = useState("");
   const [mUbicacion, setMUbicacion] = useState("");
   const [mTelefono,  setMTelefono]  = useState("");
+  const [mAceptaYape, setMAceptaYape] = useState(false);
+  const [mAceptaPlin, setMAceptaPlin] = useState(false);
   const [mAvatarFile,  setMAvatarFile]  = useState(null);
   const [mPortadaFile, setMPortadaFile] = useState(null);
   const [mAvatarPrev,  setMAvatarPrev]  = useState(null);
@@ -201,19 +205,31 @@ const Perfil = () => {
     }
   };
 
-  const abrirModal = () => {
+  const abrirModal = async () => {
     const p = perfil || {};
     setMNombre(p.nombre       || "");
     setMBio(p.bio             || "");
     setMAcerca(p.acercaDe     || "");
     setMUbicacion(p.ubicacion || "");
-    setMTelefono(p.telefono   || "");
     setMAvatarFile(null);
     setMPortadaFile(null);
     setMAvatarPrev(p.avatar  || null);
     setMPortadaPrev(p.portada || null);
+    setMAceptaYape(!!p.aceptaYape);
+    setMAceptaPlin(!!p.aceptaPlin);
     setDropdownOpen(false);
     setModalOpen(true);
+
+    // 🔒 El número real vive solo en /usuarios/{uid}/privado/contacto.
+    // Se carga aparte (y de forma asíncrona) para no bloquear la
+    // apertura del modal ni exponerlo nunca en el doc público.
+    setMTelefono("");
+    try {
+      const contacto = await obtenerContactoPrivado(user.uid);
+      setMTelefono(contacto?.telefono || "");
+    } catch (err) {
+      console.error("[Perfil] Error al cargar contacto privado:", err);
+    }
   };
 
   const handleFileSelect = (tipo, file) => {
@@ -238,17 +254,32 @@ const Perfil = () => {
       portadaFinal = await subirImagenImgBB(blob);
     }
 
+    const telefonoFinal = mTelefono.trim();
+
+    // 🔒 El número NUNCA se escribe en el doc público /usuarios/{uid}.
+    // Se guarda aparte en la subcolección privada de contacto, junto
+    // con los métodos de pago (por ahora, mismo número para Yape/Plin).
+    await guardarContactoPrivado(user.uid, {
+      telefono: telefonoFinal,
+      metodosPago: {
+        yape: { activo: mAceptaYape, numero: mAceptaYape ? telefonoFinal : "" },
+        plin: { activo: mAceptaPlin, numero: mAceptaPlin ? telefonoFinal : "" },
+      },
+    });
+
     const nuevoPerfil = {
       ...perfilPrev,
-      uid:       user.uid,
-      nombre:    mNombre    || perfilPrev.nombre    || "",
-      bio:       mBio       || perfilPrev.bio       || "",
-      acercaDe:  mAcerca    || perfilPrev.acercaDe  || "",
-      ubicacion: mUbicacion || perfilPrev.ubicacion || "",
-      telefono:  mTelefono.trim() || perfilPrev.telefono || "",
-      avatar:    avatarFinal,
-      portada:   portadaFinal,
+      uid:        user.uid,
+      nombre:     mNombre    || perfilPrev.nombre    || "",
+      bio:        mBio       || perfilPrev.bio       || "",
+      acercaDe:   mAcerca    || perfilPrev.acercaDe  || "",
+      ubicacion:  mUbicacion || perfilPrev.ubicacion || "",
+      avatar:     avatarFinal,
+      portada:    portadaFinal,
+      aceptaYape: mAceptaYape,
+      aceptaPlin: mAceptaPlin,
     };
+    delete nuevoPerfil.telefono; // por si un perfil viejo aún lo traía
 
     await setDoc(doc(db, "usuarios", user.uid), nuevoPerfil, { merge: true });
     actualizarPerfil(nuevoPerfil);
@@ -260,20 +291,24 @@ const Perfil = () => {
       const q    = query(collection(db, "productos"), where("userUid", "==", user.uid));
       const snap = await getDocs(q);
       if (!snap.empty) {
+        // 🔒 Solo se sincronizan datos públicos (nombre, avatar, insignias
+        // de método de pago). El teléfono nunca se copia a "productos".
         await Promise.all(snap.docs.map((d) =>
           updateDoc(doc(db, "productos", d.id), {
             avatarVendedor: avatarFinal,
-            vendedorNombre: nuevoPerfil.nombre   || "",
-            vendedor:       nuevoPerfil.nombre   || "",
-            telefono:       nuevoPerfil.telefono || "",
+            vendedorNombre: nuevoPerfil.nombre || "",
+            vendedor:       nuevoPerfil.nombre || "",
+            aceptaYape:     mAceptaYape,
+            aceptaPlin:     mAceptaPlin,
           })
         ));
         setProductos((prev) => prev.map((p) => ({
           ...p,
           avatarVendedor: avatarFinal,
-          vendedorNombre: nuevoPerfil.nombre   || "",
-          vendedor:       nuevoPerfil.nombre   || "",
-          telefono:       nuevoPerfil.telefono || "",
+          vendedorNombre: nuevoPerfil.nombre || "",
+          vendedor:       nuevoPerfil.nombre || "",
+          aceptaYape:     mAceptaYape,
+          aceptaPlin:     mAceptaPlin,
         })));
         mostrarToast(`✓ Perfil actualizado en ${snap.size} publicación${snap.size !== 1 ? "es" : ""}`);
       }
@@ -470,16 +505,22 @@ const Perfil = () => {
         </div>
 
         <div style={{
-          flex: 1, display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "8px",
+          flex: 1, display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "6px",
           padding: "10px 16px", background: "var(--blanco-puro)", borderRadius: "24px",
           border: "1px solid rgba(15, 37, 64, 0.06)", boxShadow: "0 4px 12px rgba(15, 37, 64, 0.04)",
+          flexWrap: "wrap",
         }}>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--verde-marca)" strokeWidth="2.2" strokeLinecap="round">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.5 2 2 0 0 1 3.6 1.32h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
-          </svg>
-          <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--azul-oscuro)", margin: 0 }}>
-            {p.telefono || "Sin WhatsApp"}
-          </span>
+          {/* 🔒 Nunca se imprime el número: solo insignias de qué métodos
+              de contacto/pago acepta este usuario. */}
+          {p.aceptaYape && (
+            <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "#7c3aed" }}>💜 Yape</span>
+          )}
+          {p.aceptaPlin && (
+            <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "#0284c7" }}>💙 Plin</span>
+          )}
+          {!p.aceptaYape && !p.aceptaPlin && (
+            <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--azul-oscuro)" }}>Sin métodos configurados</span>
+          )}
         </div>
       </div>
 
@@ -542,6 +583,18 @@ const Perfil = () => {
             ))}
           </div>
         )}
+      </div>
+
+      {/* ════════════════════════════════════════════════════
+             TÉRMINOS Y PRIVACIDAD
+        ════════════════════════════════════════════════════ */}
+      <div style={{ textAlign: "center", padding: "4px 16px 16px" }}>
+        <Link
+          to="/terminos"
+          style={{ fontSize: "0.8rem", fontWeight: 700, color: "#a0a5b9", textDecoration: "underline" }}
+        >
+          Términos y Privacidad
+        </Link>
       </div>
 
       {/* ════════════════════════════════════════════════════
@@ -610,6 +663,21 @@ const Perfil = () => {
                       maxLength={9}
                       style={{ ...inputStyle, marginTop: "6px" }}
                     />
+                    <p style={{ margin: "6px 0 0", fontSize: "0.76rem", color: "#a0a5b9", fontWeight: 600 }}>
+                      🔒 Se guarda de forma privada. Nunca se muestra en tu perfil público, solo
+                      alimenta el botón de WhatsApp.
+                    </p>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "16px" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.88rem", fontWeight: 700, color: "var(--azul-oscuro)", cursor: "pointer" }}>
+                      <input type="checkbox" checked={mAceptaYape} onChange={(e) => setMAceptaYape(e.target.checked)} />
+                      Acepto Yape
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.88rem", fontWeight: 700, color: "var(--azul-oscuro)", cursor: "pointer" }}>
+                      <input type="checkbox" checked={mAceptaPlin} onChange={(e) => setMAceptaPlin(e.target.checked)} />
+                      Acepto Plin
+                    </label>
                   </div>
 
                   {/* Foto de perfil */}
