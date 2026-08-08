@@ -33,7 +33,9 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
       vendedor:       perfil?.nombre   || user.displayName || "Vendedor UNP",
       vendedorNombre: perfil?.nombre   || user.displayName || "Vendedor UNP",
       avatarVendedor: perfil?.avatar   || "",
-      telefono:       perfil?.telefono || "",
+      // 🔒 telefono YA NO se copia al documento público del producto.
+      aceptaYape:     !!perfil?.aceptaYape,
+      aceptaPlin:     !!perfil?.aceptaPlin,
       userUid:        user.uid,
       fecha:          serverTimestamp(),
       estado:         "disponible",

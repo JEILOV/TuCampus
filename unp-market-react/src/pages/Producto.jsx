@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams }     from "react-router-dom";
 import { useAuth }                          from "../context/AuthContext";
 import { obtenerProductoPorId }             from "../services/productService";
 import { crearNotificacion }               from "../services/notificationService";
+import { obtenerOCrearChat }               from "../services/chatService";
 import { useFavorites }                     from "../hooks/useFavorites";
 
 // ── Constantes ───────────────────────────────────────────────
@@ -102,6 +103,36 @@ const Producto = () => {
     });
   };
 
+  // ── Chat interno ──
+  const [iniciandoChat, setIniciandoChat] = useState(false);
+
+  const handleChatInterno = async () => {
+    if (!currentUser) {
+      mostrarToast("Iniciá sesión para chatear con el vendedor");
+      navigate("/login");
+      return;
+    }
+    if (!producto?.userUid || producto.userUid === currentUser.uid || iniciandoChat) return;
+
+    setIniciandoChat(true);
+    try {
+      const chat = await obtenerOCrearChat(currentUser.uid, producto.userUid, {
+        productoId,
+        productoTitulo:  producto.titulo,
+        productoImagen:  producto.imagen,
+        compradorNombre: currentUser.displayName,
+        compradorAvatar: currentUser.photoURL,
+        vendedorNombre:  producto.vendedor,
+        vendedorAvatar:  producto.avatarVendedor,
+      });
+      navigate(`/chat?id=${chat.id}`);
+    } catch (err) {
+      mostrarToast(err.message || "No se pudo abrir el chat");
+    } finally {
+      setIniciandoChat(false);
+    }
+  };
+
   // ── Compartir ──
   const handleCompartir = async () => {
     const url   = window.location.href;
@@ -170,9 +201,10 @@ const Producto = () => {
     avatarVendedor, telefono, estado,
   } = producto;
 
-  const estaAgotado = (estado || "").toLowerCase() === "agotado";
-  const tieneWA     = telefono && telefono.trim().length >= 7;
-  const emoji       = ICONOS_CAT[(categoria || "").toLowerCase()] || "📦";
+  const estaAgotado  = (estado || "").toLowerCase() === "agotado";
+  const tieneWA      = telefono && telefono.trim().length >= 7;
+  const emoji        = ICONOS_CAT[(categoria || "").toLowerCase()] || "📦";
+  const esMiProducto = currentUser?.uid && producto.userUid === currentUser.uid;
 
   // ── Render ──────────────────────────────────────────────
   return (
@@ -418,8 +450,21 @@ const Producto = () => {
           </svg>
         </button>
 
-        {/* Botón WhatsApp / Agotado / Sin WA */}
-        {estaAgotado ? (
+        {/* Botones de contacto — ocultos si estás viendo tu propio producto */}
+        {esMiProducto ? (
+          <button
+            onClick={() => navigate(`/editar?id=${productoId}`)}
+            style={{
+              flex: 1, height: "54px",
+              background: "var(--bg-crema)", color: "var(--azul-oscuro)",
+              border: "1.5px solid #e8e8f0", borderRadius: "14px",
+              fontSize: "0.95rem", fontWeight: 700, cursor: "pointer",
+              fontFamily: "'Nunito', sans-serif",
+            }}
+          >
+            Este es tu producto · Editar
+          </button>
+        ) : estaAgotado ? (
           <button disabled style={{
             flex: 1, height: "54px",
             background: "#e8e8f0", color: "#a0a5b9",
@@ -434,36 +479,52 @@ const Producto = () => {
             </svg>
             Agotado
           </button>
-        ) : !tieneWA ? (
-          <button disabled style={{
-            flex: 1, height: "54px",
-            background: "#e8e8f0", color: "#a0a5b9",
-            border: "none", borderRadius: "14px",
-            fontSize: "0.95rem", fontWeight: 600, cursor: "not-allowed",
-            fontFamily: "'Nunito', sans-serif",
-          }}>
-            Vendedor sin WhatsApp
-          </button>
         ) : (
-          <button
-            onClick={handleWhatsApp}
-            style={{
-              flex: 1, height: "54px",
-              background: "var(--verde-marca)", color: "white",
-              border: "none", borderRadius: "14px",
-              fontSize: "1.05rem", fontWeight: 600, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-              boxShadow: "0 4px 15px rgba(58,125,68,0.3)",
-              transition: "background 0.2s",
-              fontFamily: "'Nunito', sans-serif",
-            }}
-          >
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-            </svg>
-            Contactar por WhatsApp
-          </button>
+          <>
+            {/* CTA primaria: Chat interno */}
+            <button
+              onClick={handleChatInterno}
+              disabled={iniciandoChat}
+              style={{
+                flex: 1, height: "54px",
+                background: "var(--verde-marca)", color: "white",
+                border: "none", borderRadius: "14px",
+                fontSize: "1.05rem", fontWeight: 600,
+                cursor: iniciandoChat ? "default" : "pointer",
+                opacity: iniciandoChat ? 0.75 : 1,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                boxShadow: "0 4px 15px rgba(58,125,68,0.3)",
+                transition: "background 0.2s",
+                fontFamily: "'Nunito', sans-serif",
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="21" height="21" fill="none"
+                stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+              </svg>
+              {iniciandoChat ? "Abriendo chat..." : "Chat interno"}
+            </button>
+
+            {/* Secundario: WhatsApp directo (fallback opcional mientras se cierra la decisión de Fase 0.1) */}
+            {tieneWA && (
+              <button
+                onClick={handleWhatsApp}
+                aria-label="Contactar por WhatsApp"
+                style={{
+                  width: "54px", height: "54px", flexShrink: 0,
+                  background: "white", color: "#25D366",
+                  border: "1.5px solid #e8e8f0", borderRadius: "14px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer",
+                }}
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                </svg>
+              </button>
+            )}
+          </>
         )}
 
       </div>

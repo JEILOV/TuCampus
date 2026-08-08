@@ -7,7 +7,10 @@ import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
 
 /**
- * Obtiene el perfil de un usuario/vendedor por su UID.
+ * Obtiene el perfil PÚBLICO de un usuario/vendedor por su UID.
+ * Ya NO incluye `telefono` ni números de Yape/Plin — solo los
+ * booleanos `aceptaYape` / `aceptaPlin` para pintar badges.
+ * Para el contacto real (número), usar obtenerContactoPrivado().
  * @param {string} uid
  * @returns {Promise<Object|null>} Los datos del perfil, o null si no existe.
  */
@@ -15,6 +18,53 @@ export const obtenerPerfilVendedor = async (uid) => {
   if (!uid) return null;
   const snap = await getDoc(doc(db, "usuarios", uid));
   return snap.exists() ? snap.data() : null;
+};
+
+/**
+ * 🔒 Lee la subcolección privada de contacto (/usuarios/{uid}/privado/contacto).
+ * La regla de Firestore exige un usuario autenticado (esEstudianteUNP()),
+ * no solo el dueño del perfil — así el botón de WhatsApp funciona entre
+ * cualquier comprador y cualquier vendedor.
+ * @param {string} uid
+ * @returns {Promise<{telefono: string, metodosPago: Object}|null>}
+ */
+export const obtenerContactoPrivado = async (uid) => {
+  if (!uid) return null;
+  try {
+    const snap = await getDoc(doc(db, "usuarios", uid, "privado", "contacto"));
+    return snap.exists() ? snap.data() : null;
+  } catch (err) {
+    // Fallo silencioso: si no hay permisos o no existe, el WA/badge
+    // simplemente no se muestra — no debe romper la pantalla.
+    logError("[userService.obtenerContactoPrivado]", err);
+    return null;
+  }
+};
+
+/**
+ * 🔒 Guarda telefono + metodosPago en la subcolección privada del dueño,
+ * y espeja SOLO los booleanos (aceptaYape/aceptaPlin) al doc público de
+ * usuarios — nunca el número — para que las tarjetas puedan mostrar el
+ * badge sin una lectura extra por tarjeta.
+ * @param {string} uid
+ * @param {{telefono: string, metodosPago: {yape:{activo:boolean,numero:string}, plin:{activo:boolean,numero:string}}}} datos
+ */
+export const guardarContactoPrivado = async (uid, { telefono, metodosPago }) => {
+  try {
+    await setDoc(
+      doc(db, "usuarios", uid, "privado", "contacto"),
+      { telefono: telefono || "", metodosPago },
+      { merge: true }
+    );
+
+    await updateDoc(doc(db, "usuarios", uid), {
+      aceptaYape: !!metodosPago?.yape?.activo,
+      aceptaPlin: !!metodosPago?.plin?.activo,
+    });
+  } catch (err) {
+    logError("[userService.guardarContactoPrivado]", err);
+    throw new Error(traducirError(err, "firestore"));
+  }
 };
 
 /**
@@ -89,7 +139,10 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
       ubicacion: "Piura",
       bio:       "Estudiante de la UNP",
       acercaDe:  "¡Hola! Bienvenido a mi tienda en el campus.",
-      telefono:  "",
+      // 🔒 telefono y metodosPago ya NO viven en el doc público.
+      // Ver /usuarios/{uid}/privado/contacto.
+      aceptaYape: false,
+      aceptaPlin: false,
     };
 
     if (!snap.exists()) {

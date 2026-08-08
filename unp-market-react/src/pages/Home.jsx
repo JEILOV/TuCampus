@@ -5,6 +5,7 @@ import { useAuth }                                  from "../context/AuthContext
 import { useProducts }                              from "../hooks/useProducts";
 import { useNotifications }                         from "../hooks/useNotifications";
 import { useToast, ToastContainer }                 from "../components/Toast"; // ✅ Nuevos imports
+import BottomNav                                    from "../components/BottomNav";
 import { CATEGORY_ICON_MAP, IconPackage }           from "../components/CategoryIcons";
 
 // ── Constantes ───────────────────────────────────────────────
@@ -118,7 +119,7 @@ const Home = () => {
   });
 
   // ── Hook: Notificaciones ─────────────────────────────────
-  const { notificaciones, noLeidas, marcarLeida, limpiarTodas } = useNotifications(user?.uid);
+  const { notificaciones, marcarLeida, limpiarTodas } = useNotifications(user?.uid);
 
   // ── Infinite scroll ──────────────────────────────────────
   useEffect(() => {
@@ -362,42 +363,7 @@ const Home = () => {
       )}
 
       {/* BOTTOM NAVIGATION */}
-      <nav className="bottom-nav">
-        <button className={`nav-item${tabActiva === "inicio" ? " active" : ""}`} onClick={() => navigate("/")} aria-label="Inicio">
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" strokeWidth="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          <span className="nav-label">Inicio</span>
-        </button>
-        <button className={`nav-item${tabActiva === "favoritos" ? " active" : ""}`} onClick={() => navigate("/?tab=favoritos")} aria-label="Favoritos">
-          <svg className="nav-icon" viewBox="0 0 24 24" fill={tabActiva === "favoritos" ? "currentColor" : "none"} strokeWidth="2.2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          <span className="nav-label">Favoritos</span>
-        </button>
-        <button className="nav-item nav-add" onClick={() => navigate("/publicar")} aria-label="Publicar">
-          <div className="nav-add-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
-          <span className="nav-label">Publicar</span>
-        </button>
-        <button className={`nav-item${tabActiva === "notifs" ? " active" : ""}`} onClick={() => navigate("/?tab=notifs")} aria-label="Notificaciones">
-          <div className="nav-icon-wrap" style={{ position: "relative", display: "inline-flex" }}>
-            <svg className="nav-icon" viewBox="0 0 24 24" fill="none" strokeWidth="2.2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            {noLeidas > 0 && (
-              <span className="nav-notif-badge" style={{
-                position: "absolute", top: "-4px", right: "-6px",
-                background: "#ef4444", color: "white", fontSize: "0.65rem",
-                fontWeight: 800, minWidth: "16px", height: "16px",
-                borderRadius: "50%", display: "flex", alignItems: "center",
-                justifyContent: "center", border: "2px solid #16a34a",
-                padding: "0 4px", lineHeight: 1,
-              }}>
-                {noLeidas}
-              </span>
-            )}
-          </div>
-          <span className="nav-label">Notifs</span>
-        </button>
-        <button className="nav-item" onClick={() => navigate("/perfil")} aria-label="Perfil">
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" strokeWidth="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          <span className="nav-label">Perfil</span>
-        </button>
-      </nav>
+      <BottomNav activo={tabActiva} />
 
       {/* ✅ TOAST CONTAINER LIMPIO */}
       <ToastContainer toasts={toasts} />

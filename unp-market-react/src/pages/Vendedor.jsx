@@ -10,6 +10,7 @@ import {
   dejarDeSeguirVendedor,
 } from "../services/userService";
 import Spinner from "../components/Spinner";
+import BottomNav from "../components/BottomNav";
 
 const ICONOS_CAT = {
   dulces: "🍫", bebidas: "☕", salados: "🍔",
@@ -366,28 +367,7 @@ const Vendedor = () => {
       </div>
 
       {/* BOTTOM NAV */}
-      <nav className="bottom-nav">
-        <button className="nav-item" onClick={() => navigate("/")} aria-label="Inicio">
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          <span className="nav-label">Inicio</span>
-        </button>
-        <button className="nav-item" onClick={() => navigate("/?tab=favoritos")} aria-label="Favoritos">
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          <span className="nav-label">Favoritos</span>
-        </button>
-        <button className="nav-item nav-add" onClick={() => navigate("/publicar")} aria-label="Publicar">
-          <div className="nav-add-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
-          <span className="nav-label">Publicar</span>
-        </button>
-        <button className="nav-item" onClick={() => navigate("/?tab=notifs")} aria-label="Notificaciones">
-          <div className="nav-icon-wrap"><svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
-          <span className="nav-label">Notifs</span>
-        </button>
-        <button className="nav-item" onClick={() => navigate("/perfil")} aria-label="Perfil">
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          <span className="nav-label">Perfil</span>
-        </button>
-      </nav>
+      <BottomNav />
     </div>
   );
 };

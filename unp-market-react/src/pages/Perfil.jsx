@@ -5,13 +5,13 @@ import {
   doc, setDoc, getDocs,
   collection, query, where,
   updateDoc, deleteDoc,
-  onSnapshot, orderBy,
 } from "firebase/firestore";
 import { db }                          from "../services/firebase";
 import { useAuth }                     from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
 import Spinner                         from "../components/Spinner"; // ✅ Nuevo import
 import { useToast, ToastContainer }    from "../components/Toast";   // ✅ Nuevo import
+import BottomNav                       from "../components/BottomNav";
 
 // ──────────────────────────────────────────────────────────────
 //  SUB-COMPONENTE: Tarjeta de producto en modo perfil
@@ -131,7 +131,6 @@ const Perfil = () => {
   // ── Datos locales de esta página ──
   const [productos,      setProductos]      = useState([]);
   const [cargando,       setCargando]       = useState(true);
-  const [notificaciones, setNotificaciones] = useState([]);
 
   // ── UI ──
   const [dropdownOpen,    setDropdownOpen]    = useState(false);
@@ -174,19 +173,6 @@ const Perfil = () => {
     };
 
     cargarProductos();
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    const q = query(
-      collection(db, "notificaciones"),
-      where("paraUid", "==", user.uid),
-      orderBy("timestamp", "desc")
-    );
-    const unsub = onSnapshot(q, (snapshot) => {
-      setNotificaciones(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-    return () => unsub();
   }, [user]);
 
   useEffect(() => {
@@ -561,64 +547,7 @@ const Perfil = () => {
       {/* ════════════════════════════════════════════════════
              BOTTOM NAVIGATION
         ════════════════════════════════════════════════════ */}
-      <nav className="bottom-nav">
-        <button className="nav-item" onClick={() => navigate("/")} aria-label="Inicio">
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-            <polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-          <span className="nav-label">Inicio</span>
-        </button>
-
-        <button className="nav-item" onClick={() => navigate("/?tab=favoritos")} aria-label="Favoritos">
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-          </svg>
-          <span className="nav-label">Favoritos</span>
-        </button>
-
-        <button className="nav-item nav-add" onClick={() => navigate("/publicar")} aria-label="Publicar">
-          <div className="nav-add-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-          </div>
-          <span className="nav-label">Publicar</span>
-        </button>
-
-        <button className="nav-item" onClick={() => navigate("/?tab=notifs")} aria-label="Notificaciones">
-          <div className="nav-icon-wrap" style={{ position: "relative", display: "inline-flex" }}>
-            <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-            </svg>
-            {notificaciones.some((n) => !n.leido) && (
-              <span className="nav-notif-badge" style={{
-                position: "absolute", top: "-4px", right: "-6px", background: "#ef4444", color: "white",
-                fontSize: "0.65rem", fontWeight: 800, minWidth: "16px", height: "16px", borderRadius: "50%",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                border: "2px solid #1e293b", padding: "0 4px", lineHeight: 1,
-              }}>
-                {notificaciones.filter((n) => !n.leido).length}
-              </span>
-            )}
-          </div>
-          <span className="nav-label">Notifs</span>
-        </button>
-
-        <button className="nav-item active" aria-label="Perfil">
-          <svg className="nav-icon" viewBox="0 0 24 24"
-            fill="currentColor" stroke="currentColor" strokeWidth="0.5">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
-          </svg>
-          <span className="nav-label" style={{ color: "var(--verde-marca)" }}>Perfil</span>
-          <span style={{
-            width: "4px", height: "4px", borderRadius: "50%",
-            background: "var(--verde-marca)", display: "block", margin: "2px auto 0",
-          }}/>
-        </button>
-      </nav>
+      <BottomNav activo="perfil" />
 
       {/* ════════════════════════════════════════════════════
              MODAL: EDITAR PERFIL
