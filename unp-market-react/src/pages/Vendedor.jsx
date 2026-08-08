@@ -9,13 +9,74 @@ import {
   seguirVendedor,
   dejarDeSeguirVendedor,
 } from "../services/userService";
-import Spinner from "../components/Spinner";
-import BottomNav from "../components/BottomNav";
+import {
+  obtenerMiResena,
+  obtenerResenasDeVendedor,
+} from "../services/reviewService";
+import Spinner    from "../components/Spinner";
+import BottomNav   from "../components/BottomNav";
+import ModalResena from "../components/ModalResena";
+import { ToastContainer, useToast } from "../components/Toast";
 
 const ICONOS_CAT = {
   dulces: "🍫", bebidas: "☕", salados: "🍔",
   servicios: "🔧", materiales: "📚",
 };
+
+const formatearFecha = (fecha) => {
+  if (!fecha?.toDate) return "";
+  return fecha.toDate().toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+// ── Sub-componente: estrellas (solo lectura) ──────────────────
+const Estrellas = ({ valor, size = 13 }) => (
+  <div style={{ display: "inline-flex", gap: "1px" }}>
+    {[1, 2, 3, 4, 5].map((n) => (
+      <svg key={n} viewBox="0 0 24 24" width={size} height={size}
+        fill={n <= Math.round(valor || 0) ? "#f5a623" : "#e0e0e6"}>
+        <polygon points="12 2 15.09 8.63 22 9.24 16.5 13.97 18.18 21 12 17.27 5.82 21 7.5 13.97 2 9.24 8.91 8.63 12 2" />
+      </svg>
+    ))}
+  </div>
+);
+
+// ── Sub-componente: tarjeta de una reseña recibida ─────────────
+const TarjetaResena = ({ resena }) => (
+  <div style={{
+    background: "white", borderRadius: "14px", padding: "14px 16px",
+    border: "1.5px solid #e8e8f0", display: "flex", flexDirection: "column", gap: "6px",
+  }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <div style={{
+        width: "32px", height: "32px", borderRadius: "50%",
+        background: "linear-gradient(135deg,#c8a97a,#a07850)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: "0.85rem", fontWeight: 700, color: "white",
+        overflow: "hidden", flexShrink: 0,
+      }}>
+        {resena.autorAvatar?.trim()
+          ? <img src={resena.autorAvatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : (resena.autorNombre || "?")[0].toUpperCase()
+        }
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: 0, fontWeight: 700, fontSize: "0.85rem", color: "var(--azul-oscuro)" }}>
+          {resena.autorNombre || "Estudiante UNP"}
+        </p>
+        <Estrellas valor={resena.estrellas} />
+      </div>
+      <span style={{ fontSize: "0.7rem", color: "#a0a5b9", fontWeight: 600, flexShrink: 0 }}>
+        {formatearFecha(resena.fechaEdicion || resena.fecha)}
+        {resena.fechaEdicion ? " · editada" : ""}
+      </span>
+    </div>
+    {resena.comentario?.trim() && (
+      <p style={{ margin: 0, fontSize: "0.85rem", color: "#5c5c7a", fontWeight: 600, lineHeight: 1.5 }}>
+        {resena.comentario}
+      </p>
+    )}
+  </div>
+);
 
 // ── Sub-componente: tarjeta de producto (solo lectura) ───────
 const TarjetaVendedor = ({ producto, onVerDetalle }) => {
@@ -111,6 +172,35 @@ const Vendedor = () => {
   const [noExiste,   setNoExiste]   = useState(false);
   const [esSeguidor, setEsSeguidor] = useState(false);
 
+  // ── Fase 3 (Opción B): reseña única/editable por vendedor ──
+  const [toasts, setToasts] = useState([]);
+  const mostrarToast        = useToast(setToasts);
+
+  const [resenas, setResenas]           = useState([]);
+  const [miResena, setMiResena]         = useState(null);
+  const [cargandoResenas, setCargandoResenas] = useState(true);
+  const [modalResenaAbierto, setModalResenaAbierto] = useState(false);
+
+  const cargarResenas = async () => {
+    if (!uid) return;
+    setCargandoResenas(true);
+    try {
+      const [lista, mia] = await Promise.all([
+        obtenerResenasDeVendedor(uid),
+        user?.uid ? obtenerMiResena(uid, user.uid) : Promise.resolve(null),
+      ]);
+      setResenas(lista);
+      setMiResena(mia);
+    } finally {
+      setCargandoResenas(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarResenas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, user?.uid]);
+
   useEffect(() => {
     if (!uid) navigate("/", { replace: true });
   }, [uid, navigate]);
@@ -160,6 +250,23 @@ const Vendedor = () => {
   }, [uid, user]);
 
   const handleVerDetalle = (id) => navigate(`/producto?id=${id}`);
+
+  // Tras crear/editar una reseña: refrescar el badge de reputación
+  // del header (vive en `vendedor`) y la lista de opiniones.
+  const handleResenaGuardada = async () => {
+    try {
+      const datosActualizados = await obtenerPerfilVendedor(uid);
+      if (datosActualizados) setVendedor((prev) => ({ ...prev, ...datosActualizados }));
+    } catch (err) {
+      console.error(err);
+    }
+    cargarResenas();
+  };
+
+  const handleAbrirModalResena = () => {
+    if (!user) { navigate("/login"); return; }
+    setModalResenaAbierto(true);
+  };
 
   const handleToggleSeguir = async () => {
     if (!user) {
@@ -251,6 +358,23 @@ const Vendedor = () => {
           <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
             {v.bio || "Estudiante de la UNP"}
           </p>
+          {/* Fase 3 — Reputación: promedio de estrellas + total de reseñas */}
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: "5px",
+            background: "rgba(255,255,255,0.15)", color: "white",
+            padding: "4px 12px", borderRadius: "20px",
+            fontSize: "0.82rem", fontWeight: 800, marginTop: "2px",
+          }}>
+            {v.totalResenas > 0 ? (
+              <>
+                <span style={{ color: "#f5a623" }}>⭐</span>
+                {(v.calificacionPromedio || 0).toFixed(1)}
+                <span style={{ opacity: 0.8, fontWeight: 700 }}>({v.totalResenas})</span>
+              </>
+            ) : (
+              <span style={{ opacity: 0.85, fontWeight: 700 }}>Sin reseñas todavía</span>
+            )}
+          </div>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: "6px",
             background: "rgba(255,255,255,0.2)", color: "white",
@@ -321,23 +445,61 @@ const Vendedor = () => {
       )}
 
       {/* SEGUIR / DEJAR DE SEGUIR */}
-      <div style={{ padding: "0 16px 20px" }}>
+      <div style={{ padding: "0 16px 12px", display: "flex", gap: "10px" }}>
         {esSeguidor ? (
           <button onClick={handleToggleSeguir} style={{
-            background: "transparent", color: "#5c5c7a", border: "2px solid #c3c6d4",
+            flex: 1, background: "transparent", color: "#5c5c7a", border: "2px solid #c3c6d4",
             padding: "12px", borderRadius: "14px", fontWeight: 800,
-            width: "100%", cursor: "pointer", fontFamily: "'Nunito', sans-serif",
+            cursor: "pointer", fontFamily: "'Nunito', sans-serif",
           }}>
             Siguiendo
           </button>
         ) : (
           <button onClick={handleToggleSeguir} style={{
-            background: "var(--azul-oscuro)", color: "white", border: "none",
+            flex: 1, background: "var(--azul-oscuro)", color: "white", border: "none",
             padding: "14px", borderRadius: "14px", fontWeight: 800,
-            width: "100%", cursor: "pointer", fontFamily: "'Nunito', sans-serif",
+            cursor: "pointer", fontFamily: "'Nunito', sans-serif",
           }}>
             Seguir Vendedor
           </button>
+        )}
+
+        {/* Calificar / editar reseña — oculto si estás viendo tu propio perfil */}
+        {user?.uid !== uid && (
+          <button onClick={handleAbrirModalResena} style={{
+            flex: 1, background: miResena ? "white" : "var(--verde-marca)",
+            color: miResena ? "var(--verde-marca)" : "white",
+            border: miResena ? "2px solid var(--verde-marca)" : "none",
+            padding: "12px", borderRadius: "14px", fontWeight: 800,
+            cursor: "pointer", fontFamily: "'Nunito', sans-serif",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+          }}>
+            ⭐ {miResena ? "Editar mi reseña" : "Calificar vendedor"}
+          </button>
+        )}
+      </div>
+
+      {/* OPINIONES */}
+      <div style={{ padding: "0 16px 20px" }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: "8px",
+          marginBottom: "12px", paddingBottom: "10px", borderBottom: "2px solid var(--verde-marca)",
+        }}>
+          <span style={{ fontSize: "16px" }}>⭐</span>
+          <span style={{ fontWeight: 700, fontSize: "1rem", color: "var(--verde-marca)" }}>
+            Opiniones {resenas.length > 0 ? `(${resenas.length})` : ""}
+          </span>
+        </div>
+        {cargandoResenas ? (
+          <Spinner mensaje="Cargando opiniones..." fullScreen={false} />
+        ) : resenas.length === 0 ? (
+          <p style={{ textAlign: "center", color: "#5c5c7a", fontWeight: 700, padding: "16px 0" }}>
+            Todavía no tiene reseñas. ¡Sé el primero en calificarlo!
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {resenas.map((r) => <TarjetaResena key={r.id} resena={r} />)}
+          </div>
         )}
       </div>
 
@@ -368,6 +530,22 @@ const Vendedor = () => {
 
       {/* BOTTOM NAV */}
       <BottomNav />
+
+      <ToastContainer toasts={toasts} />
+
+      {/* MODAL DE RESEÑA */}
+      <ModalResena
+        abierto={modalResenaAbierto}
+        onCerrar={() => setModalResenaAbierto(false)}
+        vendedorUid={uid}
+        vendedorNombre={v.nombre}
+        miUid={user?.uid}
+        miNombre={user?.displayName}
+        miAvatar={user?.photoURL}
+        resenaExistente={miResena}
+        onToast={mostrarToast}
+        onGuardado={handleResenaGuardada}
+      />
     </div>
   );
 };

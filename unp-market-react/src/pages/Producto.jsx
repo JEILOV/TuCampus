@@ -5,6 +5,7 @@ import { useAuth }                          from "../context/AuthContext";
 import { obtenerProductoPorId }             from "../services/productService";
 import { crearNotificacion }               from "../services/notificationService";
 import { obtenerOCrearChat }               from "../services/chatService";
+import { obtenerPerfilVendedor }           from "../services/userService";
 import { useFavorites }                     from "../hooks/useFavorites";
 
 // ── Constantes ───────────────────────────────────────────────
@@ -37,6 +38,7 @@ const Producto = () => {
   const [cargando, setCargando] = useState(true);
   const [noExiste, setNoExiste] = useState(false);
   const [toasts,   setToasts]   = useState([]);
+  const [reputacionVendedor, setReputacionVendedor] = useState(null); // Fase 3
 
   const { user: currentUser } = useAuth();
 
@@ -66,6 +68,16 @@ const Producto = () => {
     cargar();
     return () => { cancelado = true; };
   }, [productoId]);
+
+  // ── Fase 3: reputación del vendedor (⭐ promedio + total de reseñas) ──
+  useEffect(() => {
+    if (!producto?.userUid) { setReputacionVendedor(null); return; }
+    let cancelado = false;
+    obtenerPerfilVendedor(producto.userUid)
+      .then((v) => { if (!cancelado) setReputacionVendedor(v); })
+      .catch(() => { if (!cancelado) setReputacionVendedor(null); });
+    return () => { cancelado = true; };
+  }, [producto?.userUid]);
 
   // ── Toast helper ──
   const mostrarToast = useCallback((mensaje) => {
@@ -366,8 +378,18 @@ const Producto = () => {
             <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 600, color: "var(--azul-oscuro)" }}>
               {nombreVendedor}
             </h3>
-            <p style={{ margin: 0, fontSize: "0.8rem", color: "#5c5c7a", fontWeight: 600 }}>
-              Vendedor de la UNP
+            <p style={{ margin: 0, fontSize: "0.8rem", color: "#5c5c7a", fontWeight: 600, display: "flex", alignItems: "center", gap: "5px" }}>
+              {reputacionVendedor?.totalResenas > 0 ? (
+                <>
+                  <span style={{ color: "#f5a623" }}>⭐</span>
+                  <span style={{ color: "var(--azul-oscuro)", fontWeight: 700 }}>
+                    {(reputacionVendedor.calificacionPromedio || 0).toFixed(1)}
+                  </span>
+                  ({reputacionVendedor.totalResenas})
+                </>
+              ) : (
+                "Vendedor de la UNP"
+              )}
             </p>
           </div>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#a0a5b9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginLeft: "auto" }}><polyline points="9 18 15 12 9 6"/></svg>

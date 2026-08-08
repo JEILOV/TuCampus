@@ -143,6 +143,10 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
       // Ver /usuarios/{uid}/privado/contacto.
       aceptaYape: false,
       aceptaPlin: false,
+      // Fase 3 — Reputación: se actualizan vía writeBatch en
+      // transactionService.enviarResena, nunca a mano.
+      calificacionPromedio: 0,
+      totalResenas: 0,
     };
 
     if (!snap.exists()) {
