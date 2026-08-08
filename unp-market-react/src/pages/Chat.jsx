@@ -309,11 +309,27 @@ const Chat = () => {
 
   // ── Render ────────────────────────────────────────────────
   return (
-    <div className="app-shell" style={{ background: "var(--bg-crema)", minHeight: "100vh", position: "relative" }}>
+    <div
+      className="app-shell"
+      style={{
+        background: "var(--bg-crema)",
+        // 🔧 Layout fijo tipo WhatsApp/Instagram: el shell ocupa exactamente
+        // el alto del viewport (100dvh = dynamic viewport height, se ajusta
+        // solo cuando el teclado móvil abre/cierra, a diferencia de 100vh).
+        // Header e input viven como hijos normales de este flex-column —
+        // YA NO usan position:sticky/fixed, así nunca "flotan" ni se
+        // desalinean. Solo el contenedor de mensajes hace scroll interno.
+        height: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        padding: 0,
+      }}
+    >
 
-      {/* ── HEADER ── */}
+      {/* ── HEADER (fijo: flexShrink 0, fuera del área con scroll) ── */}
       <div style={{
-        position: "sticky", top: 0, zIndex: 20,
+        flexShrink: 0,
         background: "white", borderBottom: "1px solid #f1f3f5",
         display: "flex", alignItems: "center", gap: "12px", padding: "16px 20px",
       }}>
@@ -368,13 +384,18 @@ const Chat = () => {
         )}
       </div>
 
-      {/* ── CONTENIDO ── */}
+      {/* ── CONTENIDO (única zona con scroll: flex:1 + overflowY:auto) ── */}
       {!chatId ? (
-        <ListaChats chats={chats} cargando={cargandoChats} miUid={user?.uid} onAbrir={abrirChat} />
+        <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+          <ListaChats chats={chats} cargando={cargandoChats} miUid={user?.uid} onAbrir={abrirChat} />
+        </div>
       ) : cargandoMeta ? (
-        <Spinner mensaje="Cargando conversación..." fullScreen={false} />
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          <Spinner mensaje="Cargando conversación..." fullScreen={false} />
+        </div>
       ) : !chatValidoParaMi ? (
         <div style={{
+          flex: 1, overflowY: "auto",
           display: "flex", flexDirection: "column", alignItems: "center",
           justifyContent: "center", padding: "80px 24px", gap: "12px", textAlign: "center",
         }}>
@@ -395,7 +416,11 @@ const Chat = () => {
         </div>
       ) : (
         <>
-          <div style={{ display: "flex", flexDirection: "column", padding: "14px 0 90px" }}>
+          {/* Lista de mensajes: ÚNICO elemento con scroll interno */}
+          <div style={{
+            flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch",
+            display: "flex", flexDirection: "column", padding: "14px 0",
+          }}>
             {mensajes.length === 0 ? (
               <div style={{ textAlign: "center", color: "#a0a5b9", fontWeight: 600, fontSize: "0.85rem", marginTop: "40px" }}>
                 Todavía no hay mensajes. ¡Escribí el primero! 👋
@@ -406,14 +431,15 @@ const Chat = () => {
             <div ref={finRef} />
           </div>
 
-          {/* ── BARRA DE ENVÍO FIJA ── */}
+          {/* ── BARRA DE ENVÍO (fija: flexShrink 0, ya no position:fixed) ── */}
           <form
             onSubmit={handleEnviar}
             style={{
-              position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-              width: "100%", maxWidth: "480px", background: "white", padding: "12px 16px",
+              flexShrink: 0,
+              background: "white", padding: "12px 16px",
+              paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
               borderTop: "1px solid #f1f3f5", display: "flex", gap: "10px", alignItems: "flex-end",
-              zIndex: 100, boxSizing: "border-box",
+              boxSizing: "border-box",
             }}
           >
             <textarea

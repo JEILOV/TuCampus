@@ -5,6 +5,7 @@ import { doc, getDoc, collection, writeBatch, serverTimestamp } from "firebase/f
 import { db }                                   from "../services/firebase";
 import { useAuth }                              from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB }    from "../utils/imageUtils";
+import { obtenerContactoPrivado }               from "../services/userService";
 import { crearProducto }                        from "../services/productService";
 import Toast, { useToast }                      from "../components/Toast"; // ✅ Nuevo import
 import BottomNav                                from "../components/BottomNav";
@@ -35,6 +36,7 @@ const Publicar = () => {
   const [previewUrl,  setPreviewUrl]  = useState(null);
   const [btnTexto,    setBtnTexto]    = useState("Publicar Producto");
   const [enviando,    setEnviando]    = useState(false);
+  const [progreso,    setProgreso]    = useState(0); // 🔧 feedback real de subida (0–100)
   
   // ✅ Nuevo manejo de Toasts centralizado
   const [toast, setToast] = useState(null);
@@ -66,25 +68,44 @@ const Publicar = () => {
       mostrarToast("Debes iniciar sesión para publicar.", "error");
       return;
     }
-    if (!perfil?.telefono || perfil.telefono.trim().length < 7) {
+
+    // 🔒 `perfil.telefono` ya no existe en el doc público (vive en
+    // /usuarios/{uid}/privado/contacto). Se valida contra ese contacto
+    // real, no contra el perfil público.
+    let telefonoConfigurado = "";
+    try {
+      const contacto = await obtenerContactoPrivado(user.uid);
+      telefonoConfigurado = contacto?.telefono || "";
+    } catch (err) {
+      console.error("[Publicar] Error al verificar contacto privado:", err);
+    }
+    if (!telefonoConfigurado || telefonoConfigurado.trim().length < 7) {
       mostrarToast("⚠️ Configura tu WhatsApp en el perfil para publicar.", "error");
       setTimeout(() => navigate("/perfil", { state: { abrirModalEdicion: true } }), 2000);
       return;
     }
 
     setEnviando(true);
+    setProgreso(0);
     try {
       setBtnTexto("Comprimiendo imagen...");
       const fileComprimido = archivo ? await comprimirImagen(archivo) : null;
+      setProgreso(15);
 
       setBtnTexto("Subiendo imagen...");
-      const imagenFinal = await subirImagenImgBB(fileComprimido);
+      const imagenFinal = await subirImagenImgBB(fileComprimido, (pct) => {
+        // La compresión ya ocupó los primeros 15 puntos; el 85% restante
+        // se reparte según el progreso real de bytes subidos a ImgBB.
+        setProgreso(15 + Math.round(pct * 0.8));
+      });
+      setProgreso(95);
 
       setBtnTexto("Publicando...");
       const nuevoId = await crearProducto({
         titulo, precio, categoria, descripcion,
         imagen: imagenFinal, user, perfil,
       });
+      setProgreso(100);
 
       // Notificar a seguidores
       try {

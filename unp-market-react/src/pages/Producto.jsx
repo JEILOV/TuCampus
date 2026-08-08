@@ -5,7 +5,7 @@ import { useAuth }                          from "../context/AuthContext";
 import { obtenerProductoPorId }             from "../services/productService";
 import { crearNotificacion }               from "../services/notificationService";
 import { obtenerOCrearChat }               from "../services/chatService";
-import { obtenerPerfilVendedor }           from "../services/userService";
+import { obtenerPerfilVendedor, obtenerContactoPrivado } from "../services/userService";
 import { useFavorites }                     from "../hooks/useFavorites";
 
 // ── Constantes ───────────────────────────────────────────────
@@ -40,7 +40,13 @@ const Producto = () => {
   const [toasts,   setToasts]   = useState([]);
   const [reputacionVendedor, setReputacionVendedor] = useState(null); // Fase 3
 
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, perfil } = useAuth();
+
+  // 🔒 El campo `producto.telefono` YA NO existe en el doc público de
+  // "productos" (ver productService.js). El número real del vendedor
+  // solo vive en /usuarios/{uid}/privado/contacto — se carga aparte,
+  // exclusivamente para armar el enlace de WhatsApp.
+  const [contactoVendedor, setContactoVendedor] = useState(null);
 
   // ── Redirigir si no hay id en URL ──
   useEffect(() => {
@@ -79,6 +85,17 @@ const Producto = () => {
     return () => { cancelado = true; };
   }, [producto?.userUid]);
 
+  // 🔒 Contacto privado del vendedor (solo el número real, para el botón
+  // de WhatsApp). Requiere sesión iniciada — regla de Firestore.
+  useEffect(() => {
+    if (!producto?.userUid || !currentUser) { setContactoVendedor(null); return; }
+    let cancelado = false;
+    obtenerContactoPrivado(producto.userUid)
+      .then((c) => { if (!cancelado) setContactoVendedor(c); })
+      .catch(() => { if (!cancelado) setContactoVendedor(null); });
+    return () => { cancelado = true; };
+  }, [producto?.userUid, currentUser]);
+
   // ── Toast helper ──
   const mostrarToast = useCallback((mensaje) => {
     const id = Date.now();
@@ -99,16 +116,16 @@ const Producto = () => {
 
   // ── WhatsApp ──
   const handleWhatsApp = async () => {
-    if (!producto?.telefono) return;
-    const num   = producto.telefono.replace(/\D/g, "");
+    if (!contactoVendedor?.telefono) return;
+    const num   = contactoVendedor.telefono.replace(/\D/g, "");
     const final = num.startsWith("51") ? num : "51" + num;
-    const msg   = `¡Hola ${producto.vendedor || ""}! Vi tu publicación de "${producto.titulo}" en UNP Market y me gustaría comprarlo.`;
+    const msg   = `¡Hola ${producto.vendedor || ""}! Vi tu publicación de "${producto.titulo}" en TuCampus y me gustaría comprarlo.`;
     window.open(`https://wa.me/${final}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
 
     await crearNotificacion({
       paraUid:        producto.userUid,
       deUid:          currentUser?.uid,
-      deNombre:       currentUser?.displayName,
+      deNombre:       perfil?.nombre || currentUser?.displayName,
       tipo:           "contacto",
       productoId,
       productoTitulo: producto.titulo,
@@ -132,8 +149,8 @@ const Producto = () => {
         productoId,
         productoTitulo:  producto.titulo,
         productoImagen:  producto.imagen,
-        compradorNombre: currentUser.displayName,
-        compradorAvatar: currentUser.photoURL,
+        compradorNombre: perfil?.nombre || currentUser.displayName,
+        compradorAvatar: perfil?.avatar || currentUser.photoURL,
         vendedorNombre:  producto.vendedor,
         vendedorAvatar:  producto.avatarVendedor,
       });
@@ -210,11 +227,14 @@ const Producto = () => {
   const {
     titulo, precio, imagen, categoria, descripcion,
     vendedor: nombreVendedor = "Vendedor UNP",
-    avatarVendedor, telefono, estado,
+    avatarVendedor, estado,
   } = producto;
 
   const estaAgotado  = (estado || "").toLowerCase() === "agotado";
-  const tieneWA      = telefono && telefono.trim().length >= 7;
+  // 🔒 tieneWA ahora depende del contacto privado (ver useEffect de arriba),
+  // no de `producto.telefono` — ese campo ya no se escribe en el doc
+  // público desde que el número vive en /usuarios/{uid}/privado/contacto.
+  const tieneWA      = !!contactoVendedor?.telefono && contactoVendedor.telefono.trim().length >= 7;
   const emoji        = ICONOS_CAT[(categoria || "").toLowerCase()] || "📦";
   const esMiProducto = currentUser?.uid && producto.userUid === currentUser.uid;
 

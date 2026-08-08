@@ -59,20 +59,49 @@ export const comprimirImagen = (file) =>
  * Sube un Blob/File a ImgBB y devuelve la URL pública.
  * Devuelve "" si no hay archivo.
  *
+ * 🔧 Auditoría UI/UX: reescrito con XMLHttpRequest (en vez de fetch) porque
+ * fetch no expone eventos de progreso de subida. Esto permite mostrar una
+ * barra de progreso real en Publicar.jsx / EditarProducto.jsx en vez de
+ * un simple texto "Subiendo..." sin feedback numérico.
+ *
  * @param {Blob|File|null} file
+ * @param {(porcentaje: number) => void} [onProgress]  Callback 0–100, opcional.
  * @returns {Promise<string>} URL pública de la imagen
  */
-export const subirImagenImgBB = async (file) => {
-  if (!file) return "";
-  const formData = new FormData();
-  formData.append("image", file);
-  const res  = await fetch(
-    `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
-    { method: "POST", body: formData }
-  );
-  const data = await res.json();
-  if (!data.success) throw new Error("ImgBB rechazó la imagen");
-  return data.data.url;
+export const subirImagenImgBB = (file, onProgress) => {
+  if (!file) return Promise.resolve("");
+
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`);
+
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+    }
+
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+          onProgress?.(100);
+          resolve(data.data.url);
+        } else {
+          reject(new Error("ImgBB rechazó la imagen"));
+        }
+      } catch {
+        reject(new Error("Respuesta inválida de ImgBB"));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Error de red al subir la imagen"));
+    xhr.send(formData);
+  });
 };
 
 /**

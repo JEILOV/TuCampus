@@ -166,7 +166,12 @@ const Vendedor = () => {
   const uid            = searchParams.get("uid");
 
   // ✅ FASE 2: useAuth reemplaza el onAuthStateChanged local
-  const { user } = useAuth();
+  // 🔧 Auditoría UI/UX: se agrega `perfil` (doc de Firestore) porque
+  // `user.displayName` / `user.photoURL` son los datos CRUDOS de Google,
+  // que quedan desactualizados en cuanto alguien edita su nombre o foto
+  // en /perfil. Todo lo que se escribe hacia afuera (chat, notificaciones,
+  // reseñas) debe usar `perfil`, con `user` solo como último fallback.
+  const { user, perfil } = useAuth();
 
   const [vendedor,   setVendedor]   = useState(null);
   const [productos,  setProductos]  = useState([]);
@@ -296,8 +301,8 @@ const Vendedor = () => {
     setIniciandoChat(true);
     try {
       const chat = await obtenerOCrearChat(user.uid, uid, {
-        compradorNombre: user.displayName,
-        compradorAvatar: user.photoURL,
+        compradorNombre: perfil?.nombre || user.displayName,
+        compradorAvatar: perfil?.avatar || user.photoURL,
         vendedorNombre:  vendedor?.nombre,
         vendedorAvatar:  vendedor?.avatar,
       });
@@ -325,7 +330,7 @@ const Vendedor = () => {
         await crearNotificacion({
           paraUid:  uid,
           deUid:    user.uid,
-          deNombre: user.displayName,
+          deNombre: perfil?.nombre || user.displayName,
           tipo:     "seguidor",
         });
       }
@@ -628,8 +633,8 @@ const Vendedor = () => {
         vendedorUid={uid}
         vendedorNombre={v.nombre}
         miUid={user?.uid}
-        miNombre={user?.displayName}
-        miAvatar={user?.photoURL}
+        miNombre={perfil?.nombre || user?.displayName}
+        miAvatar={perfil?.avatar || user?.photoURL}
         resenaExistente={miResena}
         onToast={mostrarToast}
         onGuardado={handleResenaGuardada}
