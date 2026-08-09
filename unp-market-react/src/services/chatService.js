@@ -15,20 +15,38 @@
 //        productoId, productoTitulo, productoImagen  (contexto de origen)
 //        ultimoMensaje, ultimoMensajeFecha, ultimoMensajeDeUid
 //        noLeidoPor: { [uid]: number }
+//        ocultoPara: [uid, ...]   (Fase 6 — "ocultar chat", ver más abajo)
 //        creadoEn
 //
 //    /chats/{chatId}/mensajes/{mensajeId}
-//        deUid, texto, fecha
+//        deUid, tipo: "texto" | "imagen", texto, imagen, fecha
 //
 //  chatId DETERMINÍSTICO: [uidA, uidB].sort().join("_")
 //    → mismos dos usuarios siempre caen en el mismo doc,
 //      sin necesidad de buscar si ya existe una sala.
+//
+//  FASE 6 · Chat Avanzado (Plan Spark, 0 costos extra):
+//    - Bloquear usuario: no vive acá, vive en /usuarios/{uid}.bloqueados
+//      (ver userService.bloquearUsuario). Este archivo no necesita
+//      saber de bloqueos: la UI simplemente no llama a enviarMensaje
+//      si la conversación está bloqueada (ver Chat.jsx).
+//    - Ocultar chat: `ocultoPara` es un array de UIDs que NO deben ver
+//      este chat en su lista. Se filtra en `suscribirMisChats` (cliente,
+//      no hay Cloud Functions). Cuando cualquiera de los dos escribe de
+//      nuevo, `enviarMensaje` limpia `ocultoPara` para AMBOS
+//      participantes — así el chat "reaparece" para quien lo había
+//      ocultado en cuanto hay actividad nueva.
+//    - Mensajes de imagen: mismo doc de mensaje, con `tipo: "imagen"` y
+//      la URL de ImgBB en `imagen` en vez de `texto`. No hay edición ni
+//      borrado de mensajes individuales — es evidencia de acuerdos de
+//      compra/venta y se mantiene intacta a propósito.
 // ============================================================
 
 import {
   doc, getDoc, setDoc, updateDoc,
   collection, query, where, orderBy,
   onSnapshot, writeBatch, serverTimestamp, increment,
+  arrayUnion, arrayRemove,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
@@ -43,11 +61,49 @@ import { traducirError, logError } from "../utils/errorHandler";
  */
 export const generarChatId = (uidA, uidB) => [uidA, uidB].sort().join("_");
 
+// ── Helper: info de perfil "verdadera" (Firestore, no Google Auth) ──
+/**
+ * Lee `nombre` y `avatar` del doc público /usuarios/{uid}.
+ *
+ * 🔧 Auditoría UI/UX: antes, obtenerOCrearChat confiaba ciegamente en
+ * el `compradorNombre`/`compradorAvatar` que mandara el componente que
+ * lo llamaba — y varias pantallas mandaban `user.displayName` /
+ * `user.photoURL` (los datos crudos de Google), no el perfil configurado
+ * en Firestore. Ahora el servicio consulta el perfil real él mismo, así
+ * el chat nunca depende de que cada caller se acuerde de pasar los datos
+ * correctos. Los parámetros de fallback solo se usan si el doc de
+ * "usuarios" todavía no existe o falla la lectura.
+ *
+ * @param {string} uid
+ * @param {string} [fallbackNombre]
+ * @param {string} [fallbackAvatar]
+ * @returns {Promise<{nombre: string, avatar: string}>}
+ */
+const obtenerInfoPerfilReal = async (uid, fallbackNombre = "", fallbackAvatar = "") => {
+  try {
+    const snap = await getDoc(doc(db, "usuarios", uid));
+    const data = snap.exists() ? snap.data() : {};
+    return {
+      nombre: data.nombre || fallbackNombre || "Estudiante UNP",
+      avatar: data.avatar || fallbackAvatar || "",
+    };
+  } catch (err) {
+    logError("[chatService.obtenerInfoPerfilReal]", err);
+    return { nombre: fallbackNombre || "Estudiante UNP", avatar: fallbackAvatar || "" };
+  }
+};
+
 // ── Obtener o crear un chat ──────────────────────────────────
 /**
  * Recupera el chat entre comprador y vendedor, o lo crea si es la
  * primera vez que hablan. Idempotente: llamarlo muchas veces no
  * duplica la sala gracias al chatId determinístico.
+ *
+ * 🔧 `participantesInfo` (nombre/avatar de ambos) se resuelve SIEMPRE
+ * contra /usuarios/{uid}, tanto para chats nuevos como existentes —
+ * así, si alguien edita su nombre o foto de perfil después de haber
+ * empezado a chatear, la próxima vez que se abra esa conversación el
+ * chat se "auto-sana" y muestra los datos actualizados.
  *
  * @param {string} uidComprador
  * @param {string} uidVendedor
@@ -57,10 +113,10 @@ export const generarChatId = (uidA, uidB) => [uidA, uidB].sort().join("_");
  * @param {string} [productoInfo.productoId]
  * @param {string} [productoInfo.productoTitulo]
  * @param {string} [productoInfo.productoImagen]
- * @param {string} [productoInfo.compradorNombre]
- * @param {string} [productoInfo.compradorAvatar]
- * @param {string} [productoInfo.vendedorNombre]
- * @param {string} [productoInfo.vendedorAvatar]
+ * @param {string} [productoInfo.compradorNombre]  Fallback si aún no hay perfil en Firestore.
+ * @param {string} [productoInfo.compradorAvatar]  Fallback si aún no hay perfil en Firestore.
+ * @param {string} [productoInfo.vendedorNombre]   Fallback si aún no hay perfil en Firestore.
+ * @param {string} [productoInfo.vendedorAvatar]   Fallback si aún no hay perfil en Firestore.
  * @returns {Promise<{id: string, [key: string]: any}>} El doc del chat (con id)
  */
 export const obtenerOCrearChat = async (uidComprador, uidVendedor, productoInfo = {}) => {
@@ -75,23 +131,29 @@ export const obtenerOCrearChat = async (uidComprador, uidVendedor, productoInfo 
   const chatRef = doc(db, "chats", chatId);
 
   try {
-    const snap = await getDoc(chatRef);
+    const [snap, infoComprador, infoVendedor] = await Promise.all([
+      getDoc(chatRef),
+      obtenerInfoPerfilReal(uidComprador, productoInfo.compradorNombre, productoInfo.compradorAvatar),
+      obtenerInfoPerfilReal(uidVendedor, productoInfo.vendedorNombre, productoInfo.vendedorAvatar),
+    ]);
+
+    const participantesInfo = {
+      [uidComprador]: infoComprador,
+      [uidVendedor]:  infoVendedor,
+    };
+
     if (snap.exists()) {
-      return { id: chatId, ...snap.data() };
+      // Auto-sanar datos de perfil desatualizados — best-effort, no bloquea
+      // la apertura del chat si esta escritura de "refresco" falla.
+      updateDoc(chatRef, { participantesInfo }).catch((err) =>
+        logError("[chatService.obtenerOCrearChat] refresco de participantesInfo", err)
+      );
+      return { id: chatId, ...snap.data(), participantesInfo };
     }
 
     const nuevoChat = {
       participantes: [uidComprador, uidVendedor].sort(),
-      participantesInfo: {
-        [uidComprador]: {
-          nombre: productoInfo.compradorNombre || "Estudiante UNP",
-          avatar: productoInfo.compradorAvatar || "",
-        },
-        [uidVendedor]: {
-          nombre: productoInfo.vendedorNombre || "Estudiante UNP",
-          avatar: productoInfo.vendedorAvatar || "",
-        },
-      },
+      participantesInfo,
       productoId:     productoInfo.productoId     || null,
       productoTitulo: productoInfo.productoTitulo || null,
       productoImagen: productoInfo.productoImagen || null,
@@ -119,14 +181,15 @@ export const obtenerOCrearChat = async (uidComprador, uidVendedor, productoInfo 
  * un solo writeBatch — atómico, sin Cloud Functions.
  *
  * @param {string} chatId
- * @param {string} deUid   UID de quien envía
- * @param {string} texto
+ * @param {string} deUid    UID de quien envía
+ * @param {string} contenido  Texto del mensaje, o URL de la imagen si tipo="imagen"
+ * @param {"texto"|"imagen"} [tipo="texto"]
  * @returns {Promise<{id: string, otroUid: string|null}|undefined>}
  *   El id del mensaje creado y el UID del destinatario (útil para
  *   disparar la notificación desde el componente, sin otra lectura).
  */
-export const enviarMensaje = async (chatId, deUid, texto) => {
-  const limpio = (texto || "").trim();
+export const enviarMensaje = async (chatId, deUid, contenido, tipo = "texto") => {
+  const limpio = (contenido || "").trim();
   if (!chatId || !deUid || !limpio) return;
 
   const chatRef = doc(db, "chats", chatId);
@@ -147,15 +210,24 @@ export const enviarMensaje = async (chatId, deUid, texto) => {
 
     batch.set(nuevoMensajeRef, {
       deUid,
-      texto: limpio,
-      fecha: serverTimestamp(),
+      tipo,                                     // "texto" | "imagen"
+      texto:  tipo === "texto"  ? limpio : "",
+      imagen: tipo === "imagen" ? limpio : "",   // URL pública de ImgBB
+      fecha:  serverTimestamp(),
     });
 
+    const previewLista = tipo === "imagen"
+      ? "📷 Imagen"
+      : (limpio.length > 120 ? limpio.slice(0, 117) + "..." : limpio);
+
     const actualizacionChat = {
-      ultimoMensaje:      limpio.length > 120 ? limpio.slice(0, 117) + "..." : limpio,
+      ultimoMensaje:      previewLista,
       ultimoMensajeFecha: serverTimestamp(),
       ultimoMensajeDeUid: deUid,
       [`noLeidoPor.${deUid}`]: 0, // quien envía ve su propio mensaje como leído
+      // Fase 6: cualquier actividad nueva "revive" el chat para quien lo
+      // hubiera ocultado — tanto para el que envía como para el que recibe.
+      ocultoPara: arrayRemove(...participantes),
     };
     if (otroUid) {
       actualizacionChat[`noLeidoPor.${otroUid}`] = increment(1);
@@ -202,6 +274,12 @@ export const suscribirMensajes = (chatId, callback) => {
  * Escucha en tiempo real todas las conversaciones donde el usuario
  * es participante, ordenadas por actividad reciente.
  *
+ * Fase 6: filtra en el cliente los chats que el usuario ocultó
+ * (`ocultoPara` incluye su UID). No hace falta un índice ni una
+ * query aparte — Firestore no permite filtrar "array NOT contains",
+ * así que se resuelve acá, sobre los pocos chats que ya trajo la
+ * query de `participantes`.
+ *
  * @param {string} miUid
  * @param {(chats: Array<Object>) => void} callback
  * @returns {() => void} unsubscribe
@@ -216,12 +294,37 @@ export const suscribirMisChats = (miUid, callback) => {
   );
 
   const unsub = onSnapshot(q, (snap) => {
-    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    const chats = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((chat) => !(chat.ocultoPara || []).includes(miUid));
+    callback(chats);
   }, (err) => {
     logError("[chatService.suscribirMisChats] onSnapshot error", err);
   });
 
   return unsub;
+};
+
+// ── Ocultar / limpiar un chat de mi lista ─────────────────────
+/**
+ * Agrega mi UID a `ocultoPara` del chat — desaparece de mi lista sin
+ * borrar nada para la otra persona ni perder el historial. Vuelve a
+ * aparecer solo. si cualquiera de los dos escribe de nuevo (ver
+ * `enviarMensaje`, que limpia `ocultoPara` en cada mensaje nuevo).
+ *
+ * @param {string} chatId
+ * @param {string} miUid
+ */
+export const ocultarChat = async (chatId, miUid) => {
+  if (!chatId || !miUid) return;
+  try {
+    await updateDoc(doc(db, "chats", chatId), {
+      ocultoPara: arrayUnion(miUid),
+    });
+  } catch (err) {
+    logError("[chatService.ocultarChat]", err);
+    throw new Error(traducirError(err, "firestore"));
+  }
 };
 
 // ── Marcar como leído ─────────────────────────────────────────

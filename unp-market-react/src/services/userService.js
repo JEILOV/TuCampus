@@ -1,7 +1,7 @@
 import {
   doc, getDoc, setDoc,
   collection, query, where, getDocs,
-  updateDoc,
+  updateDoc, arrayUnion, arrayRemove,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
@@ -172,4 +172,48 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
  */
 export const sincronizarFavoritos = async (uid, favoritos) => {
   await setDoc(doc(db, "usuarios", uid), { favoritos }, { merge: true });
+};
+
+// ════════════════════════════════════════════════════════════
+//  FASE 6 · Chat Avanzado — Bloqueo de usuarios
+//
+//  `bloqueados` vive en el doc PÚBLICO /usuarios/{uid} (a propósito:
+//  así cualquiera puede leer si "me bloqueó" con una sola lectura de
+//  perfil, sin necesitar una subcolección privada ni una regla nueva).
+//  No expone nada sensible — es solo una lista de UIDs.
+// ════════════════════════════════════════════════════════════
+
+/**
+ * Agrega `otroUid` a mi lista de bloqueados. Atómico (arrayUnion):
+ * llamarlo dos veces no duplica la entrada.
+ * @param {string} miUid
+ * @param {string} otroUid
+ */
+export const bloquearUsuario = async (miUid, otroUid) => {
+  if (!miUid || !otroUid || miUid === otroUid) return;
+  try {
+    await updateDoc(doc(db, "usuarios", miUid), {
+      bloqueados: arrayUnion(otroUid),
+    });
+  } catch (err) {
+    logError("[userService.bloquearUsuario]", err);
+    throw new Error(traducirError(err, "firestore"));
+  }
+};
+
+/**
+ * Quita a `otroUid` de mi lista de bloqueados.
+ * @param {string} miUid
+ * @param {string} otroUid
+ */
+export const desbloquearUsuario = async (miUid, otroUid) => {
+  if (!miUid || !otroUid) return;
+  try {
+    await updateDoc(doc(db, "usuarios", miUid), {
+      bloqueados: arrayRemove(otroUid),
+    });
+  } catch (err) {
+    logError("[userService.desbloquearUsuario]", err);
+    throw new Error(traducirError(err, "firestore"));
+  }
 };

@@ -228,6 +228,19 @@ const Publicar = () => {
           <button type="submit" disabled={enviando} className="btn-publish-final">
             {enviando ? btnTexto : "Publicar Producto"}
           </button>
+
+          {enviando && (
+            <div style={{
+              marginTop: "10px", height: "6px", borderRadius: "4px",
+              background: "#e8e8f0", overflow: "hidden",
+            }}>
+              <div style={{
+                height: "100%", width: `${progreso}%`,
+                background: "var(--verde-marca)", borderRadius: "4px",
+                transition: "width 0.2s ease",
+              }} />
+            </div>
+          )}
         </form>
       </main>
 
