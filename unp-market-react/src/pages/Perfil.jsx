@@ -14,7 +14,6 @@ import { obtenerContactoPrivado, guardarContactoPrivado } from "../services/user
 import Spinner                         from "../components/Spinner"; // ✅ Nuevo import
 import { useToast, ToastContainer }    from "../components/Toast";   // ✅ Nuevo import
 import BottomNav                       from "../components/BottomNav";
-import BotonNotificaciones             from "../components/BotonNotificaciones";
 
 // ──────────────────────────────────────────────────────────────
 //  SUB-COMPONENTE: Tarjeta de producto en modo perfil
@@ -601,7 +600,6 @@ const Perfil = () => {
       {/* ════════════════════════════════════════════════════
              BOTTOM NAVIGATION
         ════════════════════════════════════════════════════ */}
-      <BotonNotificaciones />
       <BottomNav activo="perfil" />
 
       {/* ════════════════════════════════════════════════════
