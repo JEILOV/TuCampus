@@ -273,8 +273,14 @@ const Chat = () => {
   const [progresoImagen, setProgresoImagen] = useState(0);
   const fileInputRef = useRef(null);
 
-  const finRef              = useRef(null);
+  const messagesEndRef      = useRef(null);
   const esPrimeraCarga       = useRef(true);
+
+  // Auto-scroll: 'auto' (instantáneo) en la carga inicial del historial,
+  // 'smooth' para mensajes nuevos enviados/recibidos después de eso.
+  const scrollToBottom = useCallback((behavior = "smooth") => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
 
   // Metadata del chat (nombre del otro, producto de origen) — una vez por chatId
   useEffect(() => {
@@ -323,12 +329,14 @@ const Chat = () => {
     marcarComoLeido(chatId, user.uid);
   }, [chatId, user?.uid, mensajes.length]);
 
-  // Auto-scroll al último mensaje (instantáneo en la primera carga, suave después)
+  // Auto-scroll al último mensaje: se dispara al cambiar la lista de mensajes
+  // Y también cuando termina de cargar (cargandoMeta === false), para cubrir
+  // tanto el historial inicial como cada mensaje nuevo enviado/recibido.
   useEffect(() => {
-    if (mensajes.length === 0) return;
-    finRef.current?.scrollIntoView({ behavior: esPrimeraCarga.current ? "auto" : "smooth" });
+    if (cargandoMeta || mensajes.length === 0) return;
+    scrollToBottom(esPrimeraCarga.current ? "auto" : "smooth");
     esPrimeraCarga.current = false;
-  }, [mensajes]);
+  }, [mensajes, cargandoMeta, scrollToBottom]);
 
   // ── Derivados de la conversación abierta ──────────────────
   const otroUid          = chatMeta?.participantes?.find((u) => u !== user?.uid);
@@ -439,6 +447,7 @@ const Chat = () => {
         // YA NO usan position:sticky/fixed, así nunca "flotan" ni se
         // desalinean. Solo el contenedor de mensajes hace scroll interno.
         height: "100dvh",
+        maxHeight: "100dvh",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -446,9 +455,9 @@ const Chat = () => {
       }}
     >
 
-      {/* ── HEADER (fijo: flexShrink 0, fuera del área con scroll) ── */}
+      {/* ── HEADER (fijo: flexShrink 0 + zIndex, fuera del área con scroll) ── */}
       <div style={{
-        flexShrink: 0, position: "relative",
+        flexShrink: 0, position: "relative", zIndex: 10,
         background: "white", borderBottom: "1px solid #f1f3f5",
         display: "flex", alignItems: "center", gap: "12px", padding: "16px 20px",
       }}>
@@ -531,16 +540,16 @@ const Chat = () => {
 
       {/* ── CONTENIDO (única zona con scroll: flex:1 + overflowY:auto) ── */}
       {!chatId ? (
-        <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ flex: 1, overflowY: "auto", minHeight: 0, WebkitOverflowScrolling: "touch" }}>
           <ListaChats chats={chats} cargando={cargandoChats} miUid={user?.uid} onAbrir={abrirChat} />
         </div>
       ) : cargandoMeta ? (
-        <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
           <Spinner mensaje="Cargando conversación..." fullScreen={false} />
         </div>
       ) : !chatValidoParaMi ? (
         <div style={{
-          flex: 1, overflowY: "auto",
+          flex: 1, overflowY: "auto", minHeight: 0,
           display: "flex", flexDirection: "column", alignItems: "center",
           justifyContent: "center", padding: "80px 24px", gap: "12px", textAlign: "center",
         }}>
@@ -561,9 +570,9 @@ const Chat = () => {
         </div>
       ) : (
         <>
-          {/* Lista de mensajes: ÚNICO elemento con scroll interno */}
+          {/* Lista de mensajes: ÚNICO elemento con scroll interno (flex:1 + min-height:0) */}
           <div style={{
-            flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch",
+            flex: 1, overflowY: "auto", minHeight: 0, WebkitOverflowScrolling: "touch",
             display: "flex", flexDirection: "column", padding: "14px 0",
           }}>
             {mensajes.length === 0 ? (
@@ -573,14 +582,14 @@ const Chat = () => {
             ) : (
               mensajes.map((m) => <Burbuja key={m.id} mensaje={m} esMio={m.deUid === user?.uid} />)
             )}
-            <div ref={finRef} />
+            <div ref={messagesEndRef} />
           </div>
 
           {/* ── BARRA DE ENVÍO (fija: flexShrink 0, ya no position:fixed) ── */}
           {conversacionBloqueada ? (
             // Fase 6: bloqueado en cualquiera de los dos sentidos → sin input
             <div style={{
-              flexShrink: 0, background: "white", borderTop: "1px solid #f1f3f5",
+              flexShrink: 0, zIndex: 10, background: "white", borderTop: "1px solid #f1f3f5",
               padding: "16px 20px",
               paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
               textAlign: "center",
@@ -593,7 +602,7 @@ const Chat = () => {
             <form
               onSubmit={handleEnviar}
               style={{
-                flexShrink: 0,
+                flexShrink: 0, zIndex: 10,
                 background: "white", padding: "12px 16px",
                 paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
                 borderTop: "1px solid #f1f3f5", boxSizing: "border-box",
