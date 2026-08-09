@@ -9,6 +9,7 @@ import { obtenerContactoPrivado }               from "../services/userService";
 import { crearProducto }                        from "../services/productService";
 import Toast, { useToast }                      from "../components/Toast"; // ✅ Nuevo import
 import BottomNav                                from "../components/BottomNav";
+import BotonNotificaciones                      from "../components/BotonNotificaciones";
 
 // ── Estilos reutilizables ────────────────────────────────────
 const inputStyle = {
@@ -245,6 +246,7 @@ const Publicar = () => {
       </main>
 
       {/* BOTTOM NAV */}
+      <BotonNotificaciones />
       <BottomNav activo="publicar" />
 
       {/* ✅ TOAST LIMPIO */}

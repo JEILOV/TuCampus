@@ -3,9 +3,9 @@ import { useState, useEffect, useRef }              from "react";
 import { useNavigate, useSearchParams }             from "react-router-dom";
 import { useAuth }                                  from "../context/AuthContext";
 import { useProducts }                              from "../hooks/useProducts";
-import { useNotifications }                         from "../hooks/useNotifications";
 import { useToast, ToastContainer }                 from "../components/Toast"; // ✅ Nuevos imports
 import BottomNav                                    from "../components/BottomNav";
+import BotonNotificaciones                          from "../components/BotonNotificaciones";
 import { CATEGORY_ICON_MAP, IconPackage }           from "../components/CategoryIcons";
 
 // ── Constantes ───────────────────────────────────────────────
@@ -17,17 +17,6 @@ const CATEGORIAS = [
   { key: "servicios",  label: "Servicios",  bg: "#fff6e0", accent: "#c98a1f" },
   { key: "materiales", label: "Materiales", bg: "#f0eaff", accent: "#7b5bc9" },
 ];
-
-const formatearTiempo = (timestamp) => {
-  if (!timestamp) return "Hace un momento";
-  const segundos = Math.floor((new Date() - timestamp.toDate()) / 1000);
-  if (segundos < 60) return `Hace ${segundos} seg`;
-  const minutos = Math.floor(segundos / 60);
-  if (minutos < 60) return `Hace ${minutos} min`;
-  const horas = Math.floor(minutos / 60);
-  if (horas < 24) return `Hace ${horas} h`;
-  return `Hace ${Math.floor(horas / 24)} d`;
-};
 
 // ── Sub-componentes ──────────────────────────────────────────
 const ProductCard = ({ producto, onVerDetalle }) => {
@@ -98,6 +87,12 @@ const Home = () => {
   const [tabActiva, setTabActiva] = useState(tabUrl);
   useEffect(() => { setTabActiva(tabUrl); }, [tabUrl]);
 
+  // 🔧 Compat: links viejos con ?tab=notifs (guardados/compartidos antes
+  // de este refactor) redirigen a la nueva página independiente.
+  useEffect(() => {
+    if (tabUrl === "notifs") navigate("/notificaciones", { replace: true });
+  }, [tabUrl, navigate]);
+
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
 
@@ -118,9 +113,6 @@ const Home = () => {
     onError: (msg) => mostrarToast(msg, "error"),
   });
 
-  // ── Hook: Notificaciones ─────────────────────────────────
-  const { notificaciones, marcarLeida, limpiarTodas } = useNotifications(user?.uid);
-
   // ── Infinite scroll ──────────────────────────────────────
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
@@ -140,27 +132,6 @@ const Home = () => {
   );
 
   const handleVerDetalle = (id) => navigate(`/producto?id=${id}`);
-
-  const handleLimpiarNotificaciones = async () => {
-    try {
-      await limpiarTodas();
-      mostrarToast("Notificaciones eliminadas");
-    } catch {
-      mostrarToast("Error al procesar", "error");
-    }
-  };
-
-  const handleNotifClick = async (notif) => {
-    try {
-      if (!notif.leido) await marcarLeida(notif.id);
-    } finally {
-      if (notif.tipo === "nuevo_producto" && notif.productoId) {
-        navigate(`/producto?id=${notif.productoId}`);
-      } else {
-        navigate(`/vendedor?uid=${notif.deUid}`);
-      }
-    }
-  };
 
   // ── Render ───────────────────────────────────────────────
   return (
@@ -305,62 +276,13 @@ const Home = () => {
         </section>
       )}
 
-      {tabActiva === "notifs" && (
-        <section className="tab-section">
-          <div className="tab-section-header">
-            <h2 className="tab-section-title" style={{ margin: 0 }}>Notificaciones</h2>
-            {notificaciones.length > 0 && (
-              <button onClick={handleLimpiarNotificaciones} className="btn-mark-read">
-                Limpiar notificaciones
-              </button>
-            )}
-          </div>
-          {notificaciones.length === 0 ? (
-            <div className="notif-empty">
-              <span className="notif-empty-icon">🔔</span>
-              <p className="notif-empty-title">Todo al día</p>
-              <p className="notif-empty-subtitle">Aquí verás cuando alguien interactúe con tus productos.</p>
-            </div>
-          ) : (
-            <div className="notif-list">
-              {notificaciones.map((notif) => {
-                const esFav       = notif.tipo === "favorito";
-                const esSeguidor  = notif.tipo === "seguidor";
-                const esNuevoProd = notif.tipo === "nuevo_producto";
-                let icono = "💬";
-                if (esFav)       icono = "❤️";
-                if (esSeguidor)  icono = "👤";
-                if (esNuevoProd) icono = "📢";
-                let textoAccion    = "quiere comprar";
-                let mostrarProducto = true;
-                if (esFav)           { textoAccion = "guardó"; }
-                else if (esSeguidor) { textoAccion = "empezó a seguirte"; mostrarProducto = false; }
-                else if (esNuevoProd){ textoAccion = "publicó un nuevo producto:"; }
+      {/* Notificaciones ya no es un tab: ahora vive en /notificaciones,
+          accesible desde el botón flotante de la campana (ver abajo). */}
 
-                return (
-                  <div
-                    key={notif.id}
-                    className={`notif-item notif-item--${esFav ? "fav" : "msg"}${notif.leido ? " notif-item--leido" : ""}`}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => handleNotifClick(notif)}
-                  >
-                    <div className="notif-item-icon">{icono}</div>
-                    <div className="notif-item-body">
-                      <p className="notif-item-text">
-                        <span className="notif-item-name">{notif.deNombre}</span>{" "}
-                        {textoAccion}{" "}
-                        {mostrarProducto && <span className="notif-item-name">"{notif.productoTitulo}"</span>}
-                      </p>
-                      <span className="notif-item-time">{formatearTiempo(notif.timestamp)}</span>
-                    </div>
-                    {!notif.leido && <span className="notif-badge-nueva">NUEVA</span>}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      )}
+      {/* Botón flotante de notificaciones — fijo en la esquina superior
+          derecha, visible en todas las vistas principales sin taparse
+          con el header (el header de Home está centrado). */}
+      <BotonNotificaciones />
 
       {/* BOTTOM NAVIGATION */}
       <BottomNav activo={tabActiva} />

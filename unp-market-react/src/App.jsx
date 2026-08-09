@@ -7,6 +7,7 @@ import Producto       from "./pages/Producto";
 import Vendedor       from "./pages/Vendedor";
 import EditarProducto from "./pages/EditarProducto";
 import Chat           from "./pages/Chat";
+import Notificaciones from "./pages/Notificaciones";
 import Terminos       from "./pages/Terminos";
 import RutaProtegida  from "./components/RutaProtegida";
 
@@ -25,6 +26,7 @@ const App = () => (
       <Route path="/publicar" element={<RutaProtegida><Publicar /></RutaProtegida>} />
       <Route path="/editar"   element={<RutaProtegida><EditarProducto /></RutaProtegida>} />
       <Route path="/chat"     element={<RutaProtegida><Chat /></RutaProtegida>} />
+      <Route path="/notificaciones" element={<RutaProtegida><Notificaciones /></RutaProtegida>} />
 
       {/* Ruta Comodín (404) */}
       <Route path="*" element={<Navigate to="/" replace />} />

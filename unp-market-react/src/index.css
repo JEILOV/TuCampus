@@ -443,6 +443,59 @@ html, body {
   white-space: nowrap;
 } 
 /* ════════════════════════════════════════════
+   BOTÓN FLOTANTE DE NOTIFICACIONES
+   (reemplaza el tab "Notifs" del bottom-nav)
+   ════════════════════════════════════════════ */
+.notif-float-btn {
+  position: fixed;
+  top: 16px;
+  /* En mobile (viewport <= 480px, igual al ancho del app-shell) cae a 16px
+     pegado al borde real de la pantalla. En desktop, el app-shell queda
+     centrado con max-width:480px — este cálculo lo sigue pegando a SU
+     borde derecho en vez de irse al borde de la ventana completa. */
+  right: max(16px, calc(50vw - 240px + 16px));
+  z-index: 40;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--azul-oscuro);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(15, 37, 64, 0.18), 0 1px 3px rgba(15, 37, 64, 0.10);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.notif-float-btn:hover  { box-shadow: 0 6px 20px rgba(15, 37, 64, 0.24); }
+.notif-float-btn:active { transform: scale(0.90); }
+
+.notif-float-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  border-radius: 20px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  line-height: 1;
+}
+
+/* ════════════════════════════════════════════
    BARRA DE NAVEGACIÓN INFERIOR
    ════════════════════════════════════════════ */
 .bottom-nav {

@@ -17,6 +17,7 @@ import {
 } from "../services/reviewService";
 import Spinner    from "../components/Spinner";
 import BottomNav   from "../components/BottomNav";
+import BotonNotificaciones from "../components/BotonNotificaciones";
 import ModalResena from "../components/ModalResena";
 import { ToastContainer, useToast } from "../components/Toast";
 
@@ -622,6 +623,7 @@ const Vendedor = () => {
       </div>
 
       {/* BOTTOM NAV */}
+      <BotonNotificaciones />
       <BottomNav />
 
       <ToastContainer toasts={toasts} />

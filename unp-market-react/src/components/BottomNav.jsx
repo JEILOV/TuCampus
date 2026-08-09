@@ -16,11 +16,14 @@
 //
 //  En Home.jsx, "activo" es dinámico (depende de ?tab=), en el resto
 //  de las páginas es un string fijo.
+//
+//  🔧 El tab "Notificaciones" se quitó de acá y ahora vive como botón
+//  flotante independiente — ver src/components/BotonNotificaciones.jsx.
+//  Quedan 5 accesos: Inicio, Favoritos, Publicar, Mensajes y Perfil.
 // ============================================================
 
 import { useNavigate }      from "react-router-dom";
 import { useAuth }          from "../context/AuthContext";
-import { useNotifications } from "../hooks/useNotifications";
 import { useChatsNoLeidos } from "../hooks/useChatsNoLeidos";
 
 // ── Badge numérico reutilizable (notifs y mensajes usan el mismo estilo) ──
@@ -44,9 +47,8 @@ const BottomNav = ({ activo = null }) => {
   const navigate = useNavigate();
   const { user }  = useAuth();
 
-  // Mismos hooks que ya usa el resto de la app — cero listeners nuevos
-  // más allá de los que ya existían, solo centralizados acá.
-  const { noLeidas }    = useNotifications(user?.uid);
+  // Mismo hook que ya usa el resto de la app — cero listeners nuevos
+  // más allá de los que ya existían, solo centralizado acá.
   const mensajesNoLeidos = useChatsNoLeidos(user?.uid);
 
   const claseItem = (id) => (activo === id ? "nav-item active" : "nav-item");
@@ -85,17 +87,6 @@ const BottomNav = ({ activo = null }) => {
           <Badge cantidad={mensajesNoLeidos} />
         </div>
         <span className="nav-label">Mensajes</span>
-      </button>
-
-      <button className={claseItem("notifs")} onClick={() => navigate("/?tab=notifs")} aria-label="Notificaciones">
-        <div className="nav-icon-wrap">
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" strokeWidth="2.2">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-          </svg>
-          <Badge cantidad={noLeidas} />
-        </div>
-        <span className="nav-label">Notifs</span>
       </button>
 
       <button className={claseItem("perfil")} onClick={() => navigate("/perfil")} aria-label="Perfil">

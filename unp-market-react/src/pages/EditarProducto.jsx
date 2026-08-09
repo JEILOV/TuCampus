@@ -9,6 +9,7 @@ import { actualizarProducto }           from "../services/productService";
 import Spinner                          from "../components/Spinner"; // ✅ Nuevo import
 import Toast, { useToast }              from "../components/Toast";   // ✅ Nuevo import
 import BottomNav                        from "../components/BottomNav";
+import BotonNotificaciones              from "../components/BotonNotificaciones";
 
 // ── Estilos reutilizables ────────────────────────────────────
 const inputStyle = {
@@ -239,6 +240,7 @@ const EditarProducto = () => {
       </main>
 
       {/* BOTTOM NAV */}
+      <BotonNotificaciones />
       <BottomNav />
 
       {/* ✅ TOAST LIMPIO */}
