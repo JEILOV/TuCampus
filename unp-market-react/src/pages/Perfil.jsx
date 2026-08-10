@@ -7,16 +7,26 @@ import {
   updateDoc, deleteDoc,
 } from "firebase/firestore";
 import { Link }                        from "react-router-dom";
+import {
+  ChevronLeft, Settings, Pencil, MapPin, CheckCircle2,
+  MessageCircle, LayoutGrid, ImagePlus, LogOut,
+} from "lucide-react";
 import { db }                          from "../services/firebase";
 import { useAuth }                     from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
 import { obtenerContactoPrivado, guardarContactoPrivado } from "../services/userService";
-import Spinner                         from "../components/Spinner"; // ✅ Nuevo import
-import { useToast, ToastContainer }    from "../components/Toast";   // ✅ Nuevo import
+import Spinner                         from "../components/Spinner";
+import { useToast, ToastContainer }    from "../components/Toast";
 import BottomNav                       from "../components/BottomNav";
+
+// Placeholders — reemplazar por los archivos finales de cada logo.
+const YAPE_PLACEHOLDER = "/assets/yape-placeholder.png";
+const PLIN_PLACEHOLDER = "/assets/plin-placeholder.png";
 
 // ──────────────────────────────────────────────────────────────
 //  SUB-COMPONENTE: Tarjeta de producto en modo perfil
+//  (mismo lenguaje visual que ProductCard.jsx, con acciones extra
+//  de dueño — editar/agotar/borrar — que ProductCard no maneja)
 // ──────────────────────────────────────────────────────────────
 const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
   const { titulo, precio, imagen, vendedorNombre, vendedor, avatarVendedor, estado } = producto;
@@ -24,102 +34,71 @@ const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
   const nombreVend = vendedorNombre || vendedor || "Yo";
 
   return (
-    <article style={{
-      background: "white", borderRadius: "18px",
-      boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
-      overflow: "hidden", display: "flex", flexDirection: "column",
-    }}>
+    <article className="flex flex-col overflow-hidden rounded-card bg-card shadow-soft">
       {/* Imagen */}
-      <div style={{
-        position: "relative", height: "160px",
-        background: "linear-gradient(135deg,#c8a97a,#a07850)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
+      <div className="relative aspect-square w-full bg-background">
         {imagen?.trim() ? (
-          <img src={imagen} alt={titulo}
-            style={{ width: "100%", height: "100%", objectFit: "cover",
-              filter: agotado ? "grayscale(70%) opacity(0.7)" : "none" }} />
+          <img
+            src={imagen}
+            alt={titulo}
+            className={`h-full w-full object-cover${agotado ? " grayscale opacity-70" : ""}`}
+          />
         ) : (
-          <span style={{ fontSize: "2.5rem" }}>📦</span>
+          <div className="flex h-full w-full items-center justify-center text-4xl">📦</div>
         )}
-        <span style={{
-          position: "absolute", top: "8px", right: "8px",
-          background: "rgba(0,0,0,0.55)", color: "white",
-          padding: "4px 10px", borderRadius: "12px",
-          fontSize: "0.82rem", fontWeight: 700,
-        }}>
+        <span className="absolute right-2.5 top-2.5 rounded-chip bg-ink px-2.5 py-1 text-xs font-bold text-white shadow-soft">
           S/ {(precio || 0).toFixed(2)}
         </span>
         {agotado && (
-          <div style={{
-            position: "absolute", inset: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: "rgba(255,255,255,0.35)", backdropFilter: "blur(2px)",
-          }}>
-            <span style={{
-              background: "var(--azul-oscuro)", color: "white", fontWeight: 700,
-              padding: "6px 18px", borderRadius: "16px", fontSize: "0.95rem",
-              transform: "rotate(-5deg)", boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-            }}>AGOTADO</span>
+          <div className="absolute inset-0 flex items-center justify-center bg-white/35 backdrop-blur-[2px]">
+            <span className="-rotate-3 rounded-chip bg-ink px-3.5 py-1.5 text-[13px] font-extrabold text-white shadow-soft">
+              AGOTADO
+            </span>
           </div>
         )}
       </div>
 
       {/* Cuerpo */}
-      <div style={{ padding: "12px 12px 14px", flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
-        <p style={{ margin: 0, fontWeight: 600, fontSize: "0.95rem", color: "var(--azul-oscuro)", lineHeight: 1.3 }}>
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        <p className="truncate text-[13.5px] font-bold leading-tight text-ink">
           {titulo || "Sin título"}
         </p>
 
         {/* Vendedor */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <div style={{
-            width: "24px", height: "24px", borderRadius: "50%",
-            background: "linear-gradient(135deg,#c8a97a,#a07850)",
-            overflow: "hidden", flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "11px", color: "white", fontWeight: 600,
-          }}>
+        <div className="flex items-center gap-1.5">
+          <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-[10px] font-bold text-primary">
             {avatarVendedor?.trim()
-              ? <img src={avatarVendedor} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ? <img src={avatarVendedor} alt="" className="h-full w-full object-cover" />
               : (nombreVend || "?")[0].toUpperCase()
             }
           </div>
-          <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#5c5c7a" }}>{nombreVend}</span>
+          <span className="truncate text-[10.5px] font-semibold uppercase tracking-wide text-ink/60">
+            {nombreVend}
+          </span>
         </div>
 
         {/* Botones de acción */}
-        <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
-          <button onClick={onEditar} style={btnAccionStyle("#f1f3f5", "#5c5c7a")}>Editar</button>
-          <button onClick={onAgotar} style={btnAccionStyle("#f1f3f5", "#5c5c7a")}>
+        <div className="mt-1 flex gap-1.5">
+          <button onClick={onEditar} className="flex-1 rounded-[10px] bg-background py-1.5 text-[11px] font-bold text-ink/70">
+            Editar
+          </button>
+          <button onClick={onAgotar} className="flex-1 rounded-[10px] bg-background py-1.5 text-[11px] font-bold text-ink/70">
             {agotado ? "Disponible" : "Agotar"}
           </button>
-          <button onClick={onBorrar} style={btnAccionStyle("#fef2f2", "#ef4444")}>Borrar</button>
+          <button onClick={onBorrar} className="flex-1 rounded-[10px] bg-red-50 py-1.5 text-[11px] font-bold text-red-500">
+            Borrar
+          </button>
         </div>
       </div>
     </article>
   );
 };
 
-const btnAccionStyle = (bg, color) => ({
-  flex: 1, padding: "7px 0", borderRadius: "10px",
-  border: "none", background: bg, color,
-  fontSize: "0.78rem", fontWeight: 600, cursor: "pointer",
-  fontFamily: "'Nunito', sans-serif",
-});
-
 // ──────────────────────────────────────────────────────────────
-//  ESTILOS INLINE compartidos
+//  ESTILOS compartidos del formulario (clases Tailwind reutilizables)
 // ──────────────────────────────────────────────────────────────
-const inputStyle = {
-  width: "100%", background: "var(--bg-crema)", border: "1.5px solid #e8e8f0",
-  borderRadius: "12px", padding: "12px 14px",
-  fontFamily: "'Nunito', sans-serif", fontSize: "0.95rem",
-  fontWeight: 700, outline: "none", boxSizing: "border-box",
-  color: "var(--azul-oscuro)",
-};
-
-const labelStyle = { fontSize: "0.88rem", fontWeight: 600, color: "var(--azul-oscuro)" };
+const inputClass = "w-full box-border rounded-btn border-[1.5px] border-ink/10 bg-background px-3.5 py-3 text-[15px] font-bold text-ink outline-none focus:border-primary/40";
+const labelClass = "text-[13.5px] font-bold text-ink";
 
 // ──────────────────────────────────────────────────────────────
 //  COMPONENTE PRINCIPAL
@@ -368,158 +347,104 @@ const Perfil = () => {
   const p = perfil || {};
 
   return (
-    <div className="app-shell" style={{ background: "var(--bg-crema)", paddingBottom: "90px" }}>
+    <div className="app-shell font-sans pb-24">
 
       {/* ════════════════════════════════════════════════════
              CABECERA — Banner + Avatar + Nombre
         ════════════════════════════════════════════════════ */}
       <div
-        className="up-header"
-        style={{
-          position: "relative", width: "100%", minHeight: "290px",
-          background: p.portada?.trim()
-            ? `url('${p.portada}') center/cover no-repeat`
-            : "linear-gradient(135deg,#c8a97a 0%,#a07850 100%)",
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          padding: "60px 20px 30px", boxSizing: "border-box",
-        }}
+        className="relative flex min-h-[300px] w-full flex-col items-center justify-center overflow-hidden rounded-b-[32px] bg-gradient-to-b from-primary to-primary-dark px-6 pb-10 pt-14"
+        style={p.portada?.trim() ? { backgroundImage: `url('${p.portada}')`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
       >
-        {/* Overlay */}
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.85) 100%)",
-          zIndex: 1,
-        }} />
-
         {/* Botón volver */}
         <button
           onClick={() => navigate(-1)}
           aria-label="Volver"
-          style={{
-            position: "absolute", top: "16px", left: "16px", zIndex: 10,
-            width: "38px", height: "38px", borderRadius: "50%",
-            background: "rgba(0,0,0,0.35)", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", color: "white",
-          }}
+          className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
+          <ChevronLeft size={20} />
         </button>
 
         {/* Botón ⚙️ + Dropdown */}
-        <div ref={dropdownRef} style={{ position: "absolute", top: "16px", right: "16px", zIndex: 10 }}>
+        <div ref={dropdownRef} className="absolute right-4 top-4 z-10">
           <button
             onClick={() => setDropdownOpen((v) => !v)}
             aria-label="Configuración"
-            style={{
-              width: "38px", height: "38px", borderRadius: "50%",
-              background: "rgba(0,0,0,0.35)", border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", color: "white",
-            }}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
           >
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
+            <Settings size={18} />
           </button>
 
           {dropdownOpen && (
-            <div style={{
-              position: "absolute", top: "46px", right: 0, background: "white", borderRadius: "14px",
-              boxShadow: "0 8px 30px rgba(0,0,0,0.15)", border: "1px solid #f1f3f5", minWidth: "180px", overflow: "hidden", zIndex: 200,
-            }}>
-              <button onClick={abrirModal}      style={dropItemStyle("var(--azul-oscuro)")}>Editar perfil</button>
-              <button onClick={handleSignOut}   style={dropItemStyle("#ef4444")}>Cerrar sesión</button>
+            <div className="absolute right-0 top-[46px] z-[200] min-w-[190px] overflow-hidden rounded-btn border border-ink/5 bg-card shadow-softLg">
+              <button
+                onClick={abrirModal}
+                className="flex w-full items-center gap-2.5 border-b border-background px-4 py-3.5 text-left text-[14px] font-bold text-ink"
+              >
+                <Pencil size={16} />
+                Editar perfil
+              </button>
+              <button
+                onClick={handleSignOut}
+                className="flex w-full items-center gap-2.5 px-4 py-3.5 text-left text-[14px] font-bold text-red-500"
+              >
+                <LogOut size={16} />
+                Cerrar sesión
+              </button>
             </div>
           )}
         </div>
 
         {/* Contenedor Central: Avatar + Textos */}
-        <div style={{ position: "relative", zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+        <div className="relative z-[5] flex flex-col items-center gap-2.5">
 
           {/* Avatar circular con botón de edición */}
-          <div style={{ position: "relative", marginBottom: "4px" }}>
-            <div style={{
-              width: "100px", height: "100px", borderRadius: "50%",
-              border: "3px solid white", boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
-              background: "linear-gradient(135deg,#c8a97a,#a07850)", overflow: "hidden",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.5rem", fontWeight: 700, color: "white",
-            }}>
-              {p.avatar?.trim() ? <img src={p.avatar} alt={p.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (p.nombre || "U")[0].toUpperCase()}
+          <div className="relative mb-1">
+            <div className="flex h-[100px] w-[100px] items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-primary-dark text-4xl font-bold text-white shadow-softLg">
+              {p.avatar?.trim() ? <img src={p.avatar} alt={p.nombre} className="h-full w-full object-cover" /> : (p.nombre || "U")[0].toUpperCase()}
             </div>
 
             {/* Lápiz naranja */}
-            <button onClick={abrirModal} aria-label="Editar foto" style={{
-              position: "absolute", bottom: "4px", right: "0px",
-              width: "28px", height: "28px", borderRadius: "50%",
-              background: "#f97316", border: "2px solid white",
-              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0,
-              boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-            }}>
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
+            <button
+              onClick={abrirModal}
+              aria-label="Editar foto"
+              className="absolute bottom-1 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white shadow-soft"
+            >
+              <Pencil size={13} />
             </button>
           </div>
 
-          <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 700, color: "white", textAlign: "center", textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
+          <h1 className="text-center text-2xl font-extrabold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.4)]">
             {p.nombre || "Estudiante UNP"}
           </h1>
-          <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "rgba(255,255,255,0.9)", textShadow: "0 1px 2px rgba(0,0,0,0.3)" }}>
+          <p className="text-[13px] font-bold text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
             {p.bio || "Estudiante de la UNP"}
           </p>
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: "6px",
-            background: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.4)",
-            padding: "6px 16px", borderRadius: "20px", fontSize: "0.8rem", fontWeight: 600, marginTop: "4px", backdropFilter: "blur(4px)",
-          }}>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.8">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
+          <div className="mt-1 inline-flex items-center gap-1.5 rounded-chip border border-white/40 bg-white/20 px-4 py-1.5 text-[12px] font-bold text-white backdrop-blur">
+            <CheckCircle2 size={14} />
             Estudiante verificado
           </div>
         </div>
       </div>
 
       {/* ════════════════════════════════════════════════════
-             INFO: UBICACIÓN + TELÉFONO
+             INFO: UBICACIÓN + MÉTODOS DE PAGO
         ════════════════════════════════════════════════════ */}
-      <div style={{
-        display: "flex", justifyContent: "center", gap: "12px",
-        background: "transparent", margin: "16px 16px 20px",
-      }}>
-        <div style={{
-          flex: 1, display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "8px",
-          padding: "10px 16px", background: "var(--blanco-puro)", borderRadius: "24px",
-          border: "1px solid rgba(15, 37, 64, 0.06)", boxShadow: "0 4px 12px rgba(15, 37, 64, 0.04)",
-        }}>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--verde-marca)" strokeWidth="2.2" strokeLinecap="round">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-            <circle cx="12" cy="10" r="3"/>
-          </svg>
-          <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--azul-oscuro)", margin: 0 }}>
+      <div className="relative z-10 -mt-5 flex gap-3 px-4">
+        <div className="flex flex-1 items-center justify-center gap-2 rounded-card bg-card px-4 py-3.5 shadow-soft">
+          <MapPin size={18} className="shrink-0 text-primary" />
+          <span className="truncate text-[13px] font-extrabold text-ink">
             {p.ubicacion || "Piura"}
           </span>
         </div>
 
-        <div style={{
-          flex: 1, display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "6px",
-          padding: "10px 16px", background: "var(--blanco-puro)", borderRadius: "24px",
-          border: "1px solid rgba(15, 37, 64, 0.06)", boxShadow: "0 4px 12px rgba(15, 37, 64, 0.04)",
-          flexWrap: "wrap",
-        }}>
-          {/* 🔒 Nunca se imprime el número: solo insignias de qué métodos
+        <div className="flex flex-1 flex-wrap items-center justify-center gap-2.5 rounded-card bg-card px-4 py-3.5 shadow-soft">
+          {/* 🔒 Nunca se imprime el número: solo los logos de qué métodos
               de contacto/pago acepta este usuario. */}
-          {p.aceptaYape && (
-            <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "#7c3aed" }}>💜 Yape</span>
-          )}
-          {p.aceptaPlin && (
-            <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "#0284c7" }}>💙 Plin</span>
-          )}
+          {p.aceptaYape && <img src={YAPE_PLACEHOLDER} alt="Yape" className="h-7 w-7 rounded-full object-cover" />}
+          {p.aceptaPlin && <img src={PLIN_PLACEHOLDER} alt="Plin" className="h-7 w-7 rounded-full object-cover" />}
           {!p.aceptaYape && !p.aceptaPlin && (
-            <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--azul-oscuro)" }}>Sin métodos configurados</span>
+            <span className="text-[12.5px] font-extrabold text-ink/50">Sin métodos configurados</span>
           )}
         </div>
       </div>
@@ -527,21 +452,13 @@ const Perfil = () => {
       {/* ════════════════════════════════════════════════════
              ACERCA DE MÍ
         ════════════════════════════════════════════════════ */}
-      <div style={{ padding: "0 16px", marginBottom: "8px" }}>
-        <div style={{
-          background: "white", borderRadius: "16px",
-          border: "1.5px solid #e8e8f0", padding: "14px 16px",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
-              stroke="var(--verde-marca)" strokeWidth="2.2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="16" x2="12" y2="12"/>
-              <line x1="12" y1="8" x2="12.01" y2="8"/>
-            </svg>
-            <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--azul-oscuro)" }}>Acerca de mí</span>
+      <div className="px-4 pb-2 pt-4">
+        <div className="rounded-card bg-card p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <MessageCircle size={16} className="text-primary" />
+            <span className="text-sm font-bold text-ink">Acerca de mí</span>
           </div>
-          <p style={{ margin: 0, fontSize: "0.88rem", color: "#5c5c7a", fontWeight: 600, lineHeight: 1.5, wordBreak: "break-word" }}>
+          <p className="break-words text-[13px] font-semibold leading-relaxed text-ink/70">
             {p.acercaDe || "¡Hola! Bienvenido a mi tienda en el campus."}
           </p>
         </div>
@@ -550,28 +467,25 @@ const Perfil = () => {
       {/* ════════════════════════════════════════════════════
              MIS PUBLICACIONES ACTIVAS
         ════════════════════════════════════════════════════ */}
-      <div style={{ padding: "0 16px 20px" }}>
-        <div style={{
-          display: "flex", alignItems: "center", gap: "8px",
-          marginBottom: "12px", paddingBottom: "10px",
-          borderBottom: "2px solid var(--verde-marca)",
-        }}>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-            stroke="var(--verde-marca)" strokeWidth="2.2">
-            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-            <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
-          </svg>
-          <span style={{ fontWeight: 700, fontSize: "1rem", color: "var(--verde-marca)" }}>
-            Mis Publicaciones Activas
-          </span>
+      <div className="px-4 pb-5 pt-4">
+        <div className="mb-3 flex items-center justify-between border-b-2 border-[#287653]/25 pb-2.5">
+          <div className="flex items-center gap-2">
+            <LayoutGrid size={16} className="text-[#287653]" />
+            <span className="text-[15px] font-extrabold text-[#287653]">
+              Mis Publicaciones Activas
+            </span>
+          </div>
+          {productos.length > 0 && (
+            <button className="text-[12.5px] font-bold text-primary">Ver todas →</button>
+          )}
         </div>
 
         {productos.length === 0 ? (
-          <p style={{ textAlign: "center", color: "#5c5c7a", fontWeight: 700, padding: "20px 0" }}>
+          <p className="py-5 text-center text-[13px] font-bold text-ink/50">
             Aún no tienes publicaciones.
           </p>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+          <div className="grid grid-cols-2 items-start gap-3">
             {productos.map((prod) => (
               <TarjetaPerfil
                 key={prod.id}
@@ -588,11 +502,8 @@ const Perfil = () => {
       {/* ════════════════════════════════════════════════════
              TÉRMINOS Y PRIVACIDAD
         ════════════════════════════════════════════════════ */}
-      <div style={{ textAlign: "center", padding: "4px 16px 16px" }}>
-        <Link
-          to="/terminos"
-          style={{ fontSize: "0.8rem", fontWeight: 700, color: "#a0a5b9", textDecoration: "underline" }}
-        >
+      <div className="px-4 pb-4 pt-1 text-center">
+        <Link to="/terminos" className="text-[12px] font-bold text-ink/40 underline">
           Términos y Privacidad
         </Link>
       </div>
@@ -608,143 +519,134 @@ const Perfil = () => {
       {modalOpen && (
         <div
           onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}
-          style={{
-            position: "fixed", inset: 0,
-            background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)",
-            display: "flex", alignItems: "flex-end",
-            zIndex: 500,
-          }}
+          className="fixed inset-0 z-[500] flex items-end bg-ink/50 backdrop-blur-sm"
         >
-          <div style={{
-            width: "100%", maxWidth: "480px", margin: "0 auto",
-            background: "white", borderRadius: "28px 28px 0 0",
-            padding: "24px 20px 32px",
-            maxHeight: "90vh", overflowY: "auto",
-            boxSizing: "border-box",
-          }}>
-              /* ══ FORMULARIO DE PERFIL ══ */
-              <>
-                <h2 style={{ margin: "0 0 20px", fontSize: "1.2rem", fontWeight: 700, color: "var(--azul-oscuro)" }}>
-                  Editar Mi Perfil
-                </h2>
+          <div className="mx-auto box-border max-h-[90vh] w-full max-w-[480px] overflow-y-auto rounded-t-[28px] bg-card px-5 pb-8 pt-6">
+            <h2 className="mb-5 text-[19px] font-extrabold text-ink">
+              Editar Mi Perfil
+            </h2>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                  <div>
-                    <label style={labelStyle}>Nombre Completo</label>
-                    <input value={mNombre} onChange={(e) => setMNombre(e.target.value)}
-                      style={{ ...inputStyle, marginTop: "6px" }} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Carrera / Título corto</label>
-                    <input value={mBio} onChange={(e) => setMBio(e.target.value)}
-                      placeholder="Ej: Ing. Informático"
-                      style={{ ...inputStyle, marginTop: "6px" }} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Acerca de mí</label>
-                    <textarea value={mAcerca} onChange={(e) => setMAcerca(e.target.value)}
-                      rows={3} style={{ ...inputStyle, marginTop: "6px", resize: "none" }} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Ubicación actual</label>
-                    <input value={mUbicacion} onChange={(e) => setMUbicacion(e.target.value)}
-                      style={{ ...inputStyle, marginTop: "6px" }} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>WhatsApp (sin +51)</label>
-                    <input
-                      value={mTelefono}
-                      onChange={(e) => {
-                        const soloNumeros = e.target.value.replace(/\D/g, "");
-                        if (soloNumeros.length <= 9) setMTelefono(soloNumeros);
-                      }}
-                      placeholder="Ej: 987654321"
-                      type="tel"
-                      maxLength={9}
-                      style={{ ...inputStyle, marginTop: "6px" }}
-                    />
-                    <p style={{ margin: "6px 0 0", fontSize: "0.76rem", color: "#a0a5b9", fontWeight: 600 }}>
-                      🔒 Se guarda de forma privada. Nunca se muestra en tu perfil público, solo
-                      alimenta el botón de WhatsApp.
-                    </p>
-                  </div>
+            <div className="flex flex-col gap-3.5">
+              <div>
+                <label className={labelClass}>Nombre Completo</label>
+                <input
+                  value={mNombre}
+                  onChange={(e) => setMNombre(e.target.value)}
+                  className={`${inputClass} mt-1.5`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Carrera / Título corto</label>
+                <input
+                  value={mBio}
+                  onChange={(e) => setMBio(e.target.value)}
+                  placeholder="Ej: Ing. Informático"
+                  className={`${inputClass} mt-1.5`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Acerca de mí</label>
+                <textarea
+                  value={mAcerca}
+                  onChange={(e) => setMAcerca(e.target.value)}
+                  rows={3}
+                  className={`${inputClass} mt-1.5 resize-none`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Ubicación actual</label>
+                <input
+                  value={mUbicacion}
+                  onChange={(e) => setMUbicacion(e.target.value)}
+                  className={`${inputClass} mt-1.5`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>WhatsApp (sin +51)</label>
+                <input
+                  value={mTelefono}
+                  onChange={(e) => {
+                    const soloNumeros = e.target.value.replace(/\D/g, "");
+                    if (soloNumeros.length <= 9) setMTelefono(soloNumeros);
+                  }}
+                  placeholder="Ej: 987654321"
+                  type="tel"
+                  maxLength={9}
+                  className={`${inputClass} mt-1.5`}
+                />
+                <p className="mt-1.5 text-[11.5px] font-semibold text-ink/40">
+                  🔒 Se guarda de forma privada. Nunca se muestra en tu perfil público, solo
+                  alimenta el botón de WhatsApp.
+                </p>
+              </div>
 
-                  <div style={{ display: "flex", gap: "16px" }}>
-                    <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.88rem", fontWeight: 700, color: "var(--azul-oscuro)", cursor: "pointer" }}>
-                      <input type="checkbox" checked={mAceptaYape} onChange={(e) => setMAceptaYape(e.target.checked)} />
-                      Acepto Yape
-                    </label>
-                    <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.88rem", fontWeight: 700, color: "var(--azul-oscuro)", cursor: "pointer" }}>
-                      <input type="checkbox" checked={mAceptaPlin} onChange={(e) => setMAceptaPlin(e.target.checked)} />
-                      Acepto Plin
-                    </label>
-                  </div>
+              <div className="flex gap-4">
+                <label className="flex cursor-pointer items-center gap-2 text-[13.5px] font-bold text-ink">
+                  <input type="checkbox" checked={mAceptaYape} onChange={(e) => setMAceptaYape(e.target.checked)} />
+                  Acepto Yape
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-[13.5px] font-bold text-ink">
+                  <input type="checkbox" checked={mAceptaPlin} onChange={(e) => setMAceptaPlin(e.target.checked)} />
+                  Acepto Plin
+                </label>
+              </div>
 
-                  {/* Foto de perfil */}
-                  <div>
-                    <label style={labelStyle}>Foto de Perfil</label>
-                    <input type="file" accept="image/*" ref={avatarInputRef} style={{ display: "none" }}
-                      onChange={(e) => handleFileSelect("avatar", e.target.files[0])} />
-                    <button onClick={() => avatarInputRef.current?.click()} style={filePickerStyle}>
-                      {mAvatarPrev
-                        ? <img src={mAvatarPrev} alt="Avatar" style={{ width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover" }} />
-                        : <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#a0a5b9" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                      }
-                      <span style={{ color: "#5c5c7a", fontWeight: 700, fontSize: "0.9rem" }}>
-                        {mAvatarPrev ? "Cambiar foto de perfil" : "Subir foto de perfil"}
-                      </span>
-                    </button>
-                  </div>
+              {/* Foto de perfil */}
+              <div>
+                <label className={labelClass}>Foto de Perfil</label>
+                <input type="file" accept="image/*" ref={avatarInputRef} className="hidden"
+                  onChange={(e) => handleFileSelect("avatar", e.target.files[0])} />
+                <button
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="mt-1.5 box-border flex w-full items-center justify-center gap-2.5 rounded-btn border-[1.5px] border-dashed border-ink/10 bg-background px-3.5 py-3.5"
+                >
+                  {mAvatarPrev
+                    ? <img src={mAvatarPrev} alt="Avatar" className="h-10 w-10 rounded-full object-cover" />
+                    : <ImagePlus size={20} className="text-ink/30" />
+                  }
+                  <span className="text-[14px] font-bold text-ink/70">
+                    {mAvatarPrev ? "Cambiar foto de perfil" : "Subir foto de perfil"}
+                  </span>
+                </button>
+              </div>
 
-                  {/* Imagen de portada */}
-                  <div>
-                    <label style={labelStyle}>Imagen de Portada (Banner)</label>
-                    <input type="file" accept="image/*" ref={portadaInputRef} style={{ display: "none" }}
-                      onChange={(e) => handleFileSelect("portada", e.target.files[0])} />
-                    {mPortadaPrev && (
-                      <img src={mPortadaPrev} alt="Banner"
-                        style={{ width: "100%", height: "80px", objectFit: "cover", borderRadius: "12px", marginBottom: "6px" }} />
-                    )}
-                    <button onClick={() => portadaInputRef.current?.click()} style={filePickerStyle}>
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#a0a5b9" strokeWidth="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <polyline points="21 15 16 10 5 21"/>
-                      </svg>
-                      <span style={{ color: "#5c5c7a", fontWeight: 700, fontSize: "0.9rem" }}>
-                        {mPortadaPrev ? "Cambiar imagen de portada" : "Subir imagen de portada"}
-                      </span>
-                    </button>
-                  </div>
-                </div>
+              {/* Imagen de portada */}
+              <div>
+                <label className={labelClass}>Imagen de Portada (Banner)</label>
+                <input type="file" accept="image/*" ref={portadaInputRef} className="hidden"
+                  onChange={(e) => handleFileSelect("portada", e.target.files[0])} />
+                {mPortadaPrev && (
+                  <img src={mPortadaPrev} alt="Banner" className="mb-1.5 mt-1.5 h-20 w-full rounded-btn object-cover" />
+                )}
+                <button
+                  onClick={() => portadaInputRef.current?.click()}
+                  className="box-border flex w-full items-center justify-center gap-2.5 rounded-btn border-[1.5px] border-dashed border-ink/10 bg-background px-3.5 py-3.5"
+                >
+                  <ImagePlus size={20} className="text-ink/30" />
+                  <span className="text-[14px] font-bold text-ink/70">
+                    {mPortadaPrev ? "Cambiar imagen de portada" : "Subir imagen de portada"}
+                  </span>
+                </button>
+              </div>
+            </div>
 
-                <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
-                  <button
-                    onClick={() => setModalOpen(false)}
-                    style={{
-                      flex: 1, padding: "14px", borderRadius: "14px",
-                      background: "#f1f3f5", border: "none", cursor: "pointer",
-                      fontWeight: 600, fontSize: "0.95rem", color: "#5c5c7a",
-                      fontFamily: "'Nunito', sans-serif",
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleGuardar}
-                    disabled={guardando}
-                    style={{
-                      flex: 1.5, padding: "14px", borderRadius: "14px",
-                      background: guardando ? "#6b9e74" : "var(--verde-marca)",
-                      border: "none", cursor: guardando ? "not-allowed" : "pointer",
-                      fontWeight: 600, fontSize: "0.95rem", color: "white",
-                      fontFamily: "'Nunito', sans-serif",
-                      boxShadow: "0 4px 15px rgba(58,125,68,0.3)",
-                    }}
-                  >
-                    {guardando ? "Guardando..." : "Guardar Perfil"}
-                  </button>
-                </div>
-              </>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setModalOpen(false)}
+                className="flex-1 rounded-btn bg-background py-3.5 text-[15px] font-bold text-ink/60"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleGuardar}
+                disabled={guardando}
+                className={`flex-[1.5] rounded-btn py-3.5 text-[15px] font-bold text-white shadow-soft ${
+                  guardando ? "cursor-not-allowed bg-[#6b9e74]" : "bg-[#287653]"
+                }`}
+              >
+                {guardando ? "Guardando..." : "Guardar Perfil"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -755,47 +657,26 @@ const Perfil = () => {
       {productoABorrar && (
         <div
           onClick={(e) => { if (e.target === e.currentTarget) setProductoABorrar(null); }}
-          style={{
-            position: "fixed", inset: 0,
-            background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 600, padding: "20px", boxSizing: "border-box",
-          }}
+          className="fixed inset-0 z-[600] flex items-center justify-center bg-ink/50 p-5 backdrop-blur-sm"
         >
-          <div style={{
-            width: "100%", maxWidth: "340px",
-            background: "white", borderRadius: "20px",
-            padding: "24px 22px", boxSizing: "border-box",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.25)", textAlign: "center",
-          }}>
-            <h2 style={{ margin: "0 0 10px", fontSize: "1.1rem", fontWeight: 700, color: "var(--azul-oscuro)" }}>
+          <div className="w-full max-w-[340px] rounded-card bg-card p-6 text-center shadow-softLg">
+            <h2 className="mb-2.5 text-[17px] font-extrabold text-ink">
               ¿Eliminar producto?
             </h2>
-            <p style={{ margin: "0 0 22px", fontSize: "0.9rem", fontWeight: 600, color: "#5c5c7a", lineHeight: 1.4 }}>
+            <p className="mb-5 text-[14px] font-semibold leading-snug text-ink/60">
               {`Vas a eliminar "${productoABorrar.titulo}". Esta acción no se puede deshacer.`}
             </p>
 
-            <div style={{ display: "flex", gap: "12px" }}>
+            <div className="flex gap-3">
               <button
                 onClick={() => setProductoABorrar(null)}
-                style={{
-                  flex: 1, padding: "13px", borderRadius: "14px",
-                  background: "#f1f3f5", border: "none", cursor: "pointer",
-                  fontWeight: 600, fontSize: "0.9rem", color: "#5c5c7a",
-                  fontFamily: "'Nunito', sans-serif",
-                }}
+                className="flex-1 rounded-btn bg-background py-3 text-[14px] font-bold text-ink/60"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmarBorrado}
-                style={{
-                  flex: 1, padding: "13px", borderRadius: "14px",
-                  background: "#ef4444", border: "none", cursor: "pointer",
-                  fontWeight: 600, fontSize: "0.9rem", color: "white",
-                  fontFamily: "'Nunito', sans-serif",
-                  boxShadow: "0 4px 15px rgba(239,68,68,0.3)",
-                }}
+                className="flex-1 rounded-btn bg-red-500 py-3 text-[14px] font-bold text-white shadow-soft"
               >
                 Sí, eliminar
               </button>
@@ -804,31 +685,10 @@ const Perfil = () => {
         </div>
       )}
 
-      {/* ✅ TOAST CONTAINER LIMPIO */}
       <ToastContainer toasts={toasts} />
 
     </div>
   );
-};
-
-// ──────────────────────────────────────────────────────────────
-//  Estilos auxiliares
-// ──────────────────────────────────────────────────────────────
-const dropItemStyle = (color) => ({
-  width: "100%", padding: "13px 16px", border: "none",
-  background: "none", cursor: "pointer", textAlign: "left",
-  display: "flex", alignItems: "center", gap: "10px",
-  fontSize: "0.9rem", fontWeight: 600, color,
-  fontFamily: "'Nunito', sans-serif",
-  borderBottom: "1px solid var(--bg-crema)",
-});
-
-const filePickerStyle = {
-  width: "100%", marginTop: "6px",
-  border: "1.5px dashed #e8e8f0", borderRadius: "12px",
-  padding: "14px", background: "#fafbff", cursor: "pointer",
-  display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
-  fontFamily: "'Nunito', sans-serif", boxSizing: "border-box",
 };
 
 export default Perfil;
