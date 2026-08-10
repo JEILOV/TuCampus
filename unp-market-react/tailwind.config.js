@@ -9,7 +9,7 @@ export default {
           DEFAULT: "#0639B8", // Azul principal — headers, botones primary, estados activos
           dark: "#052a8f",
         },
-        background: "#F7EEDC", // Fondo base crema (nunca blanco puro)
+        background: "#FAF8F3", // Fondo base — casi blanco, con un dejo de calidez
         card: "#FFFFFF",       // Tarjetas / superficies
         ink: "#102C4D",        // Texto / azul oscuro
       },

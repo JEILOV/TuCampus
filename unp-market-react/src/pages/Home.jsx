@@ -1,72 +1,33 @@
 // src/pages/Home.jsx
 import { useState, useEffect, useRef }              from "react";
 import { useNavigate, useSearchParams }             from "react-router-dom";
+import { Search, ChevronDown }                      from "lucide-react";
 import { useAuth }                                  from "../context/AuthContext";
 import { useProducts }                              from "../hooks/useProducts";
-import { useToast, ToastContainer }                 from "../components/Toast"; // ✅ Nuevos imports
+import { useToast, ToastContainer }                 from "../components/Toast";
 import BottomNav                                    from "../components/BottomNav";
 import BotonNotificaciones                          from "../components/BotonNotificaciones";
-import { CATEGORY_ICON_MAP, IconPackage }           from "../components/CategoryIcons";
+import ProductCard                                  from "../components/ProductCard";
+import { CATEGORY_ICON_MAP }                        from "../components/CategoryIcons";
 
 // ── Constantes ───────────────────────────────────────────────
+// Placeholder de imagen — reemplazar por el archivo final.
+const MASCOTA_ICONO = "/assets/mascota-icono-placeholder.png";
+
 const CATEGORIAS = [
- { key: "todos",      label: "Todos",      bg: "#f1f3f5", accent: "#5c5c7a" },
-  { key: "dulces",     label: "Dulces",     bg: "#ffeaea", accent: "#e0607a" },
-  { key: "salados",    label: "Salados",    bg: "#e8f4ff", accent: "#2f7bc9" },
-  { key: "bebidas",    label: "Bebidas",    bg: "#e6faf0", accent: "#2e9e6f" },
-  { key: "servicios",  label: "Servicios",  bg: "#fff6e0", accent: "#c98a1f" },
-  { key: "materiales", label: "Materiales", bg: "#f0eaff", accent: "#7b5bc9" },
+  { key: "todos",      label: "Todos" },
+  { key: "dulces",     label: "Dulces" },
+  { key: "salados",    label: "Salados" },
+  { key: "bebidas",    label: "Bebidas" },
+  { key: "servicios",  label: "Servicios" },
+  { key: "materiales", label: "Materiales" },
 ];
 
-// ── Sub-componentes ──────────────────────────────────────────
-const ProductCard = ({ producto, onVerDetalle }) => {
-  const { id, titulo, precio, imagen, categoria, vendedorNombre, avatarVendedor, estado } = producto;
-  const estaAgotado = estado === "agotado";
-  const catKey       = (categoria || "").toLowerCase();
-  const IconPlaceholder = CATEGORY_ICON_MAP[catKey] || IconPackage;
-
-  return (
-    <article
-      className={`product-card${estaAgotado ? " product-card--agotado" : ""}`}
-      onClick={() => onVerDetalle(id)}
-    >
-      <div className="card-image-wrap">
-        {imagen && imagen.trim() ? (
-          <img
-            src={imagen}
-            alt={titulo || "Producto"}
-            className={`card-photo${estaAgotado ? " card-photo--agotado" : ""}`}
-          />
-        ) : (
-          <span className={`card-emoji-placeholder${estaAgotado ? " card-emoji-placeholder--agotado" : ""}`}>
-            <IconPlaceholder color="#a07850" />
-          </span>
-        )}
-        <span className={`card-price-badge${estaAgotado ? " card-price-badge--agotado" : ""}`}>
-          S/ {(precio || 0).toFixed(2)}
-        </span>
-        {estaAgotado && <div className="card-sold-out-overlay">AGOTADO</div>}
-      </div>
-      <div className="card-body">
-        <h3 className={`card-title${estaAgotado ? " card-title--agotado" : ""}`}>
-          {titulo || "Sin título"}
-        </h3>
-        {vendedorNombre && (
-          <div className="card-seller">
-            <div className="seller-avatar seller-avatar--gradient">
-              {avatarVendedor?.trim() ? (
-                <img src={avatarVendedor} alt={vendedorNombre} className="seller-avatar-img" />
-              ) : (
-                (vendedorNombre || "?")[0].toUpperCase()
-              )}
-            </div>
-            <span className="seller-name">{vendedorNombre}</span>
-          </div>
-        )}
-      </div>
-    </article>
-  );
-};
+const OPCIONES_ORDEN = [
+  { id: "recientes",   label: "Más recientes" },
+  { id: "precio_asc",  label: "Menor precio"  },
+  { id: "precio_desc", label: "Mayor precio"  },
+];
 
 // ── Componente principal ─────────────────────────────────────
 const Home = () => {
@@ -133,48 +94,69 @@ const Home = () => {
 
   const handleVerDetalle = (id) => navigate(`/producto?id=${id}`);
 
+  const labelOrden = OPCIONES_ORDEN.find((o) => o.id === orden)?.label ?? "Más recientes";
+
   // ── Render ───────────────────────────────────────────────
   return (
-    <div className="app-shell">
-      <header className="header" style={{ justifyContent: "center", paddingBottom: "0" }}>
-        <div className="logo" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
-          <img
-            src="https://i.ibb.co/XrLDwCBF/Chat-GPT-Image-17-jun-2026-03-37-28-p-m.png"
-            alt="Mercado UNP"
-            style={{ height: "56px", width: "auto", objectFit: "contain", mixBlendMode: "multiply" }}
-          />
+    <div className="app-shell font-sans">
+
+      {/* HEADER AZUL */}
+      <header className="relative rounded-b-[32px] bg-primary px-6 pb-10 pt-8">
+        <div className="flex items-center justify-center gap-3">
+          <img src={MASCOTA_ICONO} alt="TuCampus" className="h-14 w-14 object-contain" />
+          <div className="text-left">
+            <p className="text-2xl font-extrabold leading-none text-background">TuCampus</p>
+            <p className="mt-1 text-[12px] font-medium text-background/75">Conecta. Comparte. Crece.</p>
+          </div>
         </div>
       </header>
 
+      {/* Botón flotante de notificaciones — fijo en la esquina superior
+          derecha, visible en todas las vistas principales sin taparse
+          con el header. */}
+      <BotonNotificaciones />
+
       {tabActiva === "inicio" && (
         <>
-          <div className="search-wrapper">
-            <div className="search-bar">
-              <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
+          {/* Buscador — se monta sobre el borde inferior del header */}
+          <div className="relative z-10 -mt-5 px-4">
+            <div className="flex items-center gap-2.5 rounded-btn bg-card px-4 py-3.5 shadow-softLg">
+              <Search size={18} className="shrink-0 text-ink/40" />
               <input
                 type="text"
                 placeholder="Buscar postres, libros, tipeos..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
+                className="w-full bg-transparent text-sm font-semibold text-ink placeholder:font-medium placeholder:text-ink/40 focus:outline-none"
               />
             </div>
           </div>
 
-          <nav className="categories-scroll" aria-label="Categorías">
-            {CATEGORIAS.map(({ key, label, bg, accent }) => {
+          {/* Categorías — carrusel horizontal */}
+          <nav
+            aria-label="Categorías"
+            className="mt-5 flex gap-5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {CATEGORIAS.map(({ key, label }) => {
               const Icon = CATEGORY_ICON_MAP[key];
+              const activa = categoriaActiva === key;
               return (
                 <button
                   key={key}
-                  className={`category-chip${categoriaActiva === key ? " active" : ""}`}
                   onClick={() => setCategoriaActiva(key)}
+                  className="flex shrink-0 flex-col items-center gap-1.5"
                 >
-                  <span className="chip-icon" style={{ background: bg }}>
-                    <Icon color={accent} />
+                  <span
+                    className={`flex h-14 w-14 items-center justify-center rounded-card shadow-soft transition-colors ${
+                      activa ? "bg-primary" : "bg-card"
+                    }`}
+                  >
+                    <Icon color={activa ? "#F7EEDC" : "#102C4D"} />
                   </span>
-                  <span className="chip-label">{label}</span>
+                  <span className={`text-[11px] font-semibold ${activa ? "text-primary" : "text-ink/60"}`}>
+                    {label}
+                  </span>
+                  <span className={`h-[3px] w-4 rounded-full ${activa ? "bg-primary" : "bg-transparent"}`} />
                 </button>
               );
             })}
@@ -183,50 +165,32 @@ const Home = () => {
       )}
 
       {tabActiva === "inicio" && (
-        <section className="catalog">
-          <div className="catalog-header">
-            <h2 className="catalog-title">Destacados</h2>
-            <div style={{ position: "relative" }}>
+        <section className="px-4 pb-28 pt-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-extrabold text-ink">Destacados</h2>
+            <div className="relative">
               <button
                 onClick={() => setMenuOrdenAbierto(!menuOrdenAbierto)}
-                style={{
-                  background: "rgba(46, 107, 78, 0.08)", color: "var(--verde-marca)",
-                  border: "none", padding: "6px 14px", borderRadius: "14px",
-                  fontSize: "0.85rem", fontWeight: 800, cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: "6px",
-                  fontFamily: "'Nunito', sans-serif",
-                }}
+                className="flex items-center gap-1.5 rounded-chip bg-card px-3.5 py-1.5 text-[13px] font-bold text-ink shadow-soft"
               >
-                {orden === "recientes" ? "Más recientes" : orden === "precio_asc" ? "Menor precio" : "Mayor precio"}
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                  style={{ transform: menuOrdenAbierto ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}>
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
+                {labelOrden}
+                <ChevronDown
+                  size={14}
+                  strokeWidth={2.5}
+                  className={`transition-transform ${menuOrdenAbierto ? "rotate-180" : ""}`}
+                />
               </button>
               {menuOrdenAbierto && (
                 <>
-                  <div onClick={() => setMenuOrdenAbierto(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
-                  <div style={{
-                    position: "absolute", top: "100%", right: 0, marginTop: "8px",
-                    background: "white", borderRadius: "14px",
-                    boxShadow: "0 8px 24px rgba(15,37,64,0.12)",
-                    overflow: "hidden", zIndex: 100, minWidth: "145px", display: "flex", flexDirection: "column",
-                  }}>
-                    {[
-                      { id: "recientes",   label: "Más recientes" },
-                      { id: "precio_asc",  label: "Menor precio"  },
-                      { id: "precio_desc", label: "Mayor precio"  },
-                    ].map(opt => (
+                  <div onClick={() => setMenuOrdenAbierto(false)} className="fixed inset-0 z-[90]" />
+                  <div className="absolute right-0 top-full z-[100] mt-2 flex min-w-[150px] flex-col overflow-hidden rounded-card bg-card shadow-softLg">
+                    {OPCIONES_ORDEN.map((opt) => (
                       <button
                         key={opt.id}
                         onClick={() => { setOrden(opt.id); setMenuOrdenAbierto(false); }}
-                        style={{
-                          background: orden === opt.id ? "rgba(46, 107, 78, 0.05)" : "transparent",
-                          color: orden === opt.id ? "var(--verde-marca)" : "var(--text-mid)",
-                          border: "none", padding: "12px 16px", textAlign: "left",
-                          fontSize: "0.85rem", fontWeight: 800, cursor: "pointer",
-                          fontFamily: "'Nunito', sans-serif",
-                        }}
+                        className={`px-4 py-3 text-left text-[13px] font-bold ${
+                          orden === opt.id ? "bg-primary/5 text-primary" : "text-ink/60"
+                        }`}
                       >
                         {opt.label}
                       </button>
@@ -237,18 +201,18 @@ const Home = () => {
             </div>
           </div>
 
-          <div className="product-grid">
+          <div className="mt-4 grid grid-cols-2 gap-3">
             {productosFiltrados.map((p) => (
               <ProductCard key={p.id} producto={p} onVerDetalle={handleVerDetalle} />
             ))}
           </div>
 
-          {!todoCargado && <div ref={sentinelRef} className="sentinel" />}
+          {!todoCargado && <div ref={sentinelRef} className="h-2" />}
 
           {cargando && (
-            <div className="loading-more">
-              <div className="loading-pill">
-                <svg className="loading-spinner" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#E58A3B" strokeWidth="2.5">
+            <div className="mt-6 flex justify-center">
+              <div className="flex items-center gap-2 rounded-chip bg-card px-4 py-2 text-[13px] font-bold text-ink/60 shadow-soft">
+                <svg className="h-[18px] w-[18px] animate-spin" viewBox="0 0 24 24" fill="none" stroke="#0639B8" strokeWidth="2.5">
                   <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
                   <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
                   <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
@@ -262,11 +226,13 @@ const Home = () => {
       )}
 
       {tabActiva === "favoritos" && (
-        <section className="tab-section">
-          <h2 className="tab-section-title">Mis Favoritos</h2>
-          <div className="product-grid">
+        <section className="px-4 pb-28 pt-6">
+          <h2 className="text-lg font-extrabold text-ink">Mis Favoritos</h2>
+          <div className="mt-4 grid grid-cols-2 gap-3">
             {favoritos.size === 0 ? (
-              <p className="empty-state-text">Aún no tienes favoritos guardados.</p>
+              <p className="col-span-2 py-10 text-center text-sm font-semibold text-ink/40">
+                Aún no tienes favoritos guardados.
+              </p>
             ) : (
               productos.filter((p) => favoritos.has(p.id)).map((p) => (
                 <ProductCard key={p.id} producto={p} onVerDetalle={handleVerDetalle} />
@@ -277,20 +243,13 @@ const Home = () => {
       )}
 
       {/* Notificaciones ya no es un tab: ahora vive en /notificaciones,
-          accesible desde el botón flotante de la campana (ver abajo). */}
-
-      {/* Botón flotante de notificaciones — fijo en la esquina superior
-          derecha, visible en todas las vistas principales sin taparse
-          con el header (el header de Home está centrado). */}
-      <BotonNotificaciones />
+          accesible desde el botón flotante de la campana (ver arriba). */}
 
       {/* BOTTOM NAVIGATION */}
       <BottomNav activo={tabActiva} />
 
       {/* ✅ TOAST CONTAINER LIMPIO */}
       <ToastContainer toasts={toasts} />
-
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };

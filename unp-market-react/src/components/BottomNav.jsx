@@ -20,6 +20,11 @@
 //  🔧 El tab "Notificaciones" se quitó de acá y ahora vive como botón
 //  flotante independiente — ver src/components/BotonNotificaciones.jsx.
 //  Quedan 5 accesos: Inicio, Favoritos, Publicar, Mensajes y Perfil.
+//
+//  DISEÑO (Fase 2 — migrado a Tailwind):
+//    - Solo cambió la capa visual: ahora es una barra flotante
+//      redondeada con el botón "Publicar" sobresaliendo en círculo
+//      azul. La lógica de rutas, badges y "activo" es la misma.
 // ============================================================
 
 import { useNavigate }      from "react-router-dom";
@@ -30,18 +35,25 @@ import { useChatsNoLeidos } from "../hooks/useChatsNoLeidos";
 const Badge = ({ cantidad }) => {
   if (!cantidad) return null;
   return (
-    <span style={{
-      position: "absolute", top: "-4px", right: "-6px",
-      background: "#ef4444", color: "white",
-      fontSize: "0.65rem", fontWeight: 800,
-      minWidth: "16px", height: "16px", borderRadius: "50%",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      border: "2px solid #1e293b", padding: "0 4px", lineHeight: 1,
-    }}>
+    <span className="absolute -right-1.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full border-2 border-card bg-red-500 px-1 text-[10px] font-extrabold leading-none text-white">
       {cantidad > 9 ? "9+" : cantidad}
     </span>
   );
 };
+
+// ── Item de navegación estándar (Inicio, Favoritos, Mensajes, Perfil) ──
+const NavItem = ({ activo, onClick, label, children }) => (
+  <button
+    onClick={onClick}
+    aria-label={label}
+    className={`flex flex-1 flex-col items-center gap-0.5 py-1 transition-colors ${
+      activo ? "text-primary" : "text-ink/40"
+    }`}
+  >
+    <span className="relative flex h-6 w-6 items-center justify-center">{children}</span>
+    <span className="text-[10px] font-semibold">{label}</span>
+  </button>
+);
 
 const BottomNav = ({ activo = null }) => {
   const navigate = useNavigate();
@@ -51,51 +63,52 @@ const BottomNav = ({ activo = null }) => {
   // más allá de los que ya existían, solo centralizado acá.
   const mensajesNoLeidos = useChatsNoLeidos(user?.uid);
 
-  const claseItem = (id) => (activo === id ? "nav-item active" : "nav-item");
-
   return (
-    <nav className="bottom-nav">
-      <button className={claseItem("inicio")} onClick={() => navigate("/")} aria-label="Inicio">
-        <svg className="nav-icon" viewBox="0 0 24 24" fill="none" strokeWidth="2.2">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-          <polyline points="9 22 9 12 15 12 15 22"/>
+    <nav
+      className="fixed inset-x-0 bottom-4 z-40 mx-auto flex w-[calc(100%-32px)] max-w-[420px] items-end justify-between rounded-btn bg-card px-3 pb-2 pt-2 shadow-softLg"
+      aria-label="Navegación principal"
+    >
+      <NavItem activo={activo === "inicio"} onClick={() => navigate("/")} label="Inicio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-full w-full">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
-        <span className="nav-label">Inicio</span>
-      </button>
+      </NavItem>
 
-      <button className={claseItem("favoritos")} onClick={() => navigate("/?tab=favoritos")} aria-label="Favoritos">
-        <svg className="nav-icon" viewBox="0 0 24 24" fill={activo === "favoritos" ? "currentColor" : "none"} strokeWidth="2.2">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      <NavItem activo={activo === "favoritos"} onClick={() => navigate("/?tab=favoritos")} label="Favoritos">
+        <svg viewBox="0 0 24 24" fill={activo === "favoritos" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2" className="h-full w-full">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
         </svg>
-        <span className="nav-label">Favoritos</span>
-      </button>
+      </NavItem>
 
-      <button className="nav-item nav-add" onClick={() => navigate("/publicar")} aria-label="Publicar">
-        <div className="nav-add-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      {/* Publicar — círculo destacado que sobresale de la barra */}
+      <button
+        onClick={() => navigate("/publicar")}
+        aria-label="Publicar"
+        className="flex flex-1 flex-col items-center gap-0.5"
+      >
+        <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-softLg transition-transform active:scale-95">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-        </div>
-        <span className="nav-label">Publicar</span>
+        </span>
+        <span className="text-[10px] font-semibold text-ink/40">Publicar</span>
       </button>
 
-      <button className={claseItem("mensajes")} onClick={() => navigate("/chat")} aria-label="Mensajes">
-        <div className="nav-icon-wrap">
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" strokeWidth="2.2">
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-          </svg>
-          <Badge cantidad={mensajesNoLeidos} />
-        </div>
-        <span className="nav-label">Mensajes</span>
-      </button>
-
-      <button className={claseItem("perfil")} onClick={() => navigate("/perfil")} aria-label="Perfil">
-        <svg className="nav-icon" viewBox="0 0 24 24" fill="none" strokeWidth="2.2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
+      <NavItem activo={activo === "mensajes"} onClick={() => navigate("/chat")} label="Mensajes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-full w-full">
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
         </svg>
-        <span className="nav-label">Perfil</span>
-      </button>
+        <Badge cantidad={mensajesNoLeidos} />
+      </NavItem>
+
+      <NavItem activo={activo === "perfil"} onClick={() => navigate("/perfil")} label="Perfil">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-full w-full">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      </NavItem>
     </nav>
   );
 };
