@@ -16,37 +16,40 @@
 //    - La redirección ocurre reactivamente: cuando user cambia
 //      en AuthContext, el useEffect redirige al home.
 //    - cerrarSesion y todo el localStorage están en AuthContext.
+//
+//  DISEÑO (Fase 1 — Design System + Login, migrado a Tailwind):
+//    - Solo se tocó la capa visual. Cero cambios de lógica.
+//    - Único método de login: Google (único provider real en el
+//      código). No se agregan botones de Microsoft/Email porque
+//      no hay lógica detrás y quedarían inutilizados.
 // ============================================================
 
 import { useState, useEffect }       from "react";
 import { useNavigate, Link }         from "react-router-dom";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { Zap, ShieldCheck, Smile, ArrowRight } from "lucide-react";
 import { auth }                      from "../services/firebase";
 import { useAuth }                   from "../context/AuthContext";
 
 // ── Constantes ───────────────────────────────────────────────
-const DOMINIO_PERMITIDO  = "@alumnos.unp.edu.pe";
-const LOGO_HORIZONTAL    = "https://i.ibb.co/R5wf8nn/Chat-GPT-Image-17-jun-2026-03-37-18-p-m-removebg-preview.png";
-const ILUSTRACION_CAMPUS = "https://i.ibb.co/qLmxNQTz/Chat-GPT-Image-16-may-2026-04-32-51-a-m.png";
+const DOMINIO_PERMITIDO = "@alumnos.unp.edu.pe";
+
+// Placeholders de imágenes — reemplazar por los archivos finales.
+const LOGO_UNP     = "/assets/logo-unp-placeholder.png";
+const MASCOTA_LOGIN = "/assets/mascota-placeholder.png";
 
 // El provider se crea FUERA del componente: es un objeto estático,
 // recrearlo en cada render no tiene sentido.
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
-// ── Sub-componente Toast (sin cambios visuales) ──────────────
+// ── Sub-componente Toast (rediseñado a Tailwind) ──────────────
 const Toast = ({ mensaje }) => (
-  <div style={{
-    background: "#fecaca", color: "#991b1b",
-    padding: "14px 18px", borderRadius: "16px", fontSize: "13.5px",
-    fontWeight: 700, boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
-    fontFamily: "'Nunito', sans-serif",
-    display: "flex", alignItems: "center", gap: "10px",
-  }}>
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#dc2626" strokeWidth="3">
-      <circle cx="12" cy="12" r="10"/>
-      <line x1="15" y1="9" x2="9" y2="15"/>
-      <line x1="9" y1="9" x2="15" y2="15"/>
+  <div className="flex items-center gap-2.5 rounded-btn bg-red-100 px-[18px] py-3.5 text-[13.5px] font-bold text-red-800 shadow-softLg">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#dc2626" strokeWidth="3" className="shrink-0">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="15" y1="9" x2="9" y2="15" />
+      <line x1="9" y1="9" x2="15" y2="15" />
     </svg>
     {mensaje}
   </div>
@@ -58,11 +61,9 @@ const Login = () => {
   const { user, cargando }    = useAuth(); // ← consume el contexto
   const [enviando, setEnviando] = useState(false);
   const [toast,    setToast]    = useState(null);
-  const [labelBtn, setLabelBtn] = useState("Continuar con correo institucional");
+  const [labelBtn, setLabelBtn] = useState("Iniciar sesión");
 
-  // Redirección reactiva: si AuthContext ya tiene un usuario válido
-  // (sesión previa o login recién completado), ir al home.
-// Redirección reactiva: solo redirige si el usuario es de la UNP
+  // Redirección reactiva: solo redirige si el usuario es de la UNP
   useEffect(() => {
     if (!cargando && user && user.email?.endsWith(DOMINIO_PERMITIDO)) {
       navigate("/", { replace: true });
@@ -89,7 +90,7 @@ const Login = () => {
       if (!user.email?.endsWith(DOMINIO_PERMITIDO)) {
         await signOut(auth);
         setToast({ mensaje: "Acceso denegado: Usa tu correo @alumnos.unp.edu.pe" });
-        setLabelBtn("Continuar con correo institucional");
+        setLabelBtn("Iniciar sesión");
         setEnviando(false);
         return;
       }
@@ -104,69 +105,79 @@ const Login = () => {
       if (err.code !== "auth/popup-closed-by-user") {
         setToast({ mensaje: "Error de conexión. Inténtalo nuevamente." });
       }
-      setLabelBtn("Continuar con correo institucional");
+      setLabelBtn("Iniciar sesión");
       setEnviando(false);
     }
   };
 
   return (
-    <div className="login-page">
-      <div className="login-shell">
+    <div className="relative flex min-h-screen w-full flex-col items-center justify-between bg-primary px-6 pb-8 pt-14 font-sans">
 
-        {/* LOGO */}
-        <header className="login-brand" style={{ display: "flex", justifyContent: "center", width: "100%", marginBottom: "24px" }}>
-          <img
-            src={LOGO_HORIZONTAL}
-            alt="TuCampus"
-            style={{ width: "100%", maxWidth: "350px", height: "auto", objectFit: "contain", borderRadius: "50px" }}
-          />
-        </header>
+      {/* CONTENIDO PRINCIPAL */}
+      <div className="flex w-full max-w-[350px] flex-1 flex-col items-center justify-center text-center">
 
-        {/* TARJETA */}
-        <div className="login-card">
-          <div className="login-illustration-wrap">
-            <img src={ILUSTRACION_CAMPUS} alt="Campus UNP" className="login-illustration" />
-          </div>
+        {/* LOGO UNP */}
+        <img
+          src={LOGO_UNP}
+          alt="Universidad Nacional de Piura"
+          className="h-[100px] w-[100px] object-contain"
+        />
 
-          <h1 className="login-card-title">Únete a la Comunidad</h1>
-          <p className="login-card-body">
-            Compra y vende dentro de la Universidad Nacional de Piura de forma segura y rápida.
-          </p>
+        {/* MASCOTA */}
+        <img
+          src={MASCOTA_LOGIN}
+          alt="Mascota TuCampus"
+          className="mt-6 h-[260px] w-[260px] object-contain"
+        />
 
-          <button className="btn-login-primary" onClick={handleGoogleLogin} disabled={enviando}>
-            <div className="login-google-icon-wrap">
-              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-              </svg>
-            </div>
-            <span className={enviando ? "btn-label-loading" : ""}>{labelBtn}</span>
-          </button>
+        {/* MARCA */}
+        <h1 className="mt-6 text-[2.5rem] font-extrabold leading-none text-background">
+          TuCampus
+        </h1>
+        <p className="mt-2 text-[15px] font-medium text-background/80">
+          Conecta. Comparte. Crece.
+        </p>
 
-          <div className="login-features">
-            <div className="login-feature-chip chip--verde"><span className="chip-check">✓</span> Gratis</div>
-            <div className="login-feature-chip chip--verde"><span className="chip-check">✓</span> Seguro</div>
-            <div className="login-feature-chip chip--naranja"><span className="chip-check">✓</span> Instantáneo</div>
-            <div className="login-feature-chip chip--azul"><span className="chip-check">✓</span> Solo UNP</div>
-          </div>
-        </div>
+        {/* BOTÓN PRINCIPAL */}
+        <button
+          onClick={handleGoogleLogin}
+          disabled={enviando}
+          className="mt-10 flex w-full items-center justify-center gap-2 rounded-btn bg-background py-4 text-base font-bold text-primary shadow-softLg transition-transform active:scale-[0.98] disabled:opacity-70"
+        >
+          <span>{labelBtn}</span>
+          <ArrowRight size={18} strokeWidth={2.5} />
+        </button>
 
-        {/* FOOTER */}
-        <footer className="login-footer">
-          Al continuar aceptas registrarte con tu correo institucional y los{" "}
-          <Link to="/terminos">Términos y Privacidad</Link>.
-        </footer>
-
+        <p className="mt-8 flex items-center gap-1.5 text-xs font-medium text-background/60">
+          <ShieldCheck size={14} />
+          Tu información está segura con nosotros.
+        </p>
       </div>
+
+      {/* FOOTER — 3 beneficios */}
+      <div className="mt-8 grid w-full max-w-[350px] grid-cols-3 divide-x divide-background/20 text-background/85">
+        <div className="flex flex-col items-center gap-1 px-2 text-center">
+          <Zap size={18} />
+          <span className="text-[11px] font-semibold leading-tight">Publica en segundos</span>
+        </div>
+        <div className="flex flex-col items-center gap-1 px-2 text-center">
+          <ShieldCheck size={18} />
+          <span className="text-[11px] font-semibold leading-tight">Comunidad UNP</span>
+        </div>
+        <div className="flex flex-col items-center gap-1 px-2 text-center">
+          <Smile size={18} />
+          <span className="text-[11px] font-semibold leading-tight">Rápido, fácil y gratis</span>
+        </div>
+      </div>
+
+      <footer className="mt-4 max-w-[300px] text-center text-[11px] leading-snug text-background/50">
+        Al continuar aceptas registrarte con tu correo institucional y los{" "}
+        <Link to="/terminos" className="underline">Términos y Privacidad</Link>.
+      </footer>
 
       {/* TOAST DE ERROR */}
       {toast && (
-        <div style={{
-          position: "fixed", bottom: "40px", left: "50%", transform: "translateX(-50%)",
-          zIndex: 1000, width: "calc(100% - 40px)", maxWidth: "390px", pointerEvents: "none",
-        }}>
+        <div className="pointer-events-none fixed bottom-10 left-1/2 z-[1000] w-[calc(100%-40px)] max-w-[390px] -translate-x-1/2">
           <Toast mensaje={toast.mensaje} />
         </div>
       )}
