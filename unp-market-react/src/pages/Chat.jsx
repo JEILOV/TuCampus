@@ -16,7 +16,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams }              from "react-router-dom";
-import { doc, getDoc }                               from "firebase/firestore";
+import { doc, getDoc, onSnapshot }                   from "firebase/firestore";
 import { db }                                        from "../services/firebase";
 import { useAuth }                                   from "../context/AuthContext";
 import {
@@ -37,32 +37,90 @@ import Spinner                         from "../components/Spinner";
 import MenuChat                        from "../components/MenuChat";
 
 // ── Helpers ───────────────────────────────────────────────────
+// Hora dentro de una burbuja de mensaje (SIEMPRE hora, nunca fecha cruda:
+// para eso está formatearFechaChat, que es el de la tarjeta de la lista).
+// Parsea tanto un Timestamp de Firestore (con .toDate()) como un Date
+// nativo o un string/number — antes solo aceptaba Timestamp y, si el
+// campo llegaba como otra cosa (o pendiente de servidor), se colaba el
+// valor crudo sin formatear.
 const formatearHora = (fecha) => {
-  if (!fecha?.toDate) return "";
-  const d   = fecha.toDate();
-  const hoy = new Date();
-  if (d.toDateString() === hoy.toDateString()) {
-    return d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
-  }
-  return d.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit" });
+  if (!fecha) return ""; // ej. serverTimestamp() que aún no confirma el servidor
+  const d = typeof fecha?.toDate === "function" ? fecha.toDate() : new Date(fecha);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: true });
 };
 
 const inicial = (nombre) => (nombre || "?").trim()[0]?.toUpperCase() || "?";
 
+// Formato de fecha para las tarjetas de la lista de chats (distinto del
+// formatearHora de arriba, que es para las burbujas dentro de una charla
+// abierta y solo necesita la hora). Acepta Timestamp de Firestore
+// (objeto con .toDate()), Date nativo, o string/number parseable por
+// `new Date(...)`.
+//   • Hoy            → hora, ej. "02:30 p. m."
+//   • Ayer            → "Ayer"
+//   • Días anteriores → día y mes abreviado, ej. "08 ago."
+//     (si además es de otro año, agrega el año: "08 ago. 2025")
+const formatearFechaChat = (fecha) => {
+  if (!fecha) return "";
+
+  const d = typeof fecha?.toDate === "function" ? fecha.toDate() : new Date(fecha);
+  if (isNaN(d.getTime())) return ""; // fecha inválida/no parseable → no reventar el render
+
+  const ahora = new Date();
+
+  if (d.toDateString() === ahora.toDateString()) {
+    return d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: true });
+  }
+
+  const ayer = new Date(ahora);
+  ayer.setDate(ayer.getDate() - 1);
+  if (d.toDateString() === ayer.toDateString()) {
+    return "Ayer";
+  }
+
+  const dia    = String(d.getDate()).padStart(2, "0");
+  const mes    = d.toLocaleDateString("es-PE", { month: "short" }).replace(".", "").toLowerCase();
+  const esOtroAño = d.getFullYear() !== ahora.getFullYear();
+  return `${dia} ${mes}.${esOtroAño ? ` ${d.getFullYear()}` : ""}`;
+};
+
 // ── Sub-componente: Avatar ───────────────────────────────────
-const Avatar = ({ nombre, avatar, size = 46 }) => (
-  <div style={{
-    width: size, height: size, borderRadius: "50%",
-    background: "linear-gradient(135deg,#c8a97a,#a07850)",
-    display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: size * 0.42, fontWeight: 700, color: "white",
-    overflow: "hidden", flexShrink: 0,
-  }}>
-    {avatar?.trim()
-      ? <img src={avatar} alt={nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-      : inicial(nombre)}
-  </div>
-);
+// Valida que `avatar` sea un string no vacío ANTES de intentar el <img>,
+// y si igual falla al cargar (link roto, 404, etc.) el onError lo oculta
+// y cae al fallback de iniciales — nunca se ven ambos encimados.
+const Avatar = ({ nombre, avatar, size = 46 }) => {
+  const avatarValido = typeof avatar === "string" && avatar.trim().length > 0;
+  const [imgFallo, setImgFallo] = useState(false);
+
+  // Si cambia la URL del avatar (ej. el otro usuario actualizó su foto
+  // mientras la lista de chats está abierta con onSnapshot), reintenta
+  // con la nueva URL en vez de quedarse pegado en el estado de error.
+  useEffect(() => { setImgFallo(false); }, [avatar]);
+
+  const mostrarImg = avatarValido && !imgFallo;
+
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: "linear-gradient(135deg,#c8a97a,#a07850)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: size * 0.42, fontWeight: 700, color: "white",
+      overflow: "hidden", flexShrink: 0,
+    }}>
+      {mostrarImg
+        ? (
+          <img
+            src={avatar}
+            alt={nombre}
+            onError={() => setImgFallo(true)}
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        )
+        : inicial(nombre)}
+    </div>
+  );
+};
 
 // ── Íconos (mismo estilo/stroke que el resto de la app) ──────
 const IconoVolver = () => (
@@ -146,7 +204,7 @@ const ListaChats = ({ chats, cargando, miUid, onAbrir }) => {
                   {otroInfo.nombre || "Estudiante UNP"}
                 </h3>
                 <span style={{ fontSize: "0.72rem", color: "#a0a5b9", fontWeight: 600, flexShrink: 0 }}>
-                  {formatearHora(chat.ultimoMensajeFecha)}
+                  {formatearFechaChat(chat.ultimoMensajeFecha)}
                 </span>
               </div>
 
@@ -265,6 +323,7 @@ const Chat = () => {
   const [mensajes, setMensajes]         = useState([]);
   const [texto, setTexto]               = useState("");
   const [enviando, setEnviando]         = useState(false);
+  const [perfilOtroVivo, setPerfilOtroVivo] = useState(null); // nombre/avatar EN VIVO de /usuarios/{otroUid}
 
   // ── Fase 6: Chat Avanzado ─────────────────────────────────
   const [menuAbierto, setMenuAbierto]       = useState(false);
@@ -323,6 +382,32 @@ const Chat = () => {
     return () => { cancelado = true; };
   }, [chatMeta, user?.uid]);
 
+  // 🔧 Header de la conversación en vivo (mismo patrón que ya usa la lista
+  // en chatService.suscribirMisChats): chatMeta.participantesInfo[otroUid]
+  // es una FOTO ESTÁTICA de cuando se creó/reabrió el chat — si el otro
+  // usuario después cambia su nombre o foto, se quedaba desactualizado acá
+  // aunque la lista ya mostrara el dato nuevo. Este listener abre
+  // /usuarios/{otroUid} en vivo y sus datos siempre pisan lo guardado en
+  // el chat (nunca al revés) — ver el merge en `otroInfo` más abajo.
+  useEffect(() => {
+    const otro = chatMeta?.participantes?.find((u) => u !== user?.uid);
+    if (!otro) { setPerfilOtroVivo(null); return; }
+
+    const unsub = onSnapshot(
+      doc(db, "usuarios", otro),
+      (snap) => {
+        const data = snap.exists() ? snap.data() : {};
+        setPerfilOtroVivo({
+          nombre: data.nombre || "Estudiante UNP",
+          avatar: data.avatar || "",
+        });
+      },
+      () => setPerfilOtroVivo(null) // best-effort: si falla, se cae al dato guardado en el chat
+    );
+
+    return () => unsub();
+  }, [chatMeta, user?.uid]);
+
   // Marcar como leído al entrar y cada vez que llega un mensaje nuevo mientras está abierto
   useEffect(() => {
     if (!chatId || !user?.uid || mensajes.length === 0) return;
@@ -340,7 +425,9 @@ const Chat = () => {
 
   // ── Derivados de la conversación abierta ──────────────────
   const otroUid          = chatMeta?.participantes?.find((u) => u !== user?.uid);
-  const otroInfo         = chatMeta?.participantesInfo?.[otroUid] || {};
+  // Firestore en vivo (perfilOtroVivo) SIEMPRE pisa el snapshot estático
+  // guardado en el chat — mismo criterio que ya usa la lista de chats.
+  const otroInfo         = { ...chatMeta?.participantesInfo?.[otroUid], ...perfilOtroVivo };
   const chatValidoParaMi = !!chatMeta && chatMeta.participantes?.includes(user?.uid);
 
   // Fase 6: bloqueado en cualquiera de los dos sentidos → no se puede escribir

@@ -280,6 +280,26 @@ export const suscribirMensajes = (chatId, callback) => {
  * así que se resuelve acá, sobre los pocos chats que ya trajo la
  * query de `participantes`.
  *
+ * 🔧 Sanación en tiempo real (auditoría UI/UX): `participantesInfo`
+ * guardado en cada doc de /chats es una FOTO ESTÁTICA de cuando se creó
+ * (o se reabrió) la conversación — si el otro usuario cambia su nombre
+ * o foto de perfil después, la tarjeta de la lista quedaba mostrando el
+ * dato viejo (a veces el `displayName`/`photoURL` crudo de Google Auth
+ * con el que se sembró el perfil la primera vez) hasta que alguien
+ * volvía a abrir ese chat puntual (lo cual dispara el refresco en
+ * `obtenerOCrearChat`, pero SOLO para ese chat, y no en la lista).
+ *
+ * Acá se abre, además de la query de /chats, UN listener de perfil
+ * (`onSnapshot` sobre /usuarios/{uid}) por cada "otro" participante
+ * distinto que aparezca en mi lista — típicamente un puñado de
+ * vendedores/compradores, no uno por mensaje. Los datos de Firestore
+ * SIEMPRE pisan lo guardado en `participantesInfo` (nunca al revés), y
+ * si el otro usuario edita su nombre o avatar mientras la lista está
+ * abierta, se refleja al instante sin recargar ni reabrir el chat.
+ * Los listeners de perfil se dan de baja solos cuando un chat deja de
+ * aparecer en la lista (se oculta/ya no hay más chats con esa persona),
+ * y todos se cortan al hacer unsubscribe.
+ *
  * @param {string} miUid
  * @param {(chats: Array<Object>) => void} callback
  * @returns {() => void} unsubscribe
@@ -293,16 +313,89 @@ export const suscribirMisChats = (miUid, callback) => {
     orderBy("ultimoMensajeFecha", "desc")
   );
 
-  const unsub = onSnapshot(q, (snap) => {
-    const chats = snap.docs
+  let ultimosChatsRaw = [];         // último snapshot crudo de /chats (participantesInfo tal cual está guardado)
+  const perfilesVivos  = new Map(); // otroUid -> { nombre, avatar } resuelto en vivo desde /usuarios
+  const perfilUnsubs   = new Map(); // otroUid -> unsubscribe de su listener de perfil
+
+  // Combina cada chat con el perfil en vivo del otro participante (si ya
+  // llegó) y emite la lista al callback. Se llama tanto cuando cambian
+  // los chats como cuando llega una actualización de cualquier perfil.
+  const emitir = () => {
+    const chats = ultimosChatsRaw.map((chat) => {
+      const otroUid    = chat.participantes?.find((uid) => uid !== miUid);
+      const perfilVivo = otroUid ? perfilesVivos.get(otroUid) : null;
+      if (!perfilVivo) return chat; // perfil en vivo aún no resuelto → se ve el dato guardado, sin parpadeo
+
+      return {
+        ...chat,
+        participantesInfo: {
+          ...chat.participantesInfo,
+          [otroUid]: {
+            ...chat.participantesInfo?.[otroUid],
+            ...perfilVivo, // /usuarios/{uid} (Firestore) siempre gana sobre el snapshot estático del chat
+          },
+        },
+      };
+    });
+    callback(chats);
+  };
+
+  // Abre (si no existe ya) el listener de perfil en vivo de un UID.
+  const asegurarListenerPerfil = (uid) => {
+    if (perfilUnsubs.has(uid)) return;
+    const unsub = onSnapshot(
+      doc(db, "usuarios", uid),
+      (snap) => {
+        const data = snap.exists() ? snap.data() : {};
+        perfilesVivos.set(uid, {
+          nombre: data.nombre || "Estudiante UNP",
+          avatar: data.avatar || "",
+        });
+        emitir();
+      },
+      (err) => logError("[chatService.suscribirMisChats] perfil onSnapshot error", err)
+    );
+    perfilUnsubs.set(uid, unsub);
+  };
+
+  const unsubChats = onSnapshot(q, (snap) => {
+    ultimosChatsRaw = snap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
       .filter((chat) => !(chat.ocultoPara || []).includes(miUid));
-    callback(chats);
+
+    const otrosUidsActuales = new Set(
+      ultimosChatsRaw
+        .map((chat) => chat.participantes?.find((uid) => uid !== miUid))
+        .filter(Boolean)
+    );
+
+    // Un listener de perfil por cada "otro" participante distinto en la
+    // lista actual (nuevos chats → nuevos listeners).
+    otrosUidsActuales.forEach(asegurarListenerPerfil);
+
+    // Perfiles de gente que ya no aparece en mi lista (chat ocultado/sin
+    // actividad que lo saque de la query) → dar de baja su listener para
+    // no dejar suscripciones huérfanas corriendo en segundo plano.
+    perfilUnsubs.forEach((unsub, uid) => {
+      if (!otrosUidsActuales.has(uid)) {
+        unsub();
+        perfilUnsubs.delete(uid);
+        perfilesVivos.delete(uid);
+      }
+    });
+
+    emitir();
   }, (err) => {
     logError("[chatService.suscribirMisChats] onSnapshot error", err);
   });
 
-  return unsub;
+  // Unsubscribe combinado: corta la query de /chats Y todos los
+  // listeners de perfil que se hayan abierto.
+  return () => {
+    unsubChats();
+    perfilUnsubs.forEach((unsub) => unsub());
+    perfilUnsubs.clear();
+  };
 };
 
 // ── Ocultar / limpiar un chat de mi lista ─────────────────────
