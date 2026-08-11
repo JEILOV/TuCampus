@@ -22,9 +22,13 @@
 //    - Único método de login: Google (único provider real en el
 //      código). No se agregan botones de Microsoft/Email porque
 //      no hay lógica detrás y quedarían inutilizados.
-//    - FIX: insignia UNP + texto quedaban corridos a la izquierda
+//    - FIX 1: insignia UNP + texto quedaban corridos a la izquierda
 //      por "ml-1.5" + "self-start" + falta de "justify-center".
 //      Ahora el bloque se centra como conjunto dentro del contenedor.
+//    - FIX 2: había un hueco vacío arriba y el footer/beneficios se
+//      cortaban abajo. Se redujo el padding superior (pt-14 → pt-6)
+//      y algunos márgenes internos para subir todo el contenido y
+//      liberar espacio al final.
 // ============================================================
 
 import { useState, useEffect }       from "react";
@@ -114,15 +118,12 @@ const Login = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col items-center justify-between bg-primary px-6 pb-8 pt-14 font-sans">
+    <div className="relative flex min-h-screen w-full flex-col items-center justify-between bg-primary px-6 pb-6 pt-6 font-sans">
 
       {/* CONTENIDO PRINCIPAL */}
       <div className="flex w-full max-w-[350px] flex-1 flex-col items-center justify-center text-center">
 
-        {/* INSIGNIA UNP — centrada como bloque (logo + texto). Antes tenía
-            ml-1.5 + self-start + text-left, lo que la corría a la izquierda.
-            Ahora justify-center centra el conjunto y text-center centra
-            las dos líneas del texto respecto al ícono. */}
+        {/* INSIGNIA UNP — centrada como bloque (logo + texto) */}
         <div className="flex w-full items-center justify-center gap-2.5 text-center">
           <img
             src={LOGO_UNP}
@@ -138,7 +139,7 @@ const Login = () => {
         <img
           src={MASCOTA_LOGIN}
           alt="Mascota TuCampus"
-          className="mt-6 h-[260px] w-[260px] object-contain"
+          className="mt-4 h-[260px] w-[260px] object-contain"
         />
 
         {/* MARCA */}
@@ -153,20 +154,20 @@ const Login = () => {
         <button
           onClick={handleGoogleLogin}
           disabled={enviando}
-          className="mt-10 flex w-full items-center justify-center gap-2 rounded-btn bg-background py-4 text-base font-bold text-primary shadow-softLg transition-transform active:scale-[0.98] disabled:opacity-70"
+          className="mt-8 flex w-full items-center justify-center gap-2 rounded-btn bg-background py-4 text-base font-bold text-primary shadow-softLg transition-transform active:scale-[0.98] disabled:opacity-70"
         >
           <span>{labelBtn}</span>
           <ArrowRight size={18} strokeWidth={2.5} />
         </button>
 
-        <p className="mt-8 flex items-center gap-1.5 text-xs font-medium text-background/60">
+        <p className="mt-6 flex items-center gap-1.5 text-xs font-medium text-background/60">
           <ShieldCheck size={14} />
           Tu información está segura con nosotros.
         </p>
       </div>
 
       {/* FOOTER — 3 beneficios */}
-      <div className="mt-8 grid w-full max-w-[350px] grid-cols-3 divide-x divide-background/20 text-background/85">
+      <div className="mt-6 grid w-full max-w-[350px] grid-cols-3 divide-x divide-background/20 text-background/85">
         <div className="flex flex-col items-center gap-1 px-2 text-center">
           <Zap size={18} />
           <span className="text-[11px] font-semibold leading-tight">Publica en segundos</span>
@@ -181,7 +182,7 @@ const Login = () => {
         </div>
       </div>
 
-      <footer className="mt-4 max-w-[300px] text-center text-[11px] leading-snug text-background/50">
+      <footer className="mt-3 max-w-[300px] text-center text-[11px] leading-snug text-background/50">
         Al continuar aceptas registrarte con tu correo institucional y los{" "}
         <Link to="/terminos" className="underline">Términos y Privacidad</Link>.
       </footer>
@@ -189,7 +190,7 @@ const Login = () => {
       {/* TOAST DE ERROR */}
       {toast && (
         <div className="pointer-events-none fixed bottom-10 left-1/2 z-[1000] w-[calc(100%-40px)] max-w-[390px] -translate-x-1/2">
-          <Toast mensaje={toast.mensaje} />
+          <Toast mensaje={mensaje.mensaje ?? toast.mensaje} />
         </div>
       )}
     </div>
