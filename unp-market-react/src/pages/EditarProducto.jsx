@@ -117,6 +117,14 @@ const EditarProducto = () => {
       return;
     }
 
+    // 🔧 Misma validación que Publicar.jsx: las reglas de Firestore
+    // exigen precio > 0 y <= 10000 también en `update`.
+    const precioNum = parseFloat(precio);
+    if (!Number.isFinite(precioNum) || precioNum <= 0 || precioNum > 10000) {
+      mostrarToast("El precio debe ser mayor a S/0 y no superar S/10,000.", "error");
+      return;
+    }
+
     setEnviando(true);
     try {
       let imagenFinal = imagenOriginal;
@@ -130,7 +138,7 @@ const EditarProducto = () => {
 
       setBtnTexto("Guardando...");
       await actualizarProducto(productoId, {
-        titulo, precio, categoria, descripcion,
+        titulo, precio: precioNum, categoria, descripcion,
         imagen: imagenFinal,
         imagenOriginal,
       });
@@ -209,7 +217,7 @@ const EditarProducto = () => {
           <div style={{ display: "flex", gap: "12px", marginBottom: "16px" }}>
             <div style={{ flex: 1 }}>
               <label style={labelStyle}>Precio (S/)</label>
-              <input type="number" required placeholder="0.00"
+              <input type="number" required placeholder="0.00" min="0.01" max="10000" step="0.01"
                 value={precio} onChange={(e) => setPrecio(e.target.value)} style={inputStyle} />
             </div>
             <div style={{ flex: 1.5 }}>

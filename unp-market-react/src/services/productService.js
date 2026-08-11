@@ -18,17 +18,44 @@ export const obtenerProductoPorId = async (productoId) => {
   }
 };
 
+// 🔒 Única fuente de verdad de las categorías válidas — debe coincidir
+// exactamente con las reglas de seguridad de Firestore.
+const CATEGORIAS_VALIDAS = ["dulces", "bebidas", "salados", "servicios", "materiales"];
+
 export const crearProducto = async ({ titulo, precio, categoria, descripcion, imagen, user, perfil }) => {
   try {
-    const prefijos = generarPrefijos(titulo);
+    if (!user?.uid) {
+      throw new Error("Usuario no autenticado.");
+    }
+
+    // 🔧 Blindaje del payload: sin importar qué llegue desde la UI,
+    // esta función garantiza que el objeto enviado a Firestore cumpla
+    // estrictamente con las reglas de seguridad.
+    const precioNum = Number(precio);
+    if (!Number.isFinite(precioNum) || precioNum <= 0 || precioNum > 10000) {
+      throw new Error("El precio debe ser un número mayor a 0 y menor o igual a 10000.");
+    }
+
+    const categoriaValida = CATEGORIAS_VALIDAS.includes(categoria) ? categoria : null;
+    if (!categoriaValida) {
+      throw new Error("Categoría inválida.");
+    }
+
+    const tituloLimpio      = String(titulo || "").trim().slice(0, 200);
+    const descripcionLimpia = String(descripcion || "").trim().slice(0, 500);
+    if (!tituloLimpio || !descripcionLimpia) {
+      throw new Error("Título y descripción son obligatorios.");
+    }
+
+    const prefijos = generarPrefijos(tituloLimpio);
     const batch    = writeBatch(db);
 
     const nuevoRef = doc(collection(db, "productos"));
     batch.set(nuevoRef, {
-      titulo,
-      precio:         parseFloat(precio),
-      categoria,
-      descripcion,
+      titulo:         tituloLimpio,
+      precio:         precioNum,
+      categoria:      categoriaValida,
+      descripcion:    descripcionLimpia,
       imagen:         imagen || "",
       vendedor:       perfil?.nombre   || user.displayName || "Vendedor UNP",
       vendedorNombre: perfil?.nombre   || user.displayName || "Vendedor UNP",
@@ -60,12 +87,31 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
 
 export const actualizarProducto = async (productoId, { titulo, precio, categoria, descripcion, imagen, imagenOriginal }) => {
   try {
-    const prefijos = generarPrefijos(titulo);
+    // 🔧 Mismo blindaje que crearProducto: la regla de `update` también
+    // exige esProductoValido() sobre el documento resultante, así que
+    // editar un producto está sujeto exactamente a las mismas 6 reglas.
+    const precioNum = Number(precio);
+    if (!Number.isFinite(precioNum) || precioNum <= 0 || precioNum > 10000) {
+      throw new Error("El precio debe ser un número mayor a 0 y menor o igual a 10000.");
+    }
+
+    const categoriaValida = CATEGORIAS_VALIDAS.includes(categoria) ? categoria : null;
+    if (!categoriaValida) {
+      throw new Error("Categoría inválida.");
+    }
+
+    const tituloLimpio      = String(titulo || "").trim().slice(0, 200);
+    const descripcionLimpia = String(descripcion || "").trim().slice(0, 500);
+    if (!tituloLimpio || !descripcionLimpia) {
+      throw new Error("Título y descripción son obligatorios.");
+    }
+
+    const prefijos = generarPrefijos(tituloLimpio);
     await updateDoc(doc(db, "productos", productoId), {
-      titulo,
-      precio:       parseFloat(precio),
-      categoria,
-      descripcion,
+      titulo:       tituloLimpio,
+      precio:       precioNum,
+      categoria:    categoriaValida,
+      descripcion:  descripcionLimpia,
       imagen:       imagen || imagenOriginal || "",
       keywords:     prefijos,
       fechaEdicion: serverTimestamp(),
@@ -85,8 +131,13 @@ export const eliminarProducto = async (productoId) => {
   }
 };
 
+const ESTADOS_VALIDOS = ["disponible", "agotado"];
+
 export const cambiarEstadoProducto = async (productoId, nuevoEstado) => {
   try {
+    if (!ESTADOS_VALIDOS.includes(nuevoEstado)) {
+      throw new Error("Estado inválido.");
+    }
     await updateDoc(doc(db, "productos", productoId), { estado: nuevoEstado });
   } catch (err) {
     logError("[productService.cambiarEstadoProducto]", err);

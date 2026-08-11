@@ -108,18 +108,25 @@ export const subirImagenImgBB = (file, onProgress) => {
  * Genera todos los prefijos de búsqueda de un texto (para Firestore array-contains).
  * Ej: "galleta" → ["g", "ga", "gal", "gall", "galle", "gallet", "galleta"]
  *
+ * 🔒 Cap en 30 resultados: las reglas de seguridad de Firestore exigen
+ * `keywords.size() <= 30`. Sin este límite, un título con varias
+ * palabras largas genera más de 30 prefijos y Firestore rechaza el
+ * create/update por completo, sin importar que el resto del payload
+ * esté bien formado.
+ *
  * @param {string} texto
+ * @param {number} [maxKeywords=30]
  * @returns {string[]}
  */
-export const generarPrefijos = (texto) => {
+export const generarPrefijos = (texto, maxKeywords = 30) => {
   const palabras = (texto || "").toLowerCase().split(/\s+/).filter((w) => w.length > 0);
   const prefijos = new Set();
-  palabras.forEach((palabra) => {
+  for (const palabra of palabras) {
     let acumulado = "";
     for (const char of palabra) {
       acumulado += char;
       prefijos.add(acumulado);
     }
-  });
-  return Array.from(prefijos);
+  }
+  return Array.from(prefijos).slice(0, maxKeywords);
 };

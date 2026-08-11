@@ -67,6 +67,16 @@ const Publicar = () => {
       return;
     }
 
+    // 🔧 Validación de precio ANTES de enviar. Las reglas de seguridad
+    // de Firestore exigen precio > 0 y <= 10000; si no se valida aquí,
+    // el usuario recibe un "Error al publicar" genérico causado por un
+    // PERMISSION_DENIED silencioso en vez de un mensaje claro.
+    const precioNum = parseFloat(precio);
+    if (!Number.isFinite(precioNum) || precioNum <= 0 || precioNum > 10000) {
+      mostrarToast("El precio debe ser mayor a S/0 y no superar S/10,000.", "error");
+      return;
+    }
+
     // 🔒 `perfil.telefono` ya no existe en el doc público (vive en
     // /usuarios/{uid}/privado/contacto). Se valida contra ese contacto
     // real, no contra el perfil público.
@@ -100,7 +110,7 @@ const Publicar = () => {
 
       setBtnTexto("Publicando...");
       const nuevoId = await crearProducto({
-        titulo, precio, categoria, descripcion,
+        titulo, precio: precioNum, categoria, descripcion,
         imagen: imagenFinal, user, perfil,
       });
       setProgreso(100);
@@ -229,6 +239,7 @@ const Publicar = () => {
                   S/
                 </span>
                 <input type="number" required placeholder="0.00"
+                  min="0.01" max="10000" step="0.01"
                   value={precio} onChange={(e) => setPrecio(e.target.value)}
                   className={`${inputClass} pl-9`} />
               </div>
