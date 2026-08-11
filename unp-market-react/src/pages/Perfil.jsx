@@ -18,7 +18,6 @@ import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
 import { obtenerContactoPrivado, guardarContactoPrivado } from "../services/userService";
 import Spinner                         from "../components/Spinner";
 import { useToast, ToastContainer }    from "../components/Toast";
-import BottomNav                       from "../components/BottomNav";
 
 // Placeholders — reemplazar por los archivos finales de cada logo.
 const YAPE_PLACEHOLDER = "/assets/yape-placeholder.png";
@@ -348,7 +347,7 @@ const Perfil = () => {
   const p = perfil || {};
 
   return (
-    <div className="app-shell font-sans pb-24">
+    <div className="app-shell font-sans pb-6">
 
       {/* ════════════════════════════════════════════════════
              CABECERA — Banner + Avatar + Nombre
@@ -508,11 +507,6 @@ const Perfil = () => {
           Términos y Privacidad
         </Link>
       </div>
-
-      {/* ════════════════════════════════════════════════════
-             BOTTOM NAVIGATION
-        ════════════════════════════════════════════════════ */}
-      <BottomNav activo="perfil" />
 
       {/* ════════════════════════════════════════════════════
              MODAL: EDITAR PERFIL

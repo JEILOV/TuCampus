@@ -43,10 +43,10 @@
 // ============================================================
 
 import {
-  doc, getDoc, updateDoc,
+  doc, getDoc, setDoc, updateDoc,
   collection, query, where, orderBy,
   onSnapshot, writeBatch, serverTimestamp, increment,
-  arrayUnion, arrayRemove, runTransaction,
+  arrayUnion, arrayRemove,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
@@ -131,7 +131,8 @@ export const obtenerOCrearChat = async (uidComprador, uidVendedor, productoInfo 
   const chatRef = doc(db, "chats", chatId);
 
   try {
-    const [infoComprador, infoVendedor] = await Promise.all([
+    const [snap, infoComprador, infoVendedor] = await Promise.all([
+      getDoc(chatRef),
       obtenerInfoPerfilReal(uidComprador, productoInfo.compradorNombre, productoInfo.compradorAvatar),
       obtenerInfoPerfilReal(uidVendedor, productoInfo.vendedorNombre, productoInfo.vendedorAvatar),
     ]);
@@ -141,65 +142,32 @@ export const obtenerOCrearChat = async (uidComprador, uidVendedor, productoInfo 
       [uidVendedor]:  infoVendedor,
     };
 
-    // 🔧 ANTES: getDoc() + setDoc() sueltos, sin transacción. Eso es
-    // vulnerable a una lectura de caché local desactualizada (ej. offline
-    // persistence, o dos pestañas llamando esto casi al mismo tiempo):
-    // si `snap.exists()` daba un falso "no existe", el setDoc() de más
-    // abajo SOBREESCRIBÍA por completo un chat que en realidad ya tenía
-    // historial — reseteando ultimoMensaje/noLeidoPor/producto de origen
-    // (los mensajes de la subcolección no se borran, pero la vista previa
-    // y el contexto sí, dando la sensación de "otro chat").
-    //
-    // AHORA: runTransaction() lee siempre contra el servidor (nunca la
-    // caché local) y Firestore reintenta solo si algo cambió — mismo
-    // patrón que ya usamos en reviewService.guardarOActualizarResena.
-    //
-    // Además: antes, productoId/productoTitulo/productoImagen SOLO se
-    // guardaban al crear el chat y nunca más se tocaban — si dos personas
-    // ya habían chateado (ej. desde el perfil, sin producto) y luego una
-    // le escribía desde un producto puntual, el "Sobre: X" se quedaba
-    // vacío o pegado al primero para siempre. Ahora, si esta llamada trae
-    // un producto NUEVO y distinto al que el chat ya tenía guardado, se
-    // actualiza para reflejar de qué se está hablando ahora. Si se abre
-    // sin contexto de producto (ej. desde el perfil del vendedor), el
-    // producto de origen existente se deja intacto.
-    const resultado = await runTransaction(db, async (tx) => {
-      const snap = await tx.get(chatRef);
+    if (snap.exists()) {
+      // Auto-sanar datos de perfil desatualizados — best-effort, no bloquea
+      // la apertura del chat si esta escritura de "refresco" falla.
+      updateDoc(chatRef, { participantesInfo }).catch((err) =>
+        logError("[chatService.obtenerOCrearChat] refresco de participantesInfo", err)
+      );
+      return { id: chatId, ...snap.data(), participantesInfo };
+    }
 
-      if (snap.exists()) {
-        const datosActuales = snap.data();
-        const actualizacion = { participantesInfo };
+    const nuevoChat = {
+      participantes: [uidComprador, uidVendedor].sort(),
+      participantesInfo,
+      productoId:     productoInfo.productoId     || null,
+      productoTitulo: productoInfo.productoTitulo || null,
+      productoImagen: productoInfo.productoImagen || null,
 
-        if (productoInfo.productoId && productoInfo.productoId !== datosActuales.productoId) {
-          actualizacion.productoId     = productoInfo.productoId;
-          actualizacion.productoTitulo = productoInfo.productoTitulo || null;
-          actualizacion.productoImagen = productoInfo.productoImagen || null;
-        }
+      ultimoMensaje:      "",
+      ultimoMensajeFecha: serverTimestamp(),
+      ultimoMensajeDeUid: null,
 
-        tx.update(chatRef, actualizacion);
-        return { ...datosActuales, ...actualizacion };
-      }
+      noLeidoPor: { [uidComprador]: 0, [uidVendedor]: 0 },
+      creadoEn:   serverTimestamp(),
+    };
 
-      const nuevoChat = {
-        participantes: [uidComprador, uidVendedor].sort(),
-        participantesInfo,
-        productoId:     productoInfo.productoId     || null,
-        productoTitulo: productoInfo.productoTitulo || null,
-        productoImagen: productoInfo.productoImagen || null,
-
-        ultimoMensaje:      "",
-        ultimoMensajeFecha: serverTimestamp(),
-        ultimoMensajeDeUid: null,
-
-        noLeidoPor: { [uidComprador]: 0, [uidVendedor]: 0 },
-        creadoEn:   serverTimestamp(),
-      };
-
-      tx.set(chatRef, nuevoChat);
-      return nuevoChat;
-    });
-
-    return { id: chatId, ...resultado };
+    await setDoc(chatRef, nuevoChat);
+    return { id: chatId, ...nuevoChat };
   } catch (err) {
     logError("[chatService.obtenerOCrearChat]", err);
     throw new Error(traducirError(err, "firestore"));
@@ -216,11 +184,16 @@ export const obtenerOCrearChat = async (uidComprador, uidVendedor, productoInfo 
  * @param {string} deUid    UID de quien envía
  * @param {string} contenido  Texto del mensaje, o URL de la imagen si tipo="imagen"
  * @param {"texto"|"imagen"} [tipo="texto"]
+ * @param {{id: string, texto: string, autorNombre: string}|null} [respondiendoA=null]
+ *   Cita del mensaje al que se responde (estilo WhatsApp). Se guarda tal
+ *   cual la arma el componente — acá no se revalida contra la subcolección
+ *   `mensajes` a propósito: es solo una "foto" de referencia visual, igual
+ *   que `ultimoMensaje` en el doc padre, y no necesita una lectura extra.
  * @returns {Promise<{id: string, otroUid: string|null}|undefined>}
  *   El id del mensaje creado y el UID del destinatario (útil para
  *   disparar la notificación desde el componente, sin otra lectura).
  */
-export const enviarMensaje = async (chatId, deUid, contenido, tipo = "texto") => {
+export const enviarMensaje = async (chatId, deUid, contenido, tipo = "texto", respondiendoA = null) => {
   const limpio = (contenido || "").trim();
   if (!chatId || !deUid || !limpio) return;
 
@@ -246,6 +219,10 @@ export const enviarMensaje = async (chatId, deUid, contenido, tipo = "texto") =>
       texto:  tipo === "texto"  ? limpio : "",
       imagen: tipo === "imagen" ? limpio : "",   // URL pública de ImgBB
       fecha:  serverTimestamp(),
+      // Cita opcional (Fase 7 — Responder mensaje). `null` y no `undefined`
+      // porque Firestore rechaza `undefined` en un `set()`; así el campo
+      // siempre existe en el doc, vacío cuando no se respondió a nada.
+      respondiendoA: respondiendoA || null,
     });
 
     const previewLista = tipo === "imagen"

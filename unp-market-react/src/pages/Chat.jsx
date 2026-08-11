@@ -17,7 +17,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams }              from "react-router-dom";
 import { doc, getDoc, onSnapshot }                   from "firebase/firestore";
-import { Search }                                    from "lucide-react";
+import { Search, CornerUpLeft, X }                   from "lucide-react";
 import { db }                                        from "../services/firebase";
 import { useAuth }                                   from "../context/AuthContext";
 import {
@@ -35,6 +35,8 @@ import {
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
 import { ToastContainer, useToast }    from "../components/Toast";
 import Spinner                         from "../components/Spinner";
+import BottomNav                       from "../components/BottomNav";
+import BotonNotificaciones             from "../components/BotonNotificaciones";
 import MenuChat                        from "../components/MenuChat";
 
 // Placeholder — reemplazar por los archivos finales de la mascota
@@ -242,12 +244,51 @@ const ListaChats = ({ chats, cargando, miUid, onAbrir }) => {
 };
 
 // ── Sub-vista: burbuja de mensaje ────────────────────────────
-const Burbuja = ({ mensaje, esMio }) => {
+// 🔧 Fase 7 — Responder mensaje (estilo WhatsApp):
+//   `onResponder` es opcional a propósito (mismo patrón que el resto del
+//   archivo, que nunca rompe si falta un callback) — si el padre no lo
+//   pasa, el botón de citar simplemente no se muestra.
+const Burbuja = ({ mensaje, esMio, onResponder }) => {
   const esImagen = mensaje.tipo === "imagen" && mensaje.imagen;
+  const cita     = mensaje.respondiendoA;
 
+  // Botón de "responder": siempre visible (no depende de :hover) porque
+  // esta es una app mobile-first — un botón que solo aparece con hover
+  // sería inalcanzable en touch. Se apaga la opacidad para que no compita
+  // visualmente con el texto del mensaje.
+  const botonResponder = onResponder && (
+    <button
+      type="button"
+      onClick={() => onResponder(mensaje)}
+      aria-label="Responder a este mensaje"
+      style={{
+        width: "28px", height: "28px", flexShrink: 0, alignSelf: "center",
+        background: "rgba(0,0,0,0.06)", border: "none", borderRadius: "50%",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#8890a5", cursor: "pointer", opacity: 0.7,
+      }}
+    >
+      <CornerUpLeft size={14} strokeWidth={2.4} />
+    </button>
+  );
+
+  // 🔧 FIX: acá vivía el bug que invertía los lados. `flexDirection:
+  // "row-reverse"` invierte también a qué lado apunta `justifyContent:
+  // "flex-end"` (con row-reverse, "flex-end" pasa a significar IZQUIERDA,
+  // no derecha) — por eso los mensajes míos terminaban pegados al mismo
+  // lado que los del otro usuario. La solución correcta es NO tocar
+  // flexDirection (se queda siempre en "row", igual que antes de este
+  // botón) y en cambio usar `order` en los dos hijos para ubicar el botón
+  // a un lado u otro — así justifyContent sigue significando lo mismo
+  // que siempre significó en este archivo.
   return (
-    <div style={{ display: "flex", justifyContent: esMio ? "flex-end" : "flex-start", padding: "3px 16px" }}>
+    <div style={{
+      display: "flex", alignItems: "flex-end", gap: "4px",
+      justifyContent: esMio ? "flex-end" : "flex-start",
+      padding: "3px 16px",
+    }}>
       <div style={{
+        order: esMio ? 2 : 1,
         maxWidth: esImagen ? "70%" : "75%",
         background: esImagen ? "transparent" : (esMio ? "var(--verde-marca)" : "white"),
         color: esMio ? "white" : "var(--azul-oscuro)",
@@ -258,6 +299,37 @@ const Burbuja = ({ mensaje, esMio }) => {
         wordBreak: "break-word", whiteSpace: "pre-wrap",
         overflow: "hidden",
       }}>
+        {/* Mensaje citado (si este mensaje es una respuesta a otro) */}
+        {cita && (
+          <div style={{
+            display: "flex", gap: "8px", alignItems: "stretch",
+            background: esImagen ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.1)",
+            borderRadius: "8px", padding: "6px 8px",
+            marginBottom: esImagen ? "6px" : "8px",
+            overflow: "hidden",
+          }}>
+            <div style={{
+              width: "3px", flexShrink: 0, borderRadius: "3px",
+              background: esMio ? "rgba(255,255,255,0.85)" : "var(--verde-marca)",
+            }} />
+            <div style={{ minWidth: 0 }}>
+              <p style={{
+                margin: 0, fontSize: "0.72rem", fontWeight: 800,
+                color: esMio ? "rgba(255,255,255,0.9)" : "var(--verde-marca)",
+              }}>
+                {cita.autorNombre}
+              </p>
+              <p style={{
+                margin: 0, fontSize: "0.78rem", fontWeight: 600,
+                opacity: 0.85, overflow: "hidden", textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}>
+                {cita.texto}
+              </p>
+            </div>
+          </div>
+        )}
+
         {esImagen ? (
           <a href={mensaje.imagen} target="_blank" rel="noopener noreferrer">
             <img
@@ -281,6 +353,10 @@ const Burbuja = ({ mensaje, esMio }) => {
         }}>
           {formatearHora(mensaje.fecha)}
         </div>
+      </div>
+
+      <div style={{ order: esMio ? 1 : 2, flexShrink: 0 }}>
+        {botonResponder}
       </div>
     </div>
   );
@@ -325,6 +401,9 @@ const Chat = () => {
   const [subiendoImagen, setSubiendoImagen] = useState(false);
   const [progresoImagen, setProgresoImagen] = useState(0);
   const fileInputRef = useRef(null);
+
+  // ── Fase 7: Responder a un mensaje (estilo WhatsApp) ──────
+  const [mensajeRespondiendo, setMensajeRespondiendo] = useState(null);
 
   const messagesEndRef      = useRef(null);
   const esPrimeraCarga       = useRef(true);
@@ -429,12 +508,28 @@ const Chat = () => {
   const elMeBloqueo          = otroBloqueados.includes(user?.uid);
   const conversacionBloqueada = yoLoBloquee || elMeBloqueo;
 
+  // ── Fase 7: arma la cita a partir de `mensajeRespondiendo` ─────
+  // Se recalcula en cada envío (no se guarda ya armado en el estado)
+  // para que siempre use el nombre más fresco de `otroInfo` (perfil en
+  // vivo) y no un dato viejo capturado al momento del click en "responder".
+  const armarRespondiendoA = useCallback(() => {
+    if (!mensajeRespondiendo) return null;
+    return {
+      id:    mensajeRespondiendo.id,
+      texto: mensajeRespondiendo.texto || (mensajeRespondiendo.imagen ? "📷 Imagen" : ""),
+      autorNombre: mensajeRespondiendo.deUid === user?.uid
+        ? "Tú"
+        : (otroInfo.nombre || "Estudiante UNP"),
+    };
+  }, [mensajeRespondiendo, user?.uid, otroInfo.nombre]);
+
   // ── Enviar mensaje de texto ────────────────────────────────
   const handleEnviar = useCallback(async (e) => {
     e?.preventDefault();
     const limpio = texto.trim();
     if (!limpio || !chatId || !user?.uid || enviando || conversacionBloqueada) return;
 
+    const respondiendoA = armarRespondiendoA();
     setTexto("");
     setEnviando(true);
     try {
@@ -443,14 +538,15 @@ const Chat = () => {
       // (useChatsNoLeidos, vía chat.noLeidoPor) ya cubre ese aviso en
       // tiempo real — duplicarlo en /notificaciones solo llenaba esa
       // pestaña de spam por cada mensaje del chat.
-      await enviarMensaje(chatId, user.uid, limpio);
+      await enviarMensaje(chatId, user.uid, limpio, "texto", respondiendoA);
+      setMensajeRespondiendo(null); // solo se limpia la cita si el envío tuvo éxito
     } catch (err) {
       mostrarToast(err.message || "No se pudo enviar el mensaje", "error");
       setTexto(limpio); // no perder lo que el usuario escribió
     } finally {
       setEnviando(false);
     }
-  }, [texto, chatId, user, enviando, conversacionBloqueada, mostrarToast]);
+  }, [texto, chatId, user, enviando, conversacionBloqueada, mostrarToast, armarRespondiendoA]);
 
   // ── Enviar imagen (Fase 6) ─────────────────────────────────
   const handleSeleccionarImagen = async (e) => {
@@ -458,12 +554,14 @@ const Chat = () => {
     e.target.value = ""; // permite volver a elegir el mismo archivo después
     if (!archivo || !chatId || !user?.uid || subiendoImagen || conversacionBloqueada) return;
 
+    const respondiendoA = armarRespondiendoA();
     setSubiendoImagen(true);
     setProgresoImagen(0);
     try {
       const comprimida = await comprimirImagen(archivo);
       const url = await subirImagenImgBB(comprimida, setProgresoImagen);
-      await enviarMensaje(chatId, user.uid, url, "imagen");
+      await enviarMensaje(chatId, user.uid, url, "imagen", respondiendoA);
+      setMensajeRespondiendo(null); // solo se limpia la cita si el envío tuvo éxito
     } catch (err) {
       mostrarToast(err.message || "No se pudo enviar la imagen", "error");
     } finally {
@@ -508,25 +606,7 @@ const Chat = () => {
   };
 
   // ── Navegación ────────────────────────────────────────────
-  // 🔧 ANTES: navigate("/chat", { replace: true }) REEMPLAZA la entrada
-  // actual del historial por otra — no la saca. Como abrirChat() empuja
-  // (push) una entrada nueva al entrar a la conversación, el replace de
-  // acá dejaba una entrada extra apilada: al volver a la lista y tocar
-  // "volver" otra vez, hacía falta un toque de más para llegar al Home.
-  //
-  // AHORA: navigate(-1) hace lo mismo que el botón "atrás" nativo — saca
-  // exactamente la entrada que abrirChat() empujó, dejando el historial
-  // limpio y simétrico (push al entrar, pop al salir). El fallback a
-  // navigate("/chat") cubre el caso de entrar directo a un chat sin
-  // historial propio de la app detrás (ej. deep link desde una
-  // notificación), donde no hay nada más a lo que "volver".
-  const volverALista = () => {
-    if (window.history.state?.idx > 0) {
-      navigate(-1);
-    } else {
-      navigate("/chat");
-    }
-  };
+  const volverALista = () => navigate("/chat", { replace: true });
   const irAlPerfilVendedor = () => { if (otroUid) navigate(`/vendedor?uid=${otroUid}`); };
   const abrirChat     = (id) => navigate(`/chat?id=${id}`);
 
@@ -549,7 +629,7 @@ const Chat = () => {
     });
 
     return (
-      <div className="app-shell bg-background pb-8 font-sans">
+      <div className="app-shell bg-background pb-28 font-sans">
 
         {/* HEADER AZUL (mismo patrón que Home.jsx / Publicar.jsx) */}
         <header className="relative rounded-b-[32px] bg-primary px-6 pb-10 pt-8">
@@ -569,6 +649,8 @@ const Chat = () => {
             </div>
           </div>
         </header>
+
+        <BotonNotificaciones />
 
         {/* TARJETA BLANCA SUPERPUESTA */}
         <main className="relative -mt-6 px-4">
@@ -594,6 +676,7 @@ const Chat = () => {
           </div>
         </main>
 
+        <BottomNav activo="mensajes" />
         <ToastContainer toasts={toasts} />
       </div>
     );
@@ -622,7 +705,7 @@ const Chat = () => {
 
       {/* ── HEADER (fijo: flexShrink 0 + zIndex, fuera del área con scroll) ── */}
       <div style={{
-        flexShrink: 0, position: "relative", zIndex: 10,
+        flexShrink: 0, position: "relative", zIndex: 20,
         background: "white", borderBottom: "1px solid #f1f3f5",
         display: "flex", alignItems: "center", gap: "12px", padding: "16px 20px",
       }}>
@@ -737,7 +820,14 @@ const Chat = () => {
                 Todavía no hay mensajes. ¡Escribí el primero! 👋
               </div>
             ) : (
-              mensajes.map((m) => <Burbuja key={m.id} mensaje={m} esMio={m.deUid === user?.uid} />)
+              mensajes.map((m) => (
+                <Burbuja
+                  key={m.id}
+                  mensaje={m}
+                  esMio={m.deUid === user?.uid}
+                  onResponder={conversacionBloqueada ? null : setMensajeRespondiendo}
+                />
+              ))
             )}
             <div ref={messagesEndRef} />
           </div>
@@ -746,7 +836,7 @@ const Chat = () => {
           {conversacionBloqueada ? (
             // Fase 6: bloqueado en cualquiera de los dos sentidos → sin input
             <div style={{
-              flexShrink: 0, zIndex: 10, background: "white", borderTop: "1px solid #f1f3f5",
+              flexShrink: 0, zIndex: 20, background: "white", borderTop: "1px solid #f1f3f5",
               padding: "16px 20px",
               paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
               textAlign: "center",
@@ -759,12 +849,56 @@ const Chat = () => {
             <form
               onSubmit={handleEnviar}
               style={{
-                flexShrink: 0, zIndex: 10,
+                flexShrink: 0, zIndex: 20,
                 background: "white", padding: "12px 16px",
                 paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
                 borderTop: "1px solid #f1f3f5", boxSizing: "border-box",
               }}
             >
+              {/* ── Fase 7: banner de "respondiendo a" — arriba del textarea ── */}
+              {mensajeRespondiendo && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: "10px",
+                  background: "var(--bg-crema)", borderRadius: "10px",
+                  padding: "8px 10px", marginBottom: "8px",
+                }}>
+                  <div style={{
+                    width: "3px", alignSelf: "stretch", borderRadius: "3px",
+                    background: "var(--verde-marca)", flexShrink: 0,
+                  }} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{
+                      margin: 0, fontSize: "0.78rem", fontWeight: 800,
+                      color: "var(--verde-marca)",
+                    }}>
+                      {mensajeRespondiendo.deUid === user?.uid
+                        ? "Tú"
+                        : (otroInfo.nombre || "Estudiante UNP")}
+                    </p>
+                    <p style={{
+                      margin: 0, fontSize: "0.82rem", fontWeight: 600,
+                      color: "var(--azul-oscuro)", opacity: 0.75,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {mensajeRespondiendo.texto || (mensajeRespondiendo.imagen ? "📷 Imagen" : "")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMensajeRespondiendo(null)}
+                    aria-label="Cancelar respuesta"
+                    style={{
+                      width: "26px", height: "26px", flexShrink: 0,
+                      background: "none", border: "none", cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "#a0a5b9",
+                    }}
+                  >
+                    <X size={16} strokeWidth={2.4} />
+                  </button>
+                </div>
+              )}
+
               {subiendoImagen && (
                 <div style={{
                   height: "4px", borderRadius: "3px", background: "#e8e8f0",

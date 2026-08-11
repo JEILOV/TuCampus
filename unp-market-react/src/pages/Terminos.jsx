@@ -8,27 +8,42 @@
 //  y "Política de Privacidad". Contenido pensado para ser legible
 //  y escaneable (secciones cortas, íconos, sin bloques de texto
 //  interminables).
+//
+//  🔧 Refactor de estilo: esta página vivía con estilos inline y
+//  CSS vars viejas (var(--azul-oscuro), var(--verde-marca), fuente
+//  Nunito) mientras el resto de la app (Home, Publicar,
+//  EditarProducto, Vendedor, Notificaciones, Perfil) ya había
+//  migrado al Design System de Tailwind (bg-primary, text-ink,
+//  bg-card, shadow-soft, rounded-btn/card, iconos lucide-react).
+//  Se llevó al mismo patrón que Notificaciones.jsx (la otra página
+//  "secundaria" de la app: back button simple + título + chips +
+//  tarjetas), en vez del header azul alto de las páginas de acción
+//  (Home/Publicar), que no encaja con contenido largo tipo legal.
+//  La lógica (tabs, contenido) no cambió en absoluto.
 // ============================================================
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  ChevronLeft, GraduationCap, BadgeCheck, Ban, Scale, Settings2,
+  Mail, Lock, Eye, MessageCircle, ShieldCheck, FileCheck2,
+} from "lucide-react";
 
 const ULTIMA_ACTUALIZACION = "8 de agosto de 2026";
 
 // ── Sub-componente: bloque de sección con ícono ────────────────
-const Seccion = ({ icono, titulo, children }) => (
-  <div style={{
-    background: "white", borderRadius: "16px",
-    border: "1.5px solid #e8e8f0", padding: "16px 18px",
-    marginBottom: "12px",
-  }}>
-    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-      <span style={{ fontSize: "1.2rem" }}>{icono}</span>
-      <h3 style={{ margin: 0, fontSize: "0.98rem", fontWeight: 800, color: "var(--azul-oscuro)" }}>
-        {titulo}
-      </h3>
+// Mismo patrón visual que las tarjetas de Notificaciones.jsx:
+// rounded-[24px] + bg-card + shadow-soft, con un círculo de ícono
+// a la izquierda del título.
+const Seccion = ({ Icono, titulo, children }) => (
+  <div className="rounded-[24px] bg-card p-5 shadow-soft">
+    <div className="flex items-center gap-3">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <Icono size={19} strokeWidth={2.3} />
+      </span>
+      <h3 className="text-[15px] font-extrabold text-ink">{titulo}</h3>
     </div>
-    <div style={{ fontSize: "0.88rem", color: "#5c5c7a", fontWeight: 600, lineHeight: 1.6 }}>
+    <div className="mt-3 text-[13.5px] font-semibold leading-relaxed text-ink/70">
       {children}
     </div>
   </div>
@@ -36,7 +51,7 @@ const Seccion = ({ icono, titulo, children }) => (
 
 // ── Sub-componente: lista de puntos ────────────────────────────
 const Lista = ({ items }) => (
-  <ul style={{ margin: "8px 0 0", paddingLeft: "20px", display: "flex", flexDirection: "column", gap: "6px" }}>
+  <ul className="mt-2.5 flex list-disc flex-col gap-2 pl-5 marker:text-primary/50">
     {items.map((item, i) => <li key={i}>{item}</li>)}
   </ul>
 );
@@ -44,8 +59,8 @@ const Lista = ({ items }) => (
 // ── Bloque: Términos de Servicio ───────────────────────────────
 const TerminosServicio = () => (
   <>
-    <Seccion icono="🎓" titulo="1. Naturaleza del servicio">
-      <p style={{ margin: 0 }}>
+    <Seccion Icono={GraduationCap} titulo="1. Naturaleza del servicio">
+      <p className="m-0">
         TuCampus es una plataforma de libre conexión entre estudiantes de la Universidad
         Nacional de Piura (UNP) que desean comprar, vender u ofrecer productos y servicios
         dentro de la comunidad universitaria. No somos intermediarios financieros, no
@@ -55,17 +70,18 @@ const TerminosServicio = () => (
       </p>
     </Seccion>
 
-    <Seccion icono="🪪" titulo="2. Verificación de identidad institucional">
-      <p style={{ margin: 0 }}>
+    <Seccion Icono={BadgeCheck} titulo="2. Verificación de identidad institucional">
+      <p className="m-0">
         El acceso a TuCampus requiere autenticarse con un correo institucional del dominio{" "}
-        <strong>@alumnos.unp.edu.pe</strong>. Esta verificación tiene como único fin
-        confirmar que la persona usuaria pertenece a la comunidad estudiantil de la UNP y
-        reducir el riesgo de cuentas falsas o ajenas a la universidad.
+        <strong className="font-extrabold text-ink">@alumnos.unp.edu.pe</strong>. Esta
+        verificación tiene como único fin confirmar que la persona usuaria pertenece a la
+        comunidad estudiantil de la UNP y reducir el riesgo de cuentas falsas o ajenas a
+        la universidad.
       </p>
     </Seccion>
 
-    <Seccion icono="🚫" titulo="3. Conducta y contenido prohibido">
-      <p style={{ margin: 0 }}>
+    <Seccion Icono={Ban} titulo="3. Conducta y contenido prohibido">
+      <p className="m-0">
         Está terminantemente prohibido publicar, ofrecer o promocionar dentro de la
         plataforma:
       </p>
@@ -75,15 +91,15 @@ const TerminosServicio = () => (
         "Bebidas alcohólicas.",
         "Sustancias controladas o cualquier producto que represente un riesgo para la salud o la seguridad de la comunidad universitaria.",
       ]} />
-      <p style={{ margin: "10px 0 0" }}>
+      <p className="m-0 mt-2.5">
         El incumplimiento de esta cláusula puede resultar en la eliminación de la
         publicación y la suspensión permanente de la cuenta, sin perjuicio de las
         responsabilidades legales que correspondan.
       </p>
     </Seccion>
 
-    <Seccion icono="⚖️" titulo="4. Exención de responsabilidad">
-      <p style={{ margin: 0 }}>
+    <Seccion Icono={Scale} titulo="4. Exención de responsabilidad">
+      <p className="m-0">
         La responsabilidad sobre la entrega, calidad, autenticidad, condiciones y
         cumplimiento de cualquier producto o servicio publicado recae exclusivamente en
         la persona compradora y vendedora involucradas en cada transacción. TuCampus no
@@ -94,8 +110,8 @@ const TerminosServicio = () => (
       </p>
     </Seccion>
 
-    <Seccion icono="🔧" titulo="5. Modificaciones del servicio">
-      <p style={{ margin: 0 }}>
+    <Seccion Icono={Settings2} titulo="5. Modificaciones del servicio">
+      <p className="m-0">
         Podemos actualizar, suspender o discontinuar funciones de la plataforma en
         cualquier momento, así como modificar estos Términos. Los cambios relevantes se
         reflejarán en esta misma página junto con su fecha de actualización.
@@ -107,16 +123,16 @@ const TerminosServicio = () => (
 // ── Bloque: Política de Privacidad ─────────────────────────────
 const PoliticaPrivacidad = () => (
   <>
-    <Seccion icono="📧" titulo="1. Datos institucionales">
-      <p style={{ margin: 0 }}>
+    <Seccion Icono={Mail} titulo="1. Datos institucionales">
+      <p className="m-0">
         Usamos tu correo institucional (@alumnos.unp.edu.pe) únicamente para verificar tu
         pertenencia a la comunidad UNP y para identificarte dentro de la plataforma. No lo
         compartimos con terceros ajenos al servicio.
       </p>
     </Seccion>
 
-    <Seccion icono="🔒" titulo="2. Números de contacto (WhatsApp, Yape, Plin)">
-      <p style={{ margin: 0 }}>
+    <Seccion Icono={Lock} titulo="2. Números de contacto (WhatsApp, Yape, Plin)">
+      <p className="m-0">
         Tu número de WhatsApp y los datos asociados a Yape o Plin se almacenan en una
         subcolección privada de tu cuenta, independiente de tu perfil público. Estos
         datos:
@@ -128,32 +144,32 @@ const PoliticaPrivacidad = () => (
       ]} />
     </Seccion>
 
-    <Seccion icono="🗂️" titulo="3. Qué información es pública">
-      <p style={{ margin: 0 }}>
+    <Seccion Icono={Eye} titulo="3. Qué información es pública">
+      <p className="m-0">
         Son visibles públicamente dentro de la plataforma: tu nombre, foto de perfil,
         carrera o título corto, biografía, ubicación aproximada, calificaciones y
         publicaciones activas. El resto de la información de tu cuenta permanece privada.
       </p>
     </Seccion>
 
-    <Seccion icono="💬" titulo="4. Chats y mensajes">
-      <p style={{ margin: 0 }}>
+    <Seccion Icono={MessageCircle} titulo="4. Chats y mensajes">
+      <p className="m-0">
         Las conversaciones del chat interno solo son visibles para las personas
         participantes de cada conversación y se usan para coordinar la compra o venta de
         productos publicados en la plataforma.
       </p>
     </Seccion>
 
-    <Seccion icono="🛡️" titulo="5. Seguridad y acceso">
-      <p style={{ margin: 0 }}>
+    <Seccion Icono={ShieldCheck} titulo="5. Seguridad y acceso">
+      <p className="m-0">
         El acceso a la subcolección privada de contacto está restringido a estudiantes
         autenticados con correo institucional verificado. No vendemos ni cedemos tus datos
         personales a terceros con fines comerciales.
       </p>
     </Seccion>
 
-    <Seccion icono="✉️" titulo="6. Tus derechos">
-      <p style={{ margin: 0 }}>
+    <Seccion Icono={FileCheck2} titulo="6. Tus derechos">
+      <p className="m-0">
         Puedes actualizar o eliminar tu número de contacto en cualquier momento desde tu
         perfil, en la sección "Editar perfil". Si tienes dudas sobre el tratamiento de tus
         datos, puedes escribirnos a través de los canales de soporte de la plataforma.
@@ -168,84 +184,69 @@ const Terminos = () => {
   const [tab, setTab] = useState("terminos"); // "terminos" | "privacidad"
 
   return (
-    <div className="app-shell" style={{ background: "var(--bg-crema)", minHeight: "100vh", paddingBottom: "40px" }}>
+    <div className="app-shell bg-background pb-10 font-sans">
 
-      {/* HEADER */}
-      <div style={{
-        position: "sticky", top: 0, zIndex: 20,
-        background: "var(--azul-oscuro)", padding: "18px 16px",
-        display: "flex", alignItems: "center", gap: "12px",
-        boxShadow: "0 2px 12px rgba(0,0,0,0.12)",
-      }}>
+      {/* ════════════════════════════════════════════════════
+             HEADER — back button + título (mismo patrón que
+             Notificaciones.jsx: página secundaria, sin banner azul)
+        ════════════════════════════════════════════════════ */}
+      <div className="px-5 pt-6">
         <button
           onClick={() => navigate(-1)}
           aria-label="Volver"
-          style={{
-            width: "36px", height: "36px", borderRadius: "50%",
-            background: "rgba(255,255,255,0.12)", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", color: "white",
-            flexShrink: 0,
-          }}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-card text-ink shadow-soft"
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
+          <ChevronLeft size={22} />
         </button>
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 800, color: "white" }}>
+
+        <div className="mt-5">
+          <h1 className="text-[26px] font-extrabold leading-tight text-ink">
             Términos y Privacidad
           </h1>
-          <p style={{ margin: 0, fontSize: "0.75rem", color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>
+          <p className="mt-1 text-[13.5px] font-semibold text-ink/40">
             Última actualización: {ULTIMA_ACTUALIZACION}
           </p>
         </div>
       </div>
 
-      {/* PESTAÑAS */}
-      <div style={{
-        display: "flex", gap: "8px", padding: "16px 16px 4px",
-        maxWidth: "560px", margin: "0 auto", boxSizing: "border-box",
-      }}>
+      {/* ════════════════════════════════════════════════════
+             PESTAÑAS — mismo estilo chip que los filtros de
+             Notificaciones.jsx, a ancho completo (son solo 2)
+        ════════════════════════════════════════════════════ */}
+      <div className="mt-5 flex gap-2.5 px-5">
         <button
           onClick={() => setTab("terminos")}
-          style={{
-            flex: 1, padding: "11px 0", borderRadius: "12px", border: "none",
-            cursor: "pointer", fontFamily: "'Nunito', sans-serif",
-            fontWeight: 800, fontSize: "0.86rem",
-            background: tab === "terminos" ? "var(--verde-marca)" : "white",
-            color: tab === "terminos" ? "white" : "#5c5c7a",
-            boxShadow: tab === "terminos" ? "0 4px 12px rgba(46,107,78,0.25)" : "0 2px 8px rgba(0,0,0,0.05)",
-          }}
+          className={`flex-1 rounded-full px-4 py-3 text-[13px] font-extrabold transition-colors ${
+            tab === "terminos"
+              ? "bg-[#287653] text-white shadow-soft"
+              : "border-[1.5px] border-ink/10 bg-card text-ink/60"
+          }`}
         >
           Términos de Servicio
         </button>
         <button
           onClick={() => setTab("privacidad")}
-          style={{
-            flex: 1, padding: "11px 0", borderRadius: "12px", border: "none",
-            cursor: "pointer", fontFamily: "'Nunito', sans-serif",
-            fontWeight: 800, fontSize: "0.86rem",
-            background: tab === "privacidad" ? "var(--verde-marca)" : "white",
-            color: tab === "privacidad" ? "white" : "#5c5c7a",
-            boxShadow: tab === "privacidad" ? "0 4px 12px rgba(46,107,78,0.25)" : "0 2px 8px rgba(0,0,0,0.05)",
-          }}
+          className={`flex-1 rounded-full px-4 py-3 text-[13px] font-extrabold transition-colors ${
+            tab === "privacidad"
+              ? "bg-[#287653] text-white shadow-soft"
+              : "border-[1.5px] border-ink/10 bg-card text-ink/60"
+          }`}
         >
           Política de Privacidad
         </button>
       </div>
 
-      {/* CONTENIDO */}
-      <div style={{ padding: "12px 16px 0", maxWidth: "560px", margin: "0 auto", boxSizing: "border-box" }}>
+      {/* ════════════════════════════════════════════════════
+             CONTENIDO
+        ════════════════════════════════════════════════════ */}
+      <section className="mt-4 flex flex-col gap-3 px-5">
         {tab === "terminos" ? <TerminosServicio /> : <PoliticaPrivacidad />}
 
-        <p style={{
-          textAlign: "center", fontSize: "0.78rem", color: "#a0a5b9",
-          fontWeight: 600, margin: "8px 0 0", lineHeight: 1.5,
-        }}>
+        <p className="m-0 mt-2 text-center text-[12.5px] font-semibold leading-relaxed text-ink/40">
           Al usar TuCampus confirmas que has leído y aceptas estos Términos de Servicio y
           nuestra Política de Privacidad.
         </p>
-      </div>
+      </section>
     </div>
   );
 };
