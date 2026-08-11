@@ -34,7 +34,7 @@ const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
   const nombreVend = vendedorNombre || vendedor || "Yo";
 
   return (
-    <article className="flex h-fit w-full flex-col self-start overflow-hidden rounded-card bg-card shadow-soft">
+    <article className="overflow-hidden rounded-card bg-card shadow-soft">
       {/* Imagen */}
       <div className="relative aspect-square w-full bg-background">
         {imagen?.trim() ? (
@@ -485,7 +485,7 @@ const Perfil = () => {
             Aún no tienes publicaciones.
           </p>
         ) : (
-          <div className="grid grid-cols-2 items-start gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {productos.map((prod) => (
               <TarjetaPerfil
                 key={prod.id}

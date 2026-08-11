@@ -502,7 +502,7 @@ const Vendedor = () => {
             Este vendedor aún no tiene publicaciones.
           </p>
         ) : (
-          <div className="grid grid-cols-2 items-start gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {productos.map((prod) => (
               <ProductCard key={prod.id} producto={prod} onVerDetalle={handleVerDetalle} />
             ))}
