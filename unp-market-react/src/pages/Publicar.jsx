@@ -9,8 +9,6 @@ import { comprimirImagen, subirImagenImgBB }    from "../utils/imageUtils";
 import { obtenerContactoPrivado }               from "../services/userService";
 import { crearProducto }                        from "../services/productService";
 import Toast, { useToast }                      from "../components/Toast"; // ✅ Nuevo import
-import BottomNav                                from "../components/BottomNav";
-import BotonNotificaciones                      from "../components/BotonNotificaciones";
 
 // Placeholder — reemplazar por el archivo final de la mascota (mismo
 // ícono que ya usa el header de Home.jsx, para mantener consistencia).
@@ -191,7 +189,7 @@ const Publicar = () => {
   };
 
   return (
-    <div className="app-shell bg-background pb-28 font-sans">
+    <div className="app-shell bg-background pb-8 font-sans">
 
       {/* ════════════════════════════════════════════════════
              HEADER AZUL (mismo patrón que Home.jsx)
@@ -213,8 +211,6 @@ const Publicar = () => {
           </div>
         </div>
       </header>
-
-      <BotonNotificaciones />
 
       {/* ════════════════════════════════════════════════════
              TARJETA BLANCA SUPERPUESTA — Formulario
@@ -332,12 +328,9 @@ const Publicar = () => {
         </form>
       </main>
 
-      {/* BOTTOM NAV */}
-      <BottomNav activo="publicar" />
-
       {/* ✅ TOAST LIMPIO */}
       {toast && (
-        <div className="pointer-events-none fixed bottom-[84px] left-1/2 z-[1000] w-[calc(100%-40px)] max-w-[390px] -translate-x-1/2">
+        <div className="pointer-events-none fixed bottom-6 left-1/2 z-[1000] w-[calc(100%-40px)] max-w-[390px] -translate-x-1/2">
           <Toast mensaje={toast.mensaje} tipo={toast.tipo} />
         </div>
       )}

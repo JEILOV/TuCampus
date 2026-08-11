@@ -303,6 +303,24 @@ const Vendedor = () => {
 
   const v = vendedor;
 
+  // 🔧 El banner de reputación usaba v.totalResenas / v.calificacionPromedio
+  // — campos guardados aparte en el doc del vendedor — mientras que la
+  // sección "Opiniones" carga las reseñas reales de /resenas. Si esos
+  // campos se desincronizan (ej. dos calificaciones casi simultáneas
+  // pisándose el contador), el banner podía decir "Sin reseñas todavía"
+  // aunque abajo sí aparecieran reseñas. Ahora el banner se calcula
+  // directamente de `resenas`, la MISMA lista que se muestra debajo,
+  // así los dos siempre coinciden. Mientras carga, usamos el valor
+  // guardado como estimado optimista para evitar un parpadeo a "0".
+  const totalResenasReal = cargandoResenas
+    ? (v.totalResenas || 0)
+    : resenas.length;
+  const promedioReal = cargandoResenas
+    ? (v.calificacionPromedio || 0)
+    : (resenas.length > 0
+        ? Math.round((resenas.reduce((acc, r) => acc + (r.estrellas || 0), 0) / resenas.length) * 10) / 10
+        : 0);
+
   return (
     <div className="app-shell font-sans pb-24">
 
@@ -345,13 +363,15 @@ const Vendedor = () => {
             {v.bio || "Estudiante de la UNP"}
           </p>
 
-          {/* Reputación: promedio de estrellas + total de reseñas */}
+          {/* Reputación: promedio de estrellas + total de reseñas.
+              Calculado a partir de `resenas` (la misma lista de abajo),
+              no del contador guardado aparte — ver nota más arriba. */}
           <div className="mt-0.5 inline-flex items-center gap-1.5 rounded-chip bg-white/15 px-3 py-1 text-[13px] font-extrabold text-white">
-            {v.totalResenas > 0 ? (
+            {totalResenasReal > 0 ? (
               <>
                 <Star size={14} fill="#f5a623" stroke="none" />
-                {(v.calificacionPromedio || 0).toFixed(1)}
-                <span className="font-bold opacity-80">({v.totalResenas})</span>
+                {promedioReal.toFixed(1)}
+                <span className="font-bold opacity-80">({totalResenasReal})</span>
               </>
             ) : (
               <span className="font-bold opacity-85">Sin reseñas todavía</span>

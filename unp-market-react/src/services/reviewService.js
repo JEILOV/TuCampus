@@ -38,7 +38,7 @@
 import {
   doc, getDoc,
   collection, query, where, orderBy, getDocs,
-  writeBatch, serverTimestamp,
+  serverTimestamp, runTransaction,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
@@ -126,66 +126,77 @@ export const guardarOActualizarResena = async ({
     const resenaRef   = doc(db, "resenas", idResena(autorUid, vendedorUid));
     const vendedorRef = doc(db, "usuarios", vendedorUid);
 
-    // 1) Leer fuera del batch: la reseña previa (si existe) y los
-    //    contadores actuales del vendedor.
-    const [resenaSnap, vendedorSnap] = await Promise.all([
-      getDoc(resenaRef),
-      getDoc(vendedorRef),
-    ]);
+    // 🔧 ANTES: se leían resenaSnap/vendedorSnap fuera de una transacción
+    // y luego se escribían en un writeBatch normal. Ese patrón "leer,
+    // calcular, escribir" NO es atómico de punta a punta: si dos personas
+    // califican al mismo vendedor casi al mismo tiempo, ambas pueden leer
+    // el mismo `totalActual` antes de que la otra escriba, y una de las
+    // dos actualizaciones del contador se pierde (aunque las DOS reseñas
+    // sí queden guardadas) — eso desincroniza el banner de reputación
+    // del listado real de reseñas.
+    //
+    // AHORA: runTransaction() vuelve a leer los documentos dentro de la
+    // transacción y Firestore reintenta automáticamente si algo cambió
+    // entre la lectura y la escritura, garantizando que el contador
+    // siempre refleje exactamente las reseñas que existen.
+    const resultado = await runTransaction(db, async (tx) => {
+      const [resenaSnap, vendedorSnap] = await Promise.all([
+        tx.get(resenaRef),
+        tx.get(vendedorRef),
+      ]);
 
-    const esNueva = !resenaSnap.exists();
-    const vendedorData   = vendedorSnap.exists() ? vendedorSnap.data() : {};
-    const totalActual    = vendedorData.totalResenas || 0;
-    const promedioActual = vendedorData.calificacionPromedio || 0;
-    const sumaActual     = promedioActual * totalActual;
+      const esNueva = !resenaSnap.exists();
+      const vendedorData   = vendedorSnap.exists() ? vendedorSnap.data() : {};
+      const totalActual    = vendedorData.totalResenas || 0;
+      const promedioActual = vendedorData.calificacionPromedio || 0;
+      const sumaActual     = promedioActual * totalActual;
 
-    let nuevoTotal;
-    let nuevaSuma;
+      let nuevoTotal;
+      let nuevaSuma;
 
-    if (esNueva) {
-      nuevoTotal = totalActual + 1;
-      nuevaSuma  = sumaActual + puntaje;
-    } else {
-      const estrellasAnteriores = resenaSnap.data().estrellas || 0;
-      nuevoTotal = totalActual; // una edición no suma una reseña nueva
-      nuevaSuma  = sumaActual - estrellasAnteriores + puntaje; // aplica solo la diferencia
-    }
+      if (esNueva) {
+        nuevoTotal = totalActual + 1;
+        nuevaSuma  = sumaActual + puntaje;
+      } else {
+        const estrellasAnteriores = resenaSnap.data().estrellas || 0;
+        nuevoTotal = totalActual; // una edición no suma una reseña nueva
+        nuevaSuma  = sumaActual - estrellasAnteriores + puntaje; // aplica solo la diferencia
+      }
 
-    const nuevoPromedio = nuevoTotal > 0
-      ? Math.round((nuevaSuma / nuevoTotal) * 10) / 10 // 1 decimal
-      : 0;
+      const nuevoPromedio = nuevoTotal > 0
+        ? Math.round((nuevaSuma / nuevoTotal) * 10) / 10 // 1 decimal
+        : 0;
 
-    // 2) Batch atómico: doc de reseña (crear o editar) + contadores del vendedor.
-    const batch = writeBatch(db);
+      if (esNueva) {
+        tx.set(resenaRef, {
+          vendedorUid,
+          autorUid,
+          autorNombre: autorNombre || "Estudiante UNP",
+          autorAvatar: autorAvatar || "",
+          estrellas:   puntaje,
+          comentario:  (comentario || "").trim(),
+          fecha:        serverTimestamp(),
+          fechaEdicion: null,
+        });
+      } else {
+        tx.update(resenaRef, {
+          autorNombre: autorNombre || "Estudiante UNP",
+          autorAvatar: autorAvatar || "",
+          estrellas:   puntaje,
+          comentario:  (comentario || "").trim(),
+          fechaEdicion: serverTimestamp(),
+        });
+      }
 
-    if (esNueva) {
-      batch.set(resenaRef, {
-        vendedorUid,
-        autorUid,
-        autorNombre: autorNombre || "Estudiante UNP",
-        autorAvatar: autorAvatar || "",
-        estrellas:   puntaje,
-        comentario:  (comentario || "").trim(),
-        fecha:        serverTimestamp(),
-        fechaEdicion: null,
-      });
-    } else {
-      batch.update(resenaRef, {
-        autorNombre: autorNombre || "Estudiante UNP",
-        autorAvatar: autorAvatar || "",
-        estrellas:   puntaje,
-        comentario:  (comentario || "").trim(),
-        fechaEdicion: serverTimestamp(),
-      });
-    }
+      tx.set(vendedorRef, {
+        totalResenas:         nuevoTotal,
+        calificacionPromedio: nuevoPromedio,
+      }, { merge: true });
 
-    batch.set(vendedorRef, {
-      totalResenas:         nuevoTotal,
-      calificacionPromedio: nuevoPromedio,
-    }, { merge: true });
+      return { esNueva, nuevoTotal, nuevoPromedio };
+    });
 
-    await batch.commit();
-    return { id: resenaRef.id, esNueva, nuevoTotal, nuevoPromedio };
+    return { id: resenaRef.id, ...resultado };
   } catch (err) {
     logError("[reviewService.guardarOActualizarResena]", err);
     throw new Error(traducirError(err, "firestore"));
