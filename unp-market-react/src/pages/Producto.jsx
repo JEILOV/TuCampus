@@ -1,32 +1,20 @@
 // src/pages/Producto.jsx
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams }     from "react-router-dom";
+import { ChevronLeft, Heart, MessageCircle, Star, Share2, XCircle } from "lucide-react";
 import { useAuth }                          from "../context/AuthContext";
 import { obtenerProductoPorId }             from "../services/productService";
-import { crearNotificacion }               from "../services/notificationService";
-import { obtenerOCrearChat }               from "../services/chatService";
-import { obtenerPerfilVendedor, obtenerContactoPrivado } from "../services/userService";
+import { obtenerOCrearChat }                from "../services/chatService";
+import { obtenerPerfilVendedor }            from "../services/userService";
 import { useFavorites }                     from "../hooks/useFavorites";
+import Spinner                              from "../components/Spinner";
+import { ToastContainer, useToast }         from "../components/Toast";
 
 // ── Constantes ───────────────────────────────────────────────
 const ICONOS_CAT = {
   dulces: "🍰", bebidas: "🥤", salados: "🍔",
   servicios: "🔧", materiales: "📚",
 };
-
-// ── Sub-componente: Toast ────────────────────────────────────
-const Toast = ({ mensaje }) => (
-  <div style={{
-    background: "#1e293b", color: "white",
-    padding: "14px 18px", borderRadius: "16px",
-    fontSize: "13.5px", fontWeight: 700,
-    boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
-    textAlign: "center",
-    fontFamily: "'Nunito', sans-serif",
-  }}>
-    {mensaje}
-  </div>
-);
 
 // ── Componente principal ─────────────────────────────────────
 const Producto = () => {
@@ -38,15 +26,10 @@ const Producto = () => {
   const [cargando, setCargando] = useState(true);
   const [noExiste, setNoExiste] = useState(false);
   const [toasts,   setToasts]   = useState([]);
+  const mostrarToast            = useToast(setToasts);
   const [reputacionVendedor, setReputacionVendedor] = useState(null); // Fase 3
 
   const { user: currentUser, perfil } = useAuth();
-
-  // 🔒 El campo `producto.telefono` YA NO existe en el doc público de
-  // "productos" (ver productService.js). El número real del vendedor
-  // solo vive en /usuarios/{uid}/privado/contacto — se carga aparte,
-  // exclusivamente para armar el enlace de WhatsApp.
-  const [contactoVendedor, setContactoVendedor] = useState(null);
 
   // ── Redirigir si no hay id en URL ──
   useEffect(() => {
@@ -75,7 +58,10 @@ const Producto = () => {
     return () => { cancelado = true; };
   }, [productoId]);
 
-  // ── Fase 3: reputación del vendedor (⭐ promedio + total de reseñas) ──
+  // ── Fase 3: reputación del vendedor (⭐ promedio + total de reseñas).
+  // El contador ahora se mantiene consistente vía runTransaction en
+  // reviewService.js, así que este valor ya no se desincroniza con
+  // las reseñas reales (ver fix en Vendedor.jsx).
   useEffect(() => {
     if (!producto?.userUid) { setReputacionVendedor(null); return; }
     let cancelado = false;
@@ -85,27 +71,7 @@ const Producto = () => {
     return () => { cancelado = true; };
   }, [producto?.userUid]);
 
-  // 🔒 Contacto privado del vendedor (solo el número real, para el botón
-  // de WhatsApp). Requiere sesión iniciada — regla de Firestore.
-  useEffect(() => {
-    if (!producto?.userUid || !currentUser) { setContactoVendedor(null); return; }
-    let cancelado = false;
-    obtenerContactoPrivado(producto.userUid)
-      .then((c) => { if (!cancelado) setContactoVendedor(c); })
-      .catch(() => { if (!cancelado) setContactoVendedor(null); });
-    return () => { cancelado = true; };
-  }, [producto?.userUid, currentUser]);
-
-  // ── Toast helper ──
-  const mostrarToast = useCallback((mensaje) => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, mensaje }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
-  }, []);
-
   // ── Hook: Favoritos ──────────────────────────────────────
-  // Reemplaza: useState(esFavorito) + handleFavorito inline con
-  // setDoc, sincronizarFavoritos y crearNotificacion mezclados
   const { esFavorito, toggleFavorito } = useFavorites({
     productoId,
     vendedorUid:    producto?.userUid,
@@ -114,30 +80,16 @@ const Producto = () => {
     onToast:        mostrarToast,
   });
 
-  // ── WhatsApp ──
-  const handleWhatsApp = async () => {
-    if (!contactoVendedor?.telefono) return;
-    const num   = contactoVendedor.telefono.replace(/\D/g, "");
-    const final = num.startsWith("51") ? num : "51" + num;
-    const msg   = `¡Hola ${producto.vendedor || ""}! Vi tu publicación de "${producto.titulo}" en TuCampus y me gustaría comprarlo.`;
-    window.open(`https://wa.me/${final}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
-
-    await crearNotificacion({
-      paraUid:        producto.userUid,
-      deUid:          currentUser?.uid,
-      deNombre:       perfil?.nombre || currentUser?.displayName,
-      tipo:           "contacto",
-      productoId,
-      productoTitulo: producto.titulo,
-    });
-  };
-
   // ── Chat interno ──
+  // 🔧 Único canal de contacto: el botón de WhatsApp se retiró por
+  // completo (junto con la lectura del contacto privado que solo
+  // existía para armar ese enlace) — toda comunicación pasa por el
+  // chat interno de la app.
   const [iniciandoChat, setIniciandoChat] = useState(false);
 
   const handleChatInterno = async () => {
     if (!currentUser) {
-      mostrarToast("Iniciá sesión para chatear con el vendedor");
+      mostrarToast("Iniciá sesión para chatear con el vendedor", "error");
       navigate("/login");
       return;
     }
@@ -156,7 +108,7 @@ const Producto = () => {
       });
       navigate(`/chat?id=${chat.id}`);
     } catch (err) {
-      mostrarToast(err.message || "No se pudo abrir el chat");
+      mostrarToast(err.message || "No se pudo abrir el chat", "error");
     } finally {
       setIniciandoChat(false);
     }
@@ -166,8 +118,8 @@ const Producto = () => {
   const handleCompartir = async () => {
     const url   = window.location.href;
     const datos = {
-      title: `${producto?.titulo} — UNP Market`,
-      text:  `Mira este producto en UNP Market: ${producto?.titulo} a S/ ${(producto?.precio || 0).toFixed(2)}`,
+      title: `${producto?.titulo} — TuCampus`,
+      text:  `Mira este producto en TuCampus: ${producto?.titulo} a S/ ${(producto?.precio || 0).toFixed(2)}`,
       url,
     };
     if (navigator.share) {
@@ -184,38 +136,17 @@ const Producto = () => {
   };
 
   // ── Estado: Cargando ────────────────────────────────────
-  if (cargando) {
-    return (
-      <div style={{
-        display: "flex", justifyContent: "center", alignItems: "center",
-        height: "100vh", color: "#5c5c7a", fontWeight: 600,
-        fontFamily: "'Nunito', sans-serif", background: "var(--bg-crema)",
-      }}>
-        Cargando producto...
-      </div>
-    );
-  }
+  if (cargando) return <Spinner mensaje="Cargando producto..." />;
 
   // ── Estado: No existe ───────────────────────────────────
   if (noExiste || !producto) {
     return (
-      <div style={{
-        display: "flex", flexDirection: "column", justifyContent: "center",
-        alignItems: "center", height: "100vh", gap: "16px",
-        fontFamily: "'Nunito', sans-serif", background: "var(--bg-crema)",
-      }}>
-        <span style={{ fontSize: "3rem" }}>🚫</span>
-        <p style={{ fontWeight: 600, color: "var(--azul-oscuro)", fontSize: "1.1rem" }}>
-          Este producto ya no está disponible
-        </p>
+      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background font-sans">
+        <span className="text-5xl">🚫</span>
+        <p className="text-[17px] font-bold text-ink">Este producto ya no está disponible</p>
         <button
           onClick={() => navigate("/")}
-          style={{
-            background: "var(--verde-marca)", color: "white", border: "none",
-            padding: "12px 24px", borderRadius: "12px",
-            fontWeight: 600, fontSize: "0.95rem", cursor: "pointer",
-            fontFamily: "'Nunito', sans-serif",
-          }}
+          className="rounded-btn bg-primary px-6 py-3 text-[15px] font-extrabold text-white"
         >
           Volver al inicio
         </button>
@@ -231,356 +162,175 @@ const Producto = () => {
   } = producto;
 
   const estaAgotado  = (estado || "").toLowerCase() === "agotado";
-  // 🔒 tieneWA ahora depende del contacto privado (ver useEffect de arriba),
-  // no de `producto.telefono` — ese campo ya no se escribe en el doc
-  // público desde que el número vive en /usuarios/{uid}/privado/contacto.
-  const tieneWA      = !!contactoVendedor?.telefono && contactoVendedor.telefono.trim().length >= 7;
   const emoji        = ICONOS_CAT[(categoria || "").toLowerCase()] || "📦";
   const esMiProducto = currentUser?.uid && producto.userUid === currentUser.uid;
 
   // ── Render ──────────────────────────────────────────────
   return (
-    <div
-      className="app-shell"
-      style={{ background: "var(--bg-crema)", paddingBottom: "90px", position: "relative" }}
-    >
+    <div className="app-shell bg-background pb-28 font-sans">
 
-      {/* ── IMAGEN PRINCIPAL ── */}
-      <div
-        id="image-container"
-        style={{
-          position: "relative", width: "100%", height: "320px",
-          background: imagen?.trim()
-            ? "#e8e8f0"
-            : "linear-gradient(135deg,#c8a97a 0%,#a07850 100%)",
-          overflow: "hidden",
-        }}
-      >
-        {/* Botón Volver */}
+      {/* ════════════════════════════════════════════════════
+             IMAGEN PRINCIPAL — mismo lenguaje visual que
+             el header de Vendedor.jsx (rounded-b-[32px])
+        ════════════════════════════════════════════════════ */}
+      <div className="relative h-[320px] w-full overflow-hidden rounded-b-[32px] bg-ink/5">
         <button
           onClick={() => navigate(-1)}
           aria-label="Volver"
-          style={{
-            position: "absolute", top: "20px", left: "20px", zIndex: 10,
-            width: "40px", height: "40px",
-            background: "rgba(255,255,255,0.9)", borderRadius: "50%",
-            border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "var(--azul-oscuro)", boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
-          }}
+          className="absolute left-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink shadow-soft"
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
-            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
+          <ChevronLeft size={20} />
         </button>
 
-        {/* Imagen o placeholder emoji */}
         {imagen?.trim() ? (
           <img
             src={imagen}
             alt={titulo}
-            style={{
-              width: "100%", height: "100%", objectFit: "cover",
-              filter: estaAgotado ? "grayscale(60%) brightness(0.85)" : "none",
-            }}
+            className={`h-full w-full object-cover ${estaAgotado ? "grayscale-[60%] brightness-90" : ""}`}
           />
         ) : (
-          <div style={{
-            position: "absolute", inset: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "5rem",
-          }}>
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#c8a97a] to-[#a07850] text-8xl">
             {emoji}
           </div>
         )}
 
-        {/* Overlay AGOTADO */}
         {estaAgotado && (
-          <div style={{
-            position: "absolute", inset: 0,
-            background: "rgba(255,255,255,0.45)",
-            backdropFilter: "blur(3px)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 5,
-          }}>
-            <span style={{
-              background: "var(--azul-oscuro)", color: "white", fontWeight: 700,
-              padding: "10px 24px", borderRadius: "20px",
-              fontSize: "1.1rem", letterSpacing: "1px",
-              transform: "rotate(-5deg)",
-              boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
-            }}>
+          <div className="absolute inset-0 z-[5] flex items-center justify-center bg-white/45 backdrop-blur-sm">
+            <span className="-rotate-6 rounded-chip bg-ink px-6 py-2.5 text-lg font-extrabold tracking-wide text-white shadow-softLg">
               AGOTADO
             </span>
           </div>
         )}
 
-        {/* Chip Categoría */}
-        <span style={{
-          position: "absolute", bottom: "35px", left: "20px",
-          background: "rgba(0,0,0,0.6)", color: "white",
-          padding: "6px 14px", borderRadius: "20px",
-          fontSize: "0.8rem", fontWeight: 600,
-          textTransform: "uppercase", backdropFilter: "blur(4px)",
-          zIndex: 6,
-        }}>
+        <span className="absolute bottom-6 left-5 z-[6] rounded-chip bg-black/60 px-3.5 py-1.5 text-[13px] font-bold uppercase tracking-wide text-white backdrop-blur">
           {categoria || "Sin categoría"}
         </span>
       </div>
 
-      {/* ── PANEL BLANCO ── */}
-      <div style={{
-        background: "white",
-        borderRadius: "30px 30px 0 0",
-        marginTop: "-30px",
-        position: "relative", zIndex: 10,
-        padding: "25px 20px",
-      }}>
+      {/* ════════════════════════════════════════════════════
+             PANEL BLANCO SUPERPUESTO
+        ════════════════════════════════════════════════════ */}
+      <main className="relative -mt-6 px-4">
+        <div className="rounded-t-[32px] bg-card p-5 shadow-soft">
 
-        {/* Título + Precio */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
-          <h1 style={{
-            fontSize: "1.35rem", fontWeight: 700, color: "var(--azul-oscuro)",
-            margin: 0, lineHeight: 1.3,
-          }}>
-            {titulo}
-          </h1>
-          <div style={{
-            background: "#e6faf0", color: "#16a34a",
-            padding: "6px 12px", borderRadius: "12px",
-            fontWeight: 700, fontSize: "1.1rem", whiteSpace: "nowrap",
-          }}>
-            S/ {(precio || 0).toFixed(2)}
+          {/* Título + Precio */}
+          <div className="flex items-start justify-between gap-2.5">
+            <h1 className="text-[22px] font-extrabold leading-tight text-ink">{titulo}</h1>
+            <div className="whitespace-nowrap rounded-chip bg-[#e6faf0] px-3 py-1.5 text-[17px] font-extrabold text-[#16a34a]">
+              S/ {(precio || 0).toFixed(2)}
+            </div>
           </div>
-        </div>
 
-        {/* Badge Verificado */}
-        <div style={{
-          display: "inline-flex", alignItems: "center", gap: "6px",
-          background: "#fffbeb", color: "#d97706",
-          padding: "5px 12px", borderRadius: "12px",
-          fontSize: "0.75rem", fontWeight: 600, marginTop: "12px",
-        }}>
-          <span style={{ width: "6px", height: "6px", background: "#f59e0b", borderRadius: "50%" }}/>
-          Verificado
-        </div>
-
-        <hr style={{ border: "none", borderTop: "1px solid #f1f3f5", margin: "20px 0" }} />
-
-        {/* Tarjeta Vendedor */}
-        <div
-          onClick={() => { if (producto.userUid) navigate(`/vendedor?uid=${producto.userUid}`); }}
-          style={{
-            background: "var(--bg-crema)", border: "1.5px solid #e8e8f0",
-            borderRadius: "16px", padding: "12px 15px",
-            display: "flex", alignItems: "center", gap: "12px",
-            cursor: producto.userUid ? "pointer" : "default",
-            transition: "background 0.15s",
-          }}
-          onMouseEnter={(e) => { if (producto.userUid) e.currentTarget.style.background = "#eef0f5"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-crema)"; }}
-        >
-          <div style={{
-            width: "44px", height: "44px", borderRadius: "50%",
-            background: "linear-gradient(135deg,#c8a97a,#a07850)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "1.2rem", fontWeight: 700, color: "white",
-            overflow: "hidden", flexShrink: 0,
-          }}>
-            {avatarVendedor?.trim() ? (
-              <img src={avatarVendedor} alt={nombreVendedor} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : (
-              (nombreVendedor || "?")[0].toUpperCase()
-            )}
+          {/* Badge Verificado */}
+          <div className="mt-3 inline-flex items-center gap-1.5 rounded-chip bg-amber-50 px-3 py-1.5 text-[12px] font-bold text-amber-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            Verificado
           </div>
-          <div style={{ flex: 1 }}>
-            <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 600, color: "var(--azul-oscuro)" }}>
-              {nombreVendedor}
-            </h3>
-            <p style={{ margin: 0, fontSize: "0.8rem", color: "#5c5c7a", fontWeight: 600, display: "flex", alignItems: "center", gap: "5px" }}>
-              {reputacionVendedor?.totalResenas > 0 ? (
-                <>
-                  <span style={{ color: "#f5a623" }}>⭐</span>
-                  <span style={{ color: "var(--azul-oscuro)", fontWeight: 700 }}>
-                    {(reputacionVendedor.calificacionPromedio || 0).toFixed(1)}
-                  </span>
-                  ({reputacionVendedor.totalResenas})
-                </>
-              ) : (
-                "Vendedor de la UNP"
-              )}
-            </p>
-          </div>
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#a0a5b9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginLeft: "auto" }}><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
 
-        <hr style={{ border: "none", borderTop: "1px solid #f1f3f5", margin: "20px 0" }} />
+          <hr className="my-5 border-ink/10" />
 
-        {/* Descripción */}
-        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--azul-oscuro)", marginBottom: "10px" }}>
-          Descripción
-        </h2>
-        <p style={{
-          fontSize: "0.95rem", color: "#5c5c7a",
-          lineHeight: 1.6, fontWeight: 600,
-          whiteSpace: "pre-wrap", wordBreak: "break-word",
-          margin: 0,
-        }}>
-          {descripcion}
-        </p>
-
-        {/* Botón Compartir */}
-        <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid #f1f3f5" }}>
+          {/* Tarjeta Vendedor */}
           <button
-            onClick={handleCompartir}
-            style={{
-              width: "100%", background: "var(--bg-crema)", color: "#5c5c7a",
-              border: "1.5px solid #e8e8f0", borderRadius: "14px",
-              padding: "12px", fontSize: "0.9rem", fontWeight: 600,
-              cursor: "pointer", display: "flex", alignItems: "center",
-              justifyContent: "center", gap: "8px",
-              fontFamily: "'Nunito', sans-serif",
-            }}
+            type="button"
+            onClick={() => { if (producto.userUid) navigate(`/vendedor?uid=${producto.userUid}`); }}
+            className="flex w-full items-center gap-3 rounded-2xl border-[1.5px] border-ink/10 bg-background px-4 py-3 text-left transition-colors hover:bg-ink/5"
           >
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-              stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="18" cy="5" r="3"/>
-              <circle cx="6" cy="12" r="3"/>
-              <circle cx="18" cy="19" r="3"/>
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-            </svg>
-            Compartir este producto
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#c8a97a] to-[#a07850] text-lg font-bold text-white">
+              {avatarVendedor?.trim()
+                ? <img src={avatarVendedor} alt={nombreVendedor} className="h-full w-full object-cover" />
+                : (nombreVendedor || "?")[0].toUpperCase()
+              }
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-[15px] font-bold text-ink">{nombreVendedor}</h3>
+              <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink/60">
+                {reputacionVendedor?.totalResenas > 0 ? (
+                  <>
+                    <Star size={13} fill="#f5a623" stroke="none" />
+                    <span className="font-extrabold text-ink">
+                      {(reputacionVendedor.calificacionPromedio || 0).toFixed(1)}
+                    </span>
+                    ({reputacionVendedor.totalResenas})
+                  </>
+                ) : (
+                  "Vendedor de la UNP"
+                )}
+              </p>
+            </div>
+            <ChevronLeft size={18} className="ml-auto shrink-0 rotate-180 text-ink/30" />
           </button>
+
+          <hr className="my-5 border-ink/10" />
+
+          {/* Descripción */}
+          <h2 className="mb-2.5 text-[17px] font-extrabold text-ink">Descripción</h2>
+          <p className="whitespace-pre-wrap break-words text-[14px] font-semibold leading-relaxed text-ink/70">
+            {descripcion}
+          </p>
+
+          {/* Botón Compartir */}
+          <div className="mt-5 border-t border-ink/10 pt-4">
+            <button
+              onClick={handleCompartir}
+              className="flex w-full items-center justify-center gap-2 rounded-btn border-[1.5px] border-ink/10 bg-background py-3 text-[14px] font-bold text-ink/60"
+            >
+              <Share2 size={17} />
+              Compartir este producto
+            </button>
+          </div>
+
         </div>
+      </main>
 
-      </div>
+      {/* ════════════════════════════════════════════════════
+             BARRA DE ACCIÓN FIJA — solo Favorito + Chat interno.
+             El botón de WhatsApp se eliminó: toda la comunicación
+             pasa por el chat interno de la app.
+        ════════════════════════════════════════════════════ */}
+      <div className="fixed bottom-0 left-1/2 z-[100] w-full max-w-[480px] -translate-x-1/2 border-t border-ink/10 bg-card px-5 py-4 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+        <div className="flex gap-3">
 
-      {/* ── BARRA DE ACCIÓN FIJA ── */}
-      <div style={{
-        position: "fixed", bottom: 0, left: "50%",
-        transform: "translateX(-50%)",
-        width: "100%", maxWidth: "480px",
-        background: "white", padding: "15px 20px",
-        borderTop: "1px solid #f1f3f5",
-        display: "flex", gap: "12px",
-        zIndex: 100, boxSizing: "border-box",
-        boxShadow: "0 -4px 20px rgba(0,0,0,0.03)",
-      }}>
-
-        {/* Botón Favorito — usa toggleFavorito del hook */}
-        <button
-          onClick={toggleFavorito}
-          aria-label={esFavorito ? "Quitar de favoritos" : "Añadir a favoritos"}
-          style={{
-            width: "54px", height: "54px",
-            background: "white",
-            border: `1.5px solid ${esFavorito ? "#ef4444" : "#e8e8f0"}`,
-            borderRadius: "14px",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer",
-            transition: "border-color 0.2s",
-            flexShrink: 0,
-          }}
-        >
-          <svg viewBox="0 0 24 24" width="24" height="24"
-            fill={esFavorito ? "#ef4444" : "none"}
-            stroke={esFavorito ? "#ef4444" : "#5c5c7a"}
-            strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-          </svg>
-        </button>
-
-        {/* Botones de contacto — ocultos si estás viendo tu propio producto */}
-        {esMiProducto ? (
+          {/* Favorito */}
           <button
-            onClick={() => navigate(`/editar?id=${productoId}`)}
-            style={{
-              flex: 1, height: "54px",
-              background: "var(--bg-crema)", color: "var(--azul-oscuro)",
-              border: "1.5px solid #e8e8f0", borderRadius: "14px",
-              fontSize: "0.95rem", fontWeight: 700, cursor: "pointer",
-              fontFamily: "'Nunito', sans-serif",
-            }}
+            onClick={toggleFavorito}
+            aria-label={esFavorito ? "Quitar de favoritos" : "Añadir a favoritos"}
+            className={`flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-btn border-[1.5px] bg-card transition-colors ${
+              esFavorito ? "border-red-500" : "border-ink/10"
+            }`}
           >
-            Este es tu producto · Editar
+            <Heart size={22} fill={esFavorito ? "#ef4444" : "none"} stroke={esFavorito ? "#ef4444" : "#5c5c7a"} strokeWidth={2.2} />
           </button>
-        ) : estaAgotado ? (
-          <button disabled style={{
-            flex: 1, height: "54px",
-            background: "#e8e8f0", color: "#a0a5b9",
-            border: "none", borderRadius: "14px",
-            fontSize: "1rem", fontWeight: 600, cursor: "not-allowed",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-            fontFamily: "'Nunito', sans-serif",
-          }}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-            </svg>
-            Agotado
-          </button>
-        ) : (
-          <>
-            {/* CTA primaria: Chat interno */}
+
+          {esMiProducto ? (
+            <button
+              onClick={() => navigate(`/editar?id=${productoId}`)}
+              className="h-[54px] flex-1 rounded-btn border-[1.5px] border-ink/10 bg-background text-[15px] font-extrabold text-ink"
+            >
+              Este es tu producto · Editar
+            </button>
+          ) : estaAgotado ? (
+            <button
+              disabled
+              className="flex h-[54px] flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-btn bg-ink/10 text-[15px] font-bold text-ink/40"
+            >
+              <XCircle size={19} />
+              Agotado
+            </button>
+          ) : (
             <button
               onClick={handleChatInterno}
               disabled={iniciandoChat}
-              style={{
-                flex: 1, height: "54px",
-                background: "var(--verde-marca)", color: "white",
-                border: "none", borderRadius: "14px",
-                fontSize: "1.05rem", fontWeight: 600,
-                cursor: iniciandoChat ? "default" : "pointer",
-                opacity: iniciandoChat ? 0.75 : 1,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-                boxShadow: "0 4px 15px rgba(58,125,68,0.3)",
-                transition: "background 0.2s",
-                fontFamily: "'Nunito', sans-serif",
-              }}
+              className="flex h-[54px] flex-1 items-center justify-center gap-2 rounded-btn bg-primary text-[16px] font-extrabold text-white shadow-soft transition-opacity disabled:opacity-75"
             >
-              <svg viewBox="0 0 24 24" width="21" height="21" fill="none"
-                stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-              </svg>
+              <MessageCircle size={20} />
               {iniciandoChat ? "Abriendo chat..." : "Chat interno"}
             </button>
-
-            {/* Secundario: WhatsApp directo (fallback opcional mientras se cierra la decisión de Fase 0.1) */}
-            {tieneWA && (
-              <button
-                onClick={handleWhatsApp}
-                aria-label="Contactar por WhatsApp"
-                style={{
-                  width: "54px", height: "54px", flexShrink: 0,
-                  background: "white", color: "#25D366",
-                  border: "1.5px solid #e8e8f0", borderRadius: "14px",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer",
-                }}
-              >
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-                </svg>
-              </button>
-            )}
-          </>
-        )}
-
+          )}
+        </div>
       </div>
 
       {/* ── TOASTS ── */}
-      <div style={{
-        position: "fixed", bottom: "90px", left: "50%",
-        transform: "translateX(-50%)", zIndex: 1000,
-        display: "flex", flexDirection: "column", gap: "8px",
-        width: "calc(100% - 40px)", maxWidth: "390px",
-        pointerEvents: "none",
-      }}>
-        {toasts.map((t) => <Toast key={t.id} mensaje={t.mensaje} />)}
-      </div>
+      <ToastContainer toasts={toasts} />
 
     </div>
   );

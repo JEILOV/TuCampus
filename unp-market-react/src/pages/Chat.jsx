@@ -35,8 +35,6 @@ import {
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
 import { ToastContainer, useToast }    from "../components/Toast";
 import Spinner                         from "../components/Spinner";
-import BottomNav                       from "../components/BottomNav";
-import BotonNotificaciones             from "../components/BotonNotificaciones";
 import MenuChat                        from "../components/MenuChat";
 
 // Placeholder — reemplazar por los archivos finales de la mascota
@@ -510,7 +508,25 @@ const Chat = () => {
   };
 
   // ── Navegación ────────────────────────────────────────────
-  const volverALista = () => navigate("/chat", { replace: true });
+  // 🔧 ANTES: navigate("/chat", { replace: true }) REEMPLAZA la entrada
+  // actual del historial por otra — no la saca. Como abrirChat() empuja
+  // (push) una entrada nueva al entrar a la conversación, el replace de
+  // acá dejaba una entrada extra apilada: al volver a la lista y tocar
+  // "volver" otra vez, hacía falta un toque de más para llegar al Home.
+  //
+  // AHORA: navigate(-1) hace lo mismo que el botón "atrás" nativo — saca
+  // exactamente la entrada que abrirChat() empujó, dejando el historial
+  // limpio y simétrico (push al entrar, pop al salir). El fallback a
+  // navigate("/chat") cubre el caso de entrar directo a un chat sin
+  // historial propio de la app detrás (ej. deep link desde una
+  // notificación), donde no hay nada más a lo que "volver".
+  const volverALista = () => {
+    if (window.history.state?.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate("/chat");
+    }
+  };
   const irAlPerfilVendedor = () => { if (otroUid) navigate(`/vendedor?uid=${otroUid}`); };
   const abrirChat     = (id) => navigate(`/chat?id=${id}`);
 
@@ -533,7 +549,7 @@ const Chat = () => {
     });
 
     return (
-      <div className="app-shell bg-background pb-28 font-sans">
+      <div className="app-shell bg-background pb-8 font-sans">
 
         {/* HEADER AZUL (mismo patrón que Home.jsx / Publicar.jsx) */}
         <header className="relative rounded-b-[32px] bg-primary px-6 pb-10 pt-8">
@@ -553,8 +569,6 @@ const Chat = () => {
             </div>
           </div>
         </header>
-
-        <BotonNotificaciones />
 
         {/* TARJETA BLANCA SUPERPUESTA */}
         <main className="relative -mt-6 px-4">
@@ -580,7 +594,6 @@ const Chat = () => {
           </div>
         </main>
 
-        <BottomNav activo="mensajes" />
         <ToastContainer toasts={toasts} />
       </div>
     );

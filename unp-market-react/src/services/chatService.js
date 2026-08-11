@@ -43,10 +43,10 @@
 // ============================================================
 
 import {
-  doc, getDoc, setDoc, updateDoc,
+  doc, getDoc, updateDoc,
   collection, query, where, orderBy,
   onSnapshot, writeBatch, serverTimestamp, increment,
-  arrayUnion, arrayRemove,
+  arrayUnion, arrayRemove, runTransaction,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
@@ -131,8 +131,7 @@ export const obtenerOCrearChat = async (uidComprador, uidVendedor, productoInfo 
   const chatRef = doc(db, "chats", chatId);
 
   try {
-    const [snap, infoComprador, infoVendedor] = await Promise.all([
-      getDoc(chatRef),
+    const [infoComprador, infoVendedor] = await Promise.all([
       obtenerInfoPerfilReal(uidComprador, productoInfo.compradorNombre, productoInfo.compradorAvatar),
       obtenerInfoPerfilReal(uidVendedor, productoInfo.vendedorNombre, productoInfo.vendedorAvatar),
     ]);
@@ -142,32 +141,65 @@ export const obtenerOCrearChat = async (uidComprador, uidVendedor, productoInfo 
       [uidVendedor]:  infoVendedor,
     };
 
-    if (snap.exists()) {
-      // Auto-sanar datos de perfil desatualizados — best-effort, no bloquea
-      // la apertura del chat si esta escritura de "refresco" falla.
-      updateDoc(chatRef, { participantesInfo }).catch((err) =>
-        logError("[chatService.obtenerOCrearChat] refresco de participantesInfo", err)
-      );
-      return { id: chatId, ...snap.data(), participantesInfo };
-    }
+    // 🔧 ANTES: getDoc() + setDoc() sueltos, sin transacción. Eso es
+    // vulnerable a una lectura de caché local desactualizada (ej. offline
+    // persistence, o dos pestañas llamando esto casi al mismo tiempo):
+    // si `snap.exists()` daba un falso "no existe", el setDoc() de más
+    // abajo SOBREESCRIBÍA por completo un chat que en realidad ya tenía
+    // historial — reseteando ultimoMensaje/noLeidoPor/producto de origen
+    // (los mensajes de la subcolección no se borran, pero la vista previa
+    // y el contexto sí, dando la sensación de "otro chat").
+    //
+    // AHORA: runTransaction() lee siempre contra el servidor (nunca la
+    // caché local) y Firestore reintenta solo si algo cambió — mismo
+    // patrón que ya usamos en reviewService.guardarOActualizarResena.
+    //
+    // Además: antes, productoId/productoTitulo/productoImagen SOLO se
+    // guardaban al crear el chat y nunca más se tocaban — si dos personas
+    // ya habían chateado (ej. desde el perfil, sin producto) y luego una
+    // le escribía desde un producto puntual, el "Sobre: X" se quedaba
+    // vacío o pegado al primero para siempre. Ahora, si esta llamada trae
+    // un producto NUEVO y distinto al que el chat ya tenía guardado, se
+    // actualiza para reflejar de qué se está hablando ahora. Si se abre
+    // sin contexto de producto (ej. desde el perfil del vendedor), el
+    // producto de origen existente se deja intacto.
+    const resultado = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(chatRef);
 
-    const nuevoChat = {
-      participantes: [uidComprador, uidVendedor].sort(),
-      participantesInfo,
-      productoId:     productoInfo.productoId     || null,
-      productoTitulo: productoInfo.productoTitulo || null,
-      productoImagen: productoInfo.productoImagen || null,
+      if (snap.exists()) {
+        const datosActuales = snap.data();
+        const actualizacion = { participantesInfo };
 
-      ultimoMensaje:      "",
-      ultimoMensajeFecha: serverTimestamp(),
-      ultimoMensajeDeUid: null,
+        if (productoInfo.productoId && productoInfo.productoId !== datosActuales.productoId) {
+          actualizacion.productoId     = productoInfo.productoId;
+          actualizacion.productoTitulo = productoInfo.productoTitulo || null;
+          actualizacion.productoImagen = productoInfo.productoImagen || null;
+        }
 
-      noLeidoPor: { [uidComprador]: 0, [uidVendedor]: 0 },
-      creadoEn:   serverTimestamp(),
-    };
+        tx.update(chatRef, actualizacion);
+        return { ...datosActuales, ...actualizacion };
+      }
 
-    await setDoc(chatRef, nuevoChat);
-    return { id: chatId, ...nuevoChat };
+      const nuevoChat = {
+        participantes: [uidComprador, uidVendedor].sort(),
+        participantesInfo,
+        productoId:     productoInfo.productoId     || null,
+        productoTitulo: productoInfo.productoTitulo || null,
+        productoImagen: productoInfo.productoImagen || null,
+
+        ultimoMensaje:      "",
+        ultimoMensajeFecha: serverTimestamp(),
+        ultimoMensajeDeUid: null,
+
+        noLeidoPor: { [uidComprador]: 0, [uidVendedor]: 0 },
+        creadoEn:   serverTimestamp(),
+      };
+
+      tx.set(chatRef, nuevoChat);
+      return nuevoChat;
+    });
+
+    return { id: chatId, ...resultado };
   } catch (err) {
     logError("[chatService.obtenerOCrearChat]", err);
     throw new Error(traducirError(err, "firestore"));
