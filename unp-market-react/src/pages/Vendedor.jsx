@@ -20,8 +20,6 @@ import {
   obtenerResenasDeVendedor,
 } from "../services/reviewService";
 import Spinner    from "../components/Spinner";
-import BottomNav   from "../components/BottomNav";
-import BotonNotificaciones from "../components/BotonNotificaciones";
 import ModalResena from "../components/ModalResena";
 import ProductCard from "../components/ProductCard";
 import { ToastContainer, useToast } from "../components/Toast";
@@ -322,7 +320,7 @@ const Vendedor = () => {
         : 0);
 
   return (
-    <div className="app-shell font-sans pb-24">
+    <div className="app-shell font-sans pb-8">
 
       {/* CABECERA — Azul profundo, o imagen de portada tal cual (sin overlay) */}
       <div
@@ -529,10 +527,6 @@ const Vendedor = () => {
           </div>
         )}
       </div>
-
-      {/* BOTTOM NAV */}
-      <BotonNotificaciones />
-      <BottomNav />
 
       <ToastContainer toasts={toasts} />
 

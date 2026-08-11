@@ -116,12 +116,21 @@ const Login = () => {
       {/* CONTENIDO PRINCIPAL */}
       <div className="flex w-full max-w-[350px] flex-1 flex-col items-center justify-center text-center">
 
-        {/* LOGO UNP */}
-        <img
-          src={LOGO_UNP}
-          alt="Universidad Nacional de Piura"
-          className="h-[100px] w-[100px] object-contain"
-        />
+        {/* INSIGNIA UNP — más chica, corrida a la izquierda, con crédito
+            institucional al lado (en vez de ser el elemento central de
+            arriba, ahora es una firma discreta). Leve indent + alineación
+            vertical fina para que el ícono y el texto queden centrados
+            entre sí como bloque. */}
+        <div className="ml-1.5 flex w-full items-center gap-2.5 self-start text-left">
+          <img
+            src={LOGO_UNP}
+            alt="Universidad Nacional de Piura"
+            className="h-11 w-11 shrink-0 object-contain"
+          />
+          <p className="-mt-0.5 text-[11px] font-semibold leading-snug text-background/65">
+            Desarrollado por estudiantes de la<br />Universidad Nacional de Piura
+          </p>
+        </div>
 
         {/* MASCOTA */}
         <img
@@ -131,7 +140,7 @@ const Login = () => {
         />
 
         {/* MARCA */}
-        <h1 className="mt-6 text-[2.5rem] font-extrabold leading-none text-background">
+        <h1 className="mt-2 text-[2.5rem] font-extrabold leading-none text-background">
           TuCampus
         </h1>
         <p className="mt-2 text-[15px] font-medium text-background/80">
