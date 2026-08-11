@@ -34,7 +34,7 @@ const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
   const nombreVend = vendedorNombre || vendedor || "Yo";
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-card bg-card shadow-soft">
+    <article className="flex h-fit w-full flex-col self-start overflow-hidden rounded-card bg-card shadow-soft">
       {/* Imagen */}
       <div className="relative aspect-square w-full bg-background">
         {imagen?.trim() ? (
@@ -59,7 +59,7 @@ const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
       </div>
 
       {/* Cuerpo */}
-      <div className="flex flex-1 flex-col gap-2 p-3">
+      <div className="flex flex-col gap-2 p-3">
         <p className="truncate text-[13.5px] font-bold leading-tight text-ink">
           {titulo || "Sin título"}
         </p>

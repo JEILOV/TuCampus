@@ -22,7 +22,7 @@ const ProductCard = ({ producto, onVerDetalle }) => {
   return (
     <article
       onClick={() => onVerDetalle(id)}
-      className={`cursor-pointer overflow-hidden rounded-card bg-card shadow-soft transition-transform active:scale-[0.98]${
+      className={`h-fit w-full cursor-pointer self-start overflow-hidden rounded-card bg-card shadow-soft transition-transform active:scale-[0.98]${
         estaAgotado ? " opacity-70" : ""
       }`}
     >
