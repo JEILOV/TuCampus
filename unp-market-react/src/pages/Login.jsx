@@ -22,6 +22,9 @@
 //    - Único método de login: Google (único provider real en el
 //      código). No se agregan botones de Microsoft/Email porque
 //      no hay lógica detrás y quedarían inutilizados.
+//    - FIX: insignia UNP + texto quedaban corridos a la izquierda
+//      por "ml-1.5" + "self-start" + falta de "justify-center".
+//      Ahora el bloque se centra como conjunto dentro del contenedor.
 // ============================================================
 
 import { useState, useEffect }       from "react";
@@ -116,18 +119,17 @@ const Login = () => {
       {/* CONTENIDO PRINCIPAL */}
       <div className="flex w-full max-w-[350px] flex-1 flex-col items-center justify-center text-center">
 
-        {/* INSIGNIA UNP — más chica, corrida a la izquierda, con crédito
-            institucional al lado (en vez de ser el elemento central de
-            arriba, ahora es una firma discreta). Leve indent + alineación
-            vertical fina para que el ícono y el texto queden centrados
-            entre sí como bloque. */}
-        <div className="ml-1.5 flex w-full items-center gap-2.5 self-start text-left">
+        {/* INSIGNIA UNP — centrada como bloque (logo + texto). Antes tenía
+            ml-1.5 + self-start + text-left, lo que la corría a la izquierda.
+            Ahora justify-center centra el conjunto y text-center centra
+            las dos líneas del texto respecto al ícono. */}
+        <div className="flex w-full items-center justify-center gap-2.5 text-center">
           <img
             src={LOGO_UNP}
             alt="Universidad Nacional de Piura"
             className="h-11 w-11 shrink-0 object-contain"
           />
-          <p className="-mt-0.5 text-[11px] font-semibold leading-snug text-background/65">
+          <p className="text-[11px] font-semibold leading-snug text-background/65">
             Desarrollado por estudiantes de la<br />Universidad Nacional de Piura
           </p>
         </div>
