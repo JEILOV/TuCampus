@@ -69,12 +69,20 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
       keywords:       prefijos,
     });
 
-    const userRef = doc(db, "usuarios", user.uid);
-    const snap    = await getDoc(userRef);
-    if (snap.exists()) {
-      batch.update(userRef, {
-        totalPublicaciones: (snap.data().totalPublicaciones || 0) + 1,
-      });
+    // 🔧 El contador totalPublicaciones es un "nice to have", no un
+    // requisito de la publicación. Si esta lectura falla (hipo de red,
+    // etc.) NO debe tumbar la creación del producto en sí — solo se
+    // omite el incremento y se registra para diagnóstico.
+    try {
+      const userRef = doc(db, "usuarios", user.uid);
+      const snap    = await getDoc(userRef);
+      if (snap.exists()) {
+        batch.update(userRef, {
+          totalPublicaciones: (snap.data().totalPublicaciones || 0) + 1,
+        });
+      }
+    } catch (counterErr) {
+      logError("[productService.crearProducto] contador opcional", counterErr);
     }
 
     await batch.commit();

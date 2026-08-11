@@ -11,6 +11,8 @@
 //         de aquí. Cambiar la calidad = cambiar 1 constante.
 // ============================================================
 
+import { logError } from "./errorHandler";
+
 const MAX_DIMENSION = 1080;
 const CALIDAD_JPEG  = 0.70;
 const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
@@ -70,6 +72,15 @@ export const comprimirImagen = (file) =>
  */
 export const subirImagenImgBB = (file, onProgress) => {
   if (!file) return Promise.resolve("");
+
+  // 🔧 Si falta configurar la variable de entorno en el deploy,
+  // esto fallaría igual pero de forma críptica (401/400 de ImgBB sin
+  // contexto). Este guard deja un log claro para diagnosticar rápido
+  // un problema de configuración en vez de uno del usuario.
+  if (!IMGBB_API_KEY) {
+    logError("[imageUtils.subirImagenImgBB]", new Error("Falta VITE_IMGBB_API_KEY en el entorno."));
+    return Promise.reject(new Error("Falta configurar la clave de ImgBB."));
+  }
 
   return new Promise((resolve, reject) => {
     const formData = new FormData();

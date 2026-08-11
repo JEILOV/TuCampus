@@ -41,15 +41,39 @@ const Publicar = () => {
   const mostrarToast = useToast(setToast, { single: true });
 
   const fileInputRef = useRef(null);
+  // 🔧 Ref (no state) para bloquear doble-submit al instante: `disabled`
+  // depende de un re-render de React, así que un doble clic o Enter
+  // repetido podría disparar handleSubmit dos veces antes de que el
+  // botón se deshabilite visualmente. El ref se lee/escribe de forma
+  // síncrona, sin esperar al render.
+  const enviandoRef = useRef(false);
 
   // Limpiar object URL al desmontar
   useEffect(() => {
     return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); };
   }, [previewUrl]);
 
+  const MAX_IMAGEN_MB = 5;
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // 🔧 Validar ANTES de aceptar el archivo: sin esto, un archivo
+    // gigante o de tipo inválido puede colgar la compresión con
+    // Canvas más adelante y terminar en un "Error al publicar"
+    // genérico que no le dice nada al usuario sobre la causa real.
+    if (!file.type.startsWith("image/")) {
+      mostrarToast("El archivo debe ser una imagen (JPG o PNG).", "error");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > MAX_IMAGEN_MB * 1024 * 1024) {
+      mostrarToast(`La imagen supera ${MAX_IMAGEN_MB}MB. Elige una más liviana.`, "error");
+      e.target.value = "";
+      return;
+    }
+
     setArchivo(file);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(file));
@@ -58,12 +82,17 @@ const Publicar = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (enviandoRef.current) return; // ya hay un envío en curso, ignorar
+    enviandoRef.current = true;
+
     if (titulo.trim() === "" || descripcion.trim() === "") {
       mostrarToast("El título y la descripción deben contener texto real.", "error");
+      enviandoRef.current = false;
       return;
     }
     if (!user) {
       mostrarToast("Debes iniciar sesión para publicar.", "error");
+      enviandoRef.current = false;
       return;
     }
 
@@ -74,6 +103,7 @@ const Publicar = () => {
     const precioNum = parseFloat(precio);
     if (!Number.isFinite(precioNum) || precioNum <= 0 || precioNum > 10000) {
       mostrarToast("El precio debe ser mayor a S/0 y no superar S/10,000.", "error");
+      enviandoRef.current = false;
       return;
     }
 
@@ -90,6 +120,7 @@ const Publicar = () => {
     if (!telefonoConfigurado || telefonoConfigurado.trim().length < 7) {
       mostrarToast("⚠️ Configura tu WhatsApp en el perfil para publicar.", "error");
       setTimeout(() => navigate("/perfil", { state: { abrirModalEdicion: true } }), 2000);
+      enviandoRef.current = false;
       return;
     }
 
@@ -148,6 +179,7 @@ const Publicar = () => {
       mostrarToast("Error al publicar. Intenta de nuevo.", "error");
       setBtnTexto("Publicar Producto");
       setEnviando(false);
+      enviandoRef.current = false;
     }
   };
 
