@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef }          from "react";
 import { useNavigate }                          from "react-router-dom";
 import { doc, getDoc, collection, writeBatch, serverTimestamp } from "firebase/firestore";
+import { ChevronLeft, Camera, Lightbulb, Send } from "lucide-react";
 import { db }                                   from "../services/firebase";
 import { useAuth }                              from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB }    from "../utils/imageUtils";
@@ -11,18 +12,14 @@ import Toast, { useToast }                      from "../components/Toast"; // �
 import BottomNav                                from "../components/BottomNav";
 import BotonNotificaciones                      from "../components/BotonNotificaciones";
 
-// ── Estilos reutilizables ────────────────────────────────────
-const inputStyle = {
-  background: "var(--bg-crema)", border: "1.5px solid #e8e8f0",
-  borderRadius: "12px", padding: "14px 16px",
-  fontFamily: "'Nunito', sans-serif", fontSize: "0.95rem",
-  fontWeight: 700, outline: "none",
-  boxSizing: "border-box", width: "100%",
-};
+// Placeholder — reemplazar por el archivo final de la mascota (mismo
+// ícono que ya usa el header de Home.jsx, para mantener consistencia).
+const MASCOTA_ICONO = "/assets/mascota-icono-placeholder.png";
 
-const labelStyle = {
-  fontSize: "0.9rem", fontWeight: 600, color: "var(--text-dark)",
-};
+// ── Estilos reutilizables (Tailwind, mismo lenguaje que Perfil.jsx) ──
+const inputClass =
+  "w-full box-border rounded-btn border-[1.5px] border-ink/10 bg-background px-3.5 py-3 text-[15px] font-bold text-ink outline-none focus:border-primary/40";
+const labelClass = "text-[13.5px] font-bold text-ink";
 
 // ── Componente principal ─────────────────────────────────────
 const Publicar = () => {
@@ -152,63 +149,94 @@ const Publicar = () => {
   };
 
   return (
-    <div className="app-shell" style={{ background: "var(--bg-crema)", margin: "0 auto", padding: 0 }}>
+    <div className="app-shell bg-background pb-28 font-sans">
 
-      {/* HEADER */}
-      <header className="header" style={{ justifyContent: "center", background: "var(--bg-crema)", padding: "20px" }}>
-        <button onClick={() => navigate(-1)} style={{ position: "absolute", left: "20px", background: "none", border: "none", cursor: "pointer" }}>
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="var(--azul-oscuro)" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
-          </svg>
+      {/* ════════════════════════════════════════════════════
+             HEADER AZUL (mismo patrón que Home.jsx)
+        ════════════════════════════════════════════════════ */}
+      <header className="relative rounded-b-[32px] bg-primary px-6 pb-10 pt-8">
+        <button
+          onClick={() => navigate(-1)}
+          aria-label="Volver"
+          className="absolute left-5 top-8 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
+        >
+          <ChevronLeft size={20} />
         </button>
-        <img src="https://i.ibb.co/fzNKyX51/Dise-o-sin-t-tulo-1.png" alt="Logo" style={{ height: "44px", objectFit: "contain", mixBlendMode: "multiply" }} />
+
+        <div className="flex items-center justify-center gap-3">
+          <img src={MASCOTA_ICONO} alt="TuCampus" className="h-14 w-14 object-contain" />
+          <div className="text-left">
+            <p className="text-2xl font-extrabold leading-none text-background">TuCampus</p>
+            <p className="mt-1 text-[12px] font-medium text-background/75">Conecta. Comparte. Crece.</p>
+          </div>
+        </div>
       </header>
 
-      {/* FORMULARIO */}
-      <main className="publish-container" style={{ background: "var(--bg-crema)", paddingTop: "10px" }}>
-        <form onSubmit={handleSubmit} className="publish-form-card" style={{ background: "var(--blanco-puro)" }}>
+      <BotonNotificaciones />
+
+      {/* ════════════════════════════════════════════════════
+             TARJETA BLANCA SUPERPUESTA — Formulario
+        ════════════════════════════════════════════════════ */}
+      <main className="relative -mt-6 px-4">
+        <form onSubmit={handleSubmit} className="rounded-t-[32px] bg-card p-5 pb-6 shadow-soft">
 
           {/* FOTO */}
-          <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>Foto del producto *</label>
+          <div className="mb-5">
+            <label className={labelClass}>Foto del producto *</label>
             <div
               onClick={() => fileInputRef.current?.click()}
-              style={{
-                border: `2px dashed ${archivo ? "var(--verde-marca)" : "#c3c6d4"}`,
-                borderRadius: "16px", padding: "20px", marginTop: "8px",
-                textAlign: "center", background: "var(--bg-crema)", cursor: "pointer",
-              }}
+              className={`mt-2 cursor-pointer rounded-2xl border-2 border-dashed bg-background p-5 text-center transition-colors ${
+                archivo ? "border-[#287653]" : "border-ink/15"
+              }`}
             >
-              {!previewUrl && <span style={{ fontSize: "2rem" }}>📷</span>}
-              <p style={{ fontSize: "0.85rem", fontWeight: 700, color: "#5c5c7a", marginTop: "8px" }}>
-                {imagenAreaTexto()}
-              </p>
+              {!previewUrl && (
+                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Camera size={26} />
+                </span>
+              )}
+
+              {!archivo ? (
+                <>
+                  <p className="mt-2 text-[14.5px] font-extrabold text-ink">{imagenAreaTexto()}</p>
+                  <p className="mt-1 text-[12px] font-semibold text-ink/40">Formatos: JPG, PNG · Máx. 5MB</p>
+                </>
+              ) : (
+                <p className="mt-2 text-[12.5px] font-bold text-ink/60">{imagenAreaTexto()}</p>
+              )}
+
               {previewUrl && (
                 <img src={previewUrl} alt="Preview"
-                  style={{ width: "100%", height: "150px", objectFit: "cover", borderRadius: "12px", marginTop: "10px" }} />
+                  className="mt-3 h-[150px] w-full rounded-2xl object-cover" />
               )}
             </div>
-            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} style={{ display: "none" }} />
+            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
           </div>
 
           {/* TÍTULO */}
-          <div style={{ marginBottom: "16px" }}>
-            <label style={labelStyle}>¿Qué vas a vender?</label>
+          <div className="mb-4">
+            <label className={labelClass}>¿Qué vas a vender?</label>
             <input type="text" required maxLength={200} placeholder="Ej: Galletas de avena"
-              value={titulo} onChange={(e) => setTitulo(e.target.value)} style={inputStyle} />
+              value={titulo} onChange={(e) => setTitulo(e.target.value)}
+              className={`${inputClass} mt-2`} />
           </div>
 
           {/* PRECIO + CATEGORÍA */}
-          <div style={{ display: "flex", gap: "12px", marginBottom: "16px" }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Precio (S/)</label>
-              <input type="number" required placeholder="0.00"
-                value={precio} onChange={(e) => setPrecio(e.target.value)} style={inputStyle} />
+          <div className="mb-4 grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Precio (S/)</label>
+              <div className="relative mt-2">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[14px] font-extrabold text-ink/40">
+                  S/
+                </span>
+                <input type="number" required placeholder="0.00"
+                  value={precio} onChange={(e) => setPrecio(e.target.value)}
+                  className={`${inputClass} pl-9`} />
+              </div>
             </div>
-            <div style={{ flex: 1.5 }}>
-              <label style={labelStyle}>Categoría</label>
+            <div>
+              <label className={labelClass}>Categoría</label>
               <select value={categoria} onChange={(e) => setCategoria(e.target.value)}
-                style={{ ...inputStyle, cursor: "pointer" }}>
+                className={`${inputClass} mt-2 cursor-pointer`}>
                 <option value="dulces">🍰 Dulces</option>
                 <option value="salados">🍔 Salados</option>
                 <option value="bebidas">🥤 Bebidas</option>
@@ -219,42 +247,54 @@ const Publicar = () => {
           </div>
 
           {/* DESCRIPCIÓN */}
-          <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>Descripción</label>
-            <textarea required rows={3} maxLength={500} placeholder="Detalles..."
+          <div className="mb-5">
+            <div className="flex items-center justify-between">
+              <label className={labelClass}>Descripción</label>
+              <span className="text-[11px] font-semibold text-ink/30">{descripcion.length}/500</span>
+            </div>
+            <textarea required rows={3} maxLength={500} placeholder="Cuéntanos más detalles de tu producto..."
               value={descripcion} onChange={(e) => setDescripcion(e.target.value)}
-              style={{ ...inputStyle, resize: "none" }} />
+              className={`${inputClass} mt-2 resize-none`} />
           </div>
 
-          <button type="submit" disabled={enviando} className="btn-publish-final">
-            {enviando ? btnTexto : "Publicar Producto"}
+          {/* CONSEJO */}
+          <div className="mb-5 flex gap-2.5 rounded-2xl bg-primary/5 p-3.5">
+            <Lightbulb size={18} className="mt-0.5 shrink-0 text-primary" />
+            <div>
+              <p className="text-[13px] font-extrabold text-ink">Consejo</p>
+              <p className="mt-0.5 text-[12.5px] font-semibold leading-snug text-ink/60">
+                Sé claro y específico para que más estudiantes encuentren tu producto.
+              </p>
+            </div>
+          </div>
+
+          {/* CTA */}
+          <button
+            type="submit"
+            disabled={enviando}
+            className="flex w-full items-center justify-center gap-2 rounded-btn bg-primary py-4 text-[15px] font-extrabold text-white shadow-soft transition-opacity disabled:opacity-70"
+          >
+            <Send size={18} />
+            {enviando ? btnTexto : "Publicar producto"}
           </button>
 
           {enviando && (
-            <div style={{
-              marginTop: "10px", height: "6px", borderRadius: "4px",
-              background: "#e8e8f0", overflow: "hidden",
-            }}>
-              <div style={{
-                height: "100%", width: `${progreso}%`,
-                background: "var(--verde-marca)", borderRadius: "4px",
-                transition: "width 0.2s ease",
-              }} />
+            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-background">
+              <div
+                className="h-full rounded-full bg-[#287653] transition-[width] duration-200"
+                style={{ width: `${progreso}%` }}
+              />
             </div>
           )}
         </form>
       </main>
 
       {/* BOTTOM NAV */}
-      <BotonNotificaciones />
       <BottomNav activo="publicar" />
 
       {/* ✅ TOAST LIMPIO */}
       {toast && (
-        <div style={{
-          position: "fixed", bottom: "84px", left: "50%", transform: "translateX(-50%)",
-          zIndex: 1000, width: "calc(100% - 40px)", maxWidth: "390px", pointerEvents: "none",
-        }}>
+        <div className="pointer-events-none fixed bottom-[84px] left-1/2 z-[1000] w-[calc(100%-40px)] max-w-[390px] -translate-x-1/2">
           <Toast mensaje={toast.mensaje} tipo={toast.tipo} />
         </div>
       )}

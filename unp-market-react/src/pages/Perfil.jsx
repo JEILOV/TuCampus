@@ -9,7 +9,8 @@ import {
 import { Link }                        from "react-router-dom";
 import {
   ChevronLeft, Settings, Pencil, MapPin, CheckCircle2,
-  MessageCircle, LayoutGrid, ImagePlus, LogOut,
+  MessageCircle, LayoutGrid, LogOut,
+  User, GraduationCap, Phone, Lock, Camera, Image, ChevronRight, Check,
 } from "lucide-react";
 import { db }                          from "../services/firebase";
 import { useAuth }                     from "../context/AuthContext";
@@ -522,110 +523,176 @@ const Perfil = () => {
           className="fixed inset-0 z-[500] flex items-end bg-ink/50 backdrop-blur-sm"
         >
           <div className="mx-auto box-border max-h-[90vh] w-full max-w-[480px] overflow-y-auto rounded-t-[28px] bg-card px-5 pb-8 pt-6">
-            <h2 className="mb-5 text-[19px] font-extrabold text-ink">
-              Editar Mi Perfil
-            </h2>
+            <div className="mb-5 flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <User size={20} />
+              </span>
+              <div>
+                <h2 className="text-[19px] font-extrabold leading-tight text-ink">Editar Mi Perfil</h2>
+                <p className="text-[12px] font-semibold text-ink/45">
+                  Actualiza tu información para que más estudiantes te conozcan.
+                </p>
+              </div>
+            </div>
 
             <div className="flex flex-col gap-3.5">
               <div>
-                <label className={labelClass}>Nombre Completo</label>
-                <input
-                  value={mNombre}
-                  onChange={(e) => setMNombre(e.target.value)}
-                  className={`${inputClass} mt-1.5`}
-                />
+                <label className={labelClass}>Nombre completo</label>
+                <div className="relative mt-1.5">
+                  <User size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/30" />
+                  <input
+                    value={mNombre}
+                    onChange={(e) => setMNombre(e.target.value)}
+                    className={`${inputClass} pl-10`}
+                  />
+                </div>
               </div>
               <div>
                 <label className={labelClass}>Carrera / Título corto</label>
-                <input
-                  value={mBio}
-                  onChange={(e) => setMBio(e.target.value)}
-                  placeholder="Ej: Ing. Informático"
-                  className={`${inputClass} mt-1.5`}
-                />
+                <div className="relative mt-1.5">
+                  <GraduationCap size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/30" />
+                  <input
+                    value={mBio}
+                    onChange={(e) => setMBio(e.target.value)}
+                    placeholder="Ej: Ing. Informático"
+                    className={`${inputClass} pl-10`}
+                  />
+                </div>
               </div>
               <div>
                 <label className={labelClass}>Acerca de mí</label>
-                <textarea
-                  value={mAcerca}
-                  onChange={(e) => setMAcerca(e.target.value)}
-                  rows={3}
-                  className={`${inputClass} mt-1.5 resize-none`}
-                />
+                <div className="relative mt-1.5">
+                  <MessageCircle size={17} className="pointer-events-none absolute left-3.5 top-3.5 text-ink/30" />
+                  <textarea
+                    value={mAcerca}
+                    onChange={(e) => setMAcerca(e.target.value)}
+                    rows={3}
+                    className={`${inputClass} resize-none pl-10`}
+                  />
+                </div>
               </div>
               <div>
                 <label className={labelClass}>Ubicación actual</label>
-                <input
-                  value={mUbicacion}
-                  onChange={(e) => setMUbicacion(e.target.value)}
-                  className={`${inputClass} mt-1.5`}
-                />
+                <div className="relative mt-1.5">
+                  <MapPin size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/30" />
+                  <input
+                    value={mUbicacion}
+                    onChange={(e) => setMUbicacion(e.target.value)}
+                    className={`${inputClass} pl-10`}
+                  />
+                </div>
               </div>
               <div>
                 <label className={labelClass}>WhatsApp (sin +51)</label>
-                <input
-                  value={mTelefono}
-                  onChange={(e) => {
-                    const soloNumeros = e.target.value.replace(/\D/g, "");
-                    if (soloNumeros.length <= 9) setMTelefono(soloNumeros);
-                  }}
-                  placeholder="Ej: 987654321"
-                  type="tel"
-                  maxLength={9}
-                  className={`${inputClass} mt-1.5`}
-                />
-                <p className="mt-1.5 text-[11.5px] font-semibold text-ink/40">
-                  🔒 Se guarda de forma privada. Nunca se muestra en tu perfil público, solo
-                  alimenta el botón de WhatsApp.
-                </p>
+                <div className="relative mt-1.5">
+                  <Phone size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/30" />
+                  <input
+                    value={mTelefono}
+                    onChange={(e) => {
+                      const soloNumeros = e.target.value.replace(/\D/g, "");
+                      if (soloNumeros.length <= 9) setMTelefono(soloNumeros);
+                    }}
+                    placeholder="Ej: 987654321"
+                    type="tel"
+                    maxLength={9}
+                    className={`${inputClass} pl-10`}
+                  />
+                </div>
+                <div className="mt-2 flex items-start gap-2 rounded-btn bg-background px-3.5 py-3">
+                  <Lock size={15} className="mt-0.5 shrink-0 text-ink/40" />
+                  <p className="text-[11.5px] font-semibold leading-snug text-ink/50">
+                    <span className="font-bold text-ink/70">Tu información está segura.</span> Nunca
+                    mostramos tu número en público, solo aparece en el botón de WhatsApp.
+                  </p>
+                </div>
               </div>
 
-              <div className="flex gap-4">
-                <label className="flex cursor-pointer items-center gap-2 text-[13.5px] font-bold text-ink">
-                  <input type="checkbox" checked={mAceptaYape} onChange={(e) => setMAceptaYape(e.target.checked)} />
-                  Acepto Yape
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 text-[13.5px] font-bold text-ink">
-                  <input type="checkbox" checked={mAceptaPlin} onChange={(e) => setMAceptaPlin(e.target.checked)} />
-                  Acepto Plin
-                </label>
+              {/* Métodos de pago */}
+              <div>
+                <label className={labelClass}>Métodos de pago que aceptas</label>
+                <div className="mt-1.5 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMAceptaYape((v) => !v)}
+                    className={`flex items-center gap-2.5 rounded-btn border-[1.5px] px-3.5 py-3 text-left transition-colors ${
+                      mAceptaYape ? "border-primary/40 bg-primary/5" : "border-ink/10 bg-background"
+                    }`}
+                  >
+                    <img src={YAPE_PLACEHOLDER} alt="Yape" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                    <span className="flex-1 text-[13px] font-bold leading-tight text-ink">Acepto Yape</span>
+                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border-2 ${
+                      mAceptaYape ? "border-primary bg-primary text-white" : "border-ink/20 bg-card"
+                    }`}>
+                      {mAceptaYape && <Check size={13} strokeWidth={3} />}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMAceptaPlin((v) => !v)}
+                    className={`flex items-center gap-2.5 rounded-btn border-[1.5px] px-3.5 py-3 text-left transition-colors ${
+                      mAceptaPlin ? "border-primary/40 bg-primary/5" : "border-ink/10 bg-background"
+                    }`}
+                  >
+                    <img src={PLIN_PLACEHOLDER} alt="Plin" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                    <span className="flex-1 text-[13px] font-bold leading-tight text-ink">Acepto Plin</span>
+                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border-2 ${
+                      mAceptaPlin ? "border-primary bg-primary text-white" : "border-ink/20 bg-card"
+                    }`}>
+                      {mAceptaPlin && <Check size={13} strokeWidth={3} />}
+                    </span>
+                  </button>
+                </div>
               </div>
 
               {/* Foto de perfil */}
               <div>
-                <label className={labelClass}>Foto de Perfil</label>
+                <label className={labelClass}>Foto de perfil</label>
                 <input type="file" accept="image/*" ref={avatarInputRef} className="hidden"
                   onChange={(e) => handleFileSelect("avatar", e.target.files[0])} />
                 <button
                   onClick={() => avatarInputRef.current?.click()}
-                  className="mt-1.5 box-border flex w-full items-center justify-center gap-2.5 rounded-btn border-[1.5px] border-dashed border-ink/10 bg-background px-3.5 py-3.5"
+                  className="mt-1.5 box-border flex w-full items-center gap-3 rounded-btn border-[1.5px] border-ink/10 bg-background px-3.5 py-3"
                 >
-                  {mAvatarPrev
-                    ? <img src={mAvatarPrev} alt="Avatar" className="h-10 w-10 rounded-full object-cover" />
-                    : <ImagePlus size={20} className="text-ink/30" />
-                  }
-                  <span className="text-[14px] font-bold text-ink/70">
-                    {mAvatarPrev ? "Cambiar foto de perfil" : "Subir foto de perfil"}
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary">
+                    {mAvatarPrev
+                      ? <img src={mAvatarPrev} alt="Avatar" className="h-full w-full object-cover" />
+                      : <Camera size={19} />
+                    }
                   </span>
+                  <span className="flex-1">
+                    <span className="block text-[14px] font-bold text-ink">
+                      {mAvatarPrev ? "Cambiar foto de perfil" : "Subir foto de perfil"}
+                    </span>
+                    <span className="block text-[11.5px] font-semibold text-ink/40">JPG, PNG · Máx. 5MB</span>
+                  </span>
+                  <ChevronRight size={18} className="shrink-0 text-ink/30" />
                 </button>
               </div>
 
               {/* Imagen de portada */}
               <div>
-                <label className={labelClass}>Imagen de Portada (Banner)</label>
+                <label className={labelClass}>Imagen de portada (Banner)</label>
                 <input type="file" accept="image/*" ref={portadaInputRef} className="hidden"
                   onChange={(e) => handleFileSelect("portada", e.target.files[0])} />
-                {mPortadaPrev && (
-                  <img src={mPortadaPrev} alt="Banner" className="mb-1.5 mt-1.5 h-20 w-full rounded-btn object-cover" />
-                )}
                 <button
                   onClick={() => portadaInputRef.current?.click()}
-                  className="box-border flex w-full items-center justify-center gap-2.5 rounded-btn border-[1.5px] border-dashed border-ink/10 bg-background px-3.5 py-3.5"
+                  className="mt-1.5 box-border flex w-full items-center gap-3 rounded-btn border-[1.5px] border-ink/10 bg-background px-3.5 py-3"
                 >
-                  <ImagePlus size={20} className="text-ink/30" />
-                  <span className="text-[14px] font-bold text-ink/70">
-                    {mPortadaPrev ? "Cambiar imagen de portada" : "Subir imagen de portada"}
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-btn bg-primary/10 text-primary">
+                    {mPortadaPrev
+                      ? <img src={mPortadaPrev} alt="Banner" className="h-full w-full object-cover" />
+                      : <Image size={19} />
+                    }
                   </span>
+                  <span className="flex-1">
+                    <span className="block text-[14px] font-bold text-ink">
+                      {mPortadaPrev ? "Cambiar imagen de portada" : "Subir imagen de portada"}
+                    </span>
+                    <span className="block text-[11.5px] font-semibold text-ink/40">
+                      JPG, PNG · Recomendado 1200x400px
+                    </span>
+                  </span>
+                  <ChevronRight size={18} className="shrink-0 text-ink/30" />
                 </button>
               </div>
             </div>

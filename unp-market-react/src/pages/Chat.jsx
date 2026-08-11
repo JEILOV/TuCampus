@@ -17,6 +17,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams }              from "react-router-dom";
 import { doc, getDoc, onSnapshot }                   from "firebase/firestore";
+import { Search }                                    from "lucide-react";
 import { db }                                        from "../services/firebase";
 import { useAuth }                                   from "../context/AuthContext";
 import {
@@ -34,7 +35,14 @@ import {
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
 import { ToastContainer, useToast }    from "../components/Toast";
 import Spinner                         from "../components/Spinner";
+import BottomNav                       from "../components/BottomNav";
+import BotonNotificaciones             from "../components/BotonNotificaciones";
 import MenuChat                        from "../components/MenuChat";
+
+// Placeholder — reemplazar por los archivos finales de la mascota
+// (mismo ícono que usan Home.jsx/Publicar.jsx en su header azul).
+const MASCOTA_ICONO   = "/assets/mascota-icono-placeholder.png";
+const MASCOTA_AL_DIA  = "/assets/mascota-al-dia-placeholder.png";
 
 // ── Helpers ───────────────────────────────────────────────────
 // Hora dentro de una burbuja de mensaje (SIEMPRE hora, nunca fecha cruda:
@@ -159,15 +167,10 @@ const ListaChats = ({ chats, cargando, miUid, onAbrir }) => {
 
   if (chats.length === 0) {
     return (
-      <div style={{
-        display: "flex", flexDirection: "column", alignItems: "center",
-        justifyContent: "center", padding: "80px 24px", gap: "12px", textAlign: "center",
-      }}>
-        <span style={{ fontSize: "2.6rem" }}>💬</span>
-        <p style={{ fontWeight: 700, color: "var(--azul-oscuro)", margin: 0 }}>
-          Todavía no tenés conversaciones
-        </p>
-        <p style={{ fontSize: "0.85rem", color: "#5c5c7a", fontWeight: 600, margin: 0 }}>
+      <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+        <span className="text-[2.6rem]">💬</span>
+        <p className="m-0 font-bold text-ink">Todavía no tenés conversaciones</p>
+        <p className="m-0 text-[13.5px] font-semibold text-ink/50">
           Escribile a un vendedor desde la página de un producto para empezar a chatear.
         </p>
       </div>
@@ -175,7 +178,7 @@ const ListaChats = ({ chats, cargando, miUid, onAbrir }) => {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
+    <div className="flex flex-col">
       {chats.map((chat) => {
         const otroUid     = chat.participantes?.find((u) => u !== miUid);
         const otroInfo    = chat.participantesInfo?.[otroUid] || {};
@@ -186,56 +189,41 @@ const ListaChats = ({ chats, cargando, miUid, onAbrir }) => {
           <button
             key={chat.id}
             onClick={() => onAbrir(chat.id)}
-            style={{
-              display: "flex", alignItems: "center", gap: "12px",
-              padding: "14px 20px", background: "white", border: "none",
-              borderBottom: "1px solid #f1f3f5", cursor: "pointer",
-              textAlign: "left", width: "100%", fontFamily: "'Nunito', sans-serif",
-            }}
+            className="flex w-full items-center gap-3 border-b border-background bg-card px-5 py-3.5 text-left last:border-b-0"
           >
-            <Avatar nombre={otroInfo.nombre} avatar={otroInfo.avatar} />
+            <div className="relative shrink-0">
+              <Avatar nombre={otroInfo.nombre} avatar={otroInfo.avatar} />
+              {/* 🎨 Indicador decorativo de estado — placeholder visual hasta que
+                  exista un campo real de presencia/online en el modelo de datos. */}
+              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-card bg-ink/25" />
+            </div>
 
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
-                <h3 style={{
-                  margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "var(--azul-oscuro)",
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                }}>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="truncate text-[15px] font-bold text-ink">
                   {otroInfo.nombre || "Estudiante UNP"}
                 </h3>
-                <span style={{ fontSize: "0.72rem", color: "#a0a5b9", fontWeight: 600, flexShrink: 0 }}>
+                <span className="shrink-0 text-[11.5px] font-semibold text-ink/40">
                   {formatearFechaChat(chat.ultimoMensajeFecha)}
                 </span>
               </div>
 
               {chat.productoTitulo && (
-                <p style={{
-                  margin: "1px 0 2px", fontSize: "0.72rem", color: "var(--verde-marca)", fontWeight: 700,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                }}>
+                <p className="mb-0.5 mt-px truncate text-[11.5px] font-bold text-[#287653]">
                   Sobre: {chat.productoTitulo}
                 </p>
               )}
 
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-                <p style={{
-                  margin: 0, fontSize: "0.83rem",
-                  color: noLeidos > 0 ? "var(--azul-oscuro)" : "#5c5c7a",
-                  fontWeight: noLeidos > 0 ? 700 : 600,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
-                }}>
+              <div className="flex items-center justify-between gap-2">
+                <p className={`min-w-0 flex-1 truncate text-[13.5px] ${
+                  noLeidos > 0 ? "font-bold text-ink" : "font-semibold text-ink/50"
+                }`}>
                   {chat.ultimoMensaje
                     ? `${soyYoUltimo ? "Tú: " : ""}${chat.ultimoMensaje}`
                     : "Empieza la conversación"}
                 </p>
                 {noLeidos > 0 && (
-                  <span style={{
-                    background: "var(--naranja-marca)", color: "white",
-                    fontSize: "0.7rem", fontWeight: 800, borderRadius: "10px",
-                    minWidth: "18px", height: "18px", padding: "0 5px",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    flexShrink: 0,
-                  }}>
+                  <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-extrabold text-white">
                     {noLeidos > 9 ? "9+" : noLeidos}
                   </span>
                 )}
@@ -244,6 +232,13 @@ const ListaChats = ({ chats, cargando, miUid, onAbrir }) => {
           </button>
         );
       })}
+
+      {/* Footer decorativo: cierre amistoso de la lista (mockup) */}
+      <div className="flex flex-col items-center gap-1 px-6 py-6 text-center">
+        <img src={MASCOTA_AL_DIA} alt="" className="h-14 w-14 object-contain opacity-90" />
+        <p className="m-0 text-[13px] font-extrabold text-ink">¡Estás al día!</p>
+        <p className="m-0 text-[11.5px] font-semibold text-ink/40">No tienes mensajes nuevos</p>
+      </div>
     </div>
   );
 };
@@ -306,6 +301,7 @@ const Chat = () => {
   // ── Modo lista ──────────────────────────────────────────
   const [chats, setChats]                 = useState([]);
   const [cargandoChats, setCargandoChats] = useState(true);
+  const [busquedaChats, setBusquedaChats] = useState(""); // filtro visual del buscador (mockup)
 
   useEffect(() => {
     if (chatId || !user?.uid) return; // solo corre en modo lista
@@ -521,7 +517,76 @@ const Chat = () => {
   // ── Auth aún resolviendo ────────────────────────────────
   if (cargandoAuth) return <Spinner mensaje="Cargando..." />;
 
-  // ── Render ────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════
+  //  MODO LISTA (Misión C): header azul + tarjeta blanca
+  //  superpuesta, buscador y tarjetas de chat (mockup 3).
+  //  La conversación individual (modo charla) sigue el layout
+  //  WhatsApp/Instagram ya ajustado más abajo — no se toca acá.
+  // ════════════════════════════════════════════════════════════
+  if (!chatId) {
+    const chatsFiltrados = chats.filter((chat) => {
+      if (!busquedaChats.trim()) return true;
+      const otroUidF  = chat.participantes?.find((u) => u !== user?.uid);
+      const nombreF   = chat.participantesInfo?.[otroUidF]?.nombre || "";
+      const haystack  = `${nombreF} ${chat.productoTitulo || ""} ${chat.ultimoMensaje || ""}`.toLowerCase();
+      return haystack.includes(busquedaChats.trim().toLowerCase());
+    });
+
+    return (
+      <div className="app-shell bg-background pb-28 font-sans">
+
+        {/* HEADER AZUL (mismo patrón que Home.jsx / Publicar.jsx) */}
+        <header className="relative rounded-b-[32px] bg-primary px-6 pb-10 pt-8">
+          <button
+            onClick={() => navigate(-1)}
+            aria-label="Volver"
+            className="absolute left-5 top-8 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
+          >
+            <IconoVolver />
+          </button>
+
+          <div className="flex items-center justify-center gap-3">
+            <img src={MASCOTA_ICONO} alt="TuCampus" className="h-14 w-14 object-contain" />
+            <div className="text-left">
+              <p className="text-2xl font-extrabold leading-none text-background">TuCampus</p>
+              <p className="mt-1 text-[12px] font-medium text-background/75">Conecta. Comparte. Crece.</p>
+            </div>
+          </div>
+        </header>
+
+        <BotonNotificaciones />
+
+        {/* TARJETA BLANCA SUPERPUESTA */}
+        <main className="relative -mt-6 px-4">
+          <div className="rounded-t-[32px] bg-card pb-2 pt-6 shadow-soft">
+            <div className="px-5">
+              <h1 className="text-[19px] font-extrabold text-ink">Mensajes</h1>
+              <p className="mt-0.5 text-[12.5px] font-semibold text-ink/50">Revisa tus conversaciones</p>
+
+              {/* Buscador — filtro visual local, no toca la suscripción real */}
+              <div className="relative mt-4 mb-1">
+                <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink/30" />
+                <input
+                  type="text"
+                  value={busquedaChats}
+                  onChange={(e) => setBusquedaChats(e.target.value)}
+                  placeholder="Buscar mensajes..."
+                  className="w-full rounded-full border-none bg-background py-3 pl-10 pr-4 text-[13.5px] font-semibold text-ink outline-none placeholder:text-ink/30"
+                />
+              </div>
+            </div>
+
+            <ListaChats chats={chatsFiltrados} cargando={cargandoChats} miUid={user?.uid} onAbrir={abrirChat} />
+          </div>
+        </main>
+
+        <BottomNav activo="mensajes" />
+        <ToastContainer toasts={toasts} />
+      </div>
+    );
+  }
+
+  // ── Render (modo charla) ────────────────────────────────────
   return (
     <div
       className="app-shell"
@@ -549,7 +614,7 @@ const Chat = () => {
         display: "flex", alignItems: "center", gap: "12px", padding: "16px 20px",
       }}>
         <button
-          onClick={() => (chatId ? volverALista() : navigate(-1))}
+          onClick={volverALista}
           aria-label="Volver"
           style={{
             width: "36px", height: "36px", flexShrink: 0,
@@ -562,11 +627,7 @@ const Chat = () => {
           <IconoVolver />
         </button>
 
-        {!chatId ? (
-          <h1 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 800, color: "var(--azul-oscuro)" }}>
-            Mensajes
-          </h1>
-        ) : cargandoMeta ? (
+        {cargandoMeta ? (
           <span style={{ fontWeight: 600, color: "#5c5c7a", fontSize: "0.9rem" }}>Cargando...</span>
         ) : !chatValidoParaMi ? (
           <span style={{ fontWeight: 600, color: "#5c5c7a", fontSize: "0.9rem" }}>Chat no encontrado</span>
@@ -626,11 +687,7 @@ const Chat = () => {
       </div>
 
       {/* ── CONTENIDO (única zona con scroll: flex:1 + overflowY:auto) ── */}
-      {!chatId ? (
-        <div style={{ flex: 1, overflowY: "auto", minHeight: 0, WebkitOverflowScrolling: "touch" }}>
-          <ListaChats chats={chats} cargando={cargandoChats} miUid={user?.uid} onAbrir={abrirChat} />
-        </div>
-      ) : cargandoMeta ? (
+      {cargandoMeta ? (
         <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
           <Spinner mensaje="Cargando conversación..." fullScreen={false} />
         </div>
