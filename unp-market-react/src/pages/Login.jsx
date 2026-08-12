@@ -190,7 +190,7 @@ const Login = () => {
       {/* TOAST DE ERROR */}
       {toast && (
         <div className="pointer-events-none fixed bottom-10 left-1/2 z-[1000] w-[calc(100%-40px)] max-w-[390px] -translate-x-1/2">
-          <Toast mensaje={mensaje.mensaje ?? toast.mensaje} />
+          <Toast mensaje={toast.mensaje} />
         </div>
       )}
     </div>

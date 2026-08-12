@@ -25,9 +25,19 @@ import { logError }     from "../utils/errorHandler";
 const PAGE_SIZE = 20;
 
 const ORDEN_CONFIG = {
-  recientes:   { campo: "fecha",  dir: "desc" },
-  precio_asc:  { campo: "precio", dir: "asc"  },
-  precio_desc: { campo: "precio", dir: "desc" },
+  recientes:      { campo: "fecha",                dir: "desc" },
+  precio_asc:     { campo: "precio",                dir: "asc"  },
+  precio_desc:    { campo: "precio",                dir: "desc" },
+  // ⭐ "Mejor valorados" ordena por la reputación DENORMALIZADA del
+  // vendedor (ver calificacionVendedor en productService.crearProducto).
+  // ⚠️ Caveat de Firestore: orderBy() excluye documentos donde el campo
+  // no existe. Los productos publicados ANTES de este cambio no tienen
+  // `calificacionVendedor` y por lo tanto no aparecerán en este orden
+  // hasta que se editen/republiquen o se corra un script de migración
+  // que rellene ese campo en los productos existentes. También requiere
+  // crear el índice compuesto que Firestore pedirá en la consola la
+  // primera vez que se ejecute esta consulta.
+  mejor_valorados: { campo: "calificacionVendedor", dir: "desc" },
 };
 
 /**

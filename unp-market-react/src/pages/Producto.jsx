@@ -11,9 +11,10 @@ import Spinner                              from "../components/Spinner";
 import { ToastContainer, useToast }         from "../components/Toast";
 
 // ── Constantes ───────────────────────────────────────────────
+// 🔧 Mismo set que Home.jsx / Publicar.jsx / productService.js.
 const ICONOS_CAT = {
-  dulces: "🍰", bebidas: "🥤", salados: "🍔",
-  servicios: "🔧", materiales: "📚",
+  comida: "🍔", tecnologia: "🎧", ropa: "👕",
+  materiales: "📚", servicios: "🛠️", otros: "📦",
 };
 
 // ── Componente principal ─────────────────────────────────────

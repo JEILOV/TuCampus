@@ -26,7 +26,7 @@ const Publicar = () => {
 
   const [titulo,      setTitulo]      = useState("");
   const [precio,      setPrecio]      = useState("");
-  const [categoria,   setCategoria]   = useState("dulces");
+  const [categoria,   setCategoria]   = useState("comida");
   const [descripcion, setDescripcion] = useState("");
   const [archivo,     setArchivo]     = useState(null);
   const [previewUrl,  setPreviewUrl]  = useState(null);
@@ -274,13 +274,17 @@ const Publicar = () => {
             </div>
             <div>
               <label className={labelClass}>Categoría</label>
+              {/* 🔧 Debe coincidir EXACTAMENTE (mismos values) con
+                  CATEGORIAS en Home.jsx y CATEGORIAS_VALIDAS en
+                  services/productService.js. */}
               <select value={categoria} onChange={(e) => setCategoria(e.target.value)}
                 className={`${inputClass} mt-2 cursor-pointer`}>
-                <option value="dulces">🍰 Dulces</option>
-                <option value="salados">🍔 Salados</option>
-                <option value="bebidas">🥤 Bebidas</option>
-                <option value="servicios">🔧 Servicios</option>
-                <option value="materiales">📚 Materiales</option>
+                <option value="comida">🍔 Comida & Snacks</option>
+                <option value="tecnologia">🎧 Tecnología</option>
+                <option value="ropa">👕 Ropa & Moda</option>
+                <option value="materiales">📚 Materiales & Libros</option>
+                <option value="servicios">🛠️ Servicios & Tipeos</option>
+                <option value="otros">📦 Otros</option>
               </select>
             </div>
           </div>

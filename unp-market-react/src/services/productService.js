@@ -20,7 +20,12 @@ export const obtenerProductoPorId = async (productoId) => {
 
 // 🔒 Única fuente de verdad de las categorías válidas — debe coincidir
 // exactamente con las reglas de seguridad de Firestore.
-const CATEGORIAS_VALIDAS = ["dulces", "bebidas", "salados", "servicios", "materiales"];
+// ⚠️ IMPORTANTE: este arreglo es solo el blindaje del lado del cliente.
+// Las Firestore Security Rules (fuera de este repo) tienen su propia
+// whitelist de categorías y DEBEN actualizarse a mano en la consola de
+// Firebase con este mismo set, o la publicación fallará con
+// PERMISSION_DENIED aunque el cliente la valide correctamente.
+const CATEGORIAS_VALIDAS = ["comida", "tecnologia", "ropa", "materiales", "servicios", "otros"];
 
 export const crearProducto = async ({ titulo, precio, categoria, descripcion, imagen, user, perfil }) => {
   try {
@@ -63,6 +68,18 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
       // 🔒 telefono YA NO se copia al documento público del producto.
       aceptaYape:     !!perfil?.aceptaYape,
       aceptaPlin:     !!perfil?.aceptaPlin,
+      // ⭐ Reputación denormalizada — snapshot de la calificación del
+      // vendedor AL MOMENTO de publicar. Se usa para el badge de
+      // estrellas en ProductCard y para el orden "Mejor valorados" sin
+      // tener que leer el doc del vendedor por cada producto (N+1).
+      // 🔧 Trade-off conocido: este valor NO se actualiza solo cuando el
+      // vendedor recibe nuevas reseñas después de publicar. Para
+      // mantenerlo sincronizado, reviewService.enviarResena debería
+      // además actualizar (vía batch) calificacionVendedor/
+      // totalResenasVendedor en todos los productos activos de ese
+      // vendedor — no incluido aquí porque excede el alcance pedido.
+      calificacionVendedor: perfil?.calificacionPromedio || 0,
+      totalResenasVendedor: perfil?.totalResenas || 0,
       userUid:        user.uid,
       fecha:          serverTimestamp(),
       estado:         "disponible",

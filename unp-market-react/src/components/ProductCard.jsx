@@ -7,17 +7,30 @@
 //  la lógica (estado agotado, placeholder por categoría, formato
 //  de precio) es exactamente la misma que ya tenías.
 //
+//  ⭐ Fase "Reputación visible": se agregó un badge de estrellas
+//  sobre la imagen, usando calificacionVendedor / totalResenasVendedor
+//  (denormalizados en el producto al publicar — ver productService.js).
+//  Si el vendedor aún no tiene reseñas, muestra "⭐ Nuevo".
+//
 //  USO:
 //    <ProductCard producto={p} onVerDetalle={(id) => ...} />
 // ============================================================
 
+import { Star } from "lucide-react";
 import { CATEGORY_ICON_MAP, IconPackage } from "./CategoryIcons";
 
 const ProductCard = ({ producto, onVerDetalle }) => {
-  const { id, titulo, precio, imagen, categoria, vendedorNombre, avatarVendedor, estado } = producto;
+  const {
+    id, titulo, precio, imagen, categoria,
+    vendedorNombre, avatarVendedor, estado,
+    calificacionVendedor, totalResenasVendedor,
+  } = producto;
+
   const estaAgotado = estado === "agotado";
   const catKey = (categoria || "").toLowerCase();
   const IconPlaceholder = CATEGORY_ICON_MAP[catKey] || IconPackage;
+
+  const tieneResenas = (totalResenasVendedor || 0) > 0;
 
   return (
     <article
@@ -46,6 +59,19 @@ const ProductCard = ({ producto, onVerDetalle }) => {
           }`}
         >
           S/ {(precio || 0).toFixed(2)}
+        </span>
+
+        {/* ⭐ Badge de reputación del vendedor */}
+        <span className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-chip bg-white/95 px-2 py-1 text-[11px] font-extrabold text-ink shadow-soft">
+          <Star size={12} strokeWidth={2.5} fill="#F5B301" color="#F5B301" />
+          {tieneResenas ? (
+            <>
+              {(calificacionVendedor || 0).toFixed(1)}
+              <span className="font-semibold text-ink/50">({totalResenasVendedor})</span>
+            </>
+          ) : (
+            <span className="text-ink/50">Nuevo</span>
+          )}
         </span>
 
         {estaAgotado && (

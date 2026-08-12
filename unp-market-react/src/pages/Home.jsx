@@ -8,25 +8,31 @@ import { useToast, ToastContainer }                 from "../components/Toast";
 import BottomNav                                    from "../components/BottomNav";
 import BotonNotificaciones                          from "../components/BotonNotificaciones";
 import ProductCard                                  from "../components/ProductCard";
+import CarruselAnuncios                             from "../components/CarruselAnuncios";
 import { CATEGORY_ICON_MAP }                        from "../components/CategoryIcons";
 
 // ── Constantes ───────────────────────────────────────────────
 // Placeholder de imagen — reemplazar por el archivo final.
 const MASCOTA_ICONO = "/assets/mascota-icono-placeholder.png";
 
+// 🔧 Categorías ampliadas — deben coincidir EXACTAMENTE (misma key)
+// con el <select> de Publicar.jsx / EditarProducto.jsx y con
+// CATEGORIAS_VALIDAS en services/productService.js.
 const CATEGORIAS = [
   { key: "todos",      label: "Todos" },
-  { key: "dulces",     label: "Dulces" },
-  { key: "salados",    label: "Salados" },
-  { key: "bebidas",    label: "Bebidas" },
-  { key: "servicios",  label: "Servicios" },
-  { key: "materiales", label: "Materiales" },
+  { key: "comida",     label: "Comida & Snacks" },
+  { key: "tecnologia", label: "Tecnología" },
+  { key: "ropa",       label: "Ropa & Moda" },
+  { key: "materiales", label: "Materiales & Libros" },
+  { key: "servicios",  label: "Servicios & Tipeos" },
+  { key: "otros",      label: "Otros" },
 ];
 
 const OPCIONES_ORDEN = [
-  { id: "recientes",   label: "Más recientes" },
-  { id: "precio_asc",  label: "Menor precio"  },
-  { id: "precio_desc", label: "Mayor precio"  },
+  { id: "recientes",       label: "Más recientes"   },
+  { id: "precio_asc",      label: "Menor precio"    },
+  { id: "precio_desc",     label: "Mayor precio"    },
+  { id: "mejor_valorados", label: "Mejor valorados ⭐" },
 ];
 
 // ── Componente principal ─────────────────────────────────────
@@ -131,6 +137,9 @@ const Home = () => {
               />
             </div>
           </div>
+
+          {/* Carrusel de Anuncios — flyers de eventos/promos del campus */}
+          <CarruselAnuncios />
 
           {/* Categorías — carrusel horizontal */}
           <nav

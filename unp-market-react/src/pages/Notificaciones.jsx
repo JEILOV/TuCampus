@@ -17,7 +17,7 @@
 import { useState }                 from "react";
 import { useNavigate }              from "react-router-dom";
 import {
-  ChevronLeft, Trash2, Bell, MessageCircle, Heart, Megaphone, User,
+  ChevronLeft, Trash2, Bell, MessageCircle, Heart, Megaphone, User, Star,
 } from "lucide-react";
 import { useAuth }                  from "../context/AuthContext";
 import { useNotifications }         from "../hooks/useNotifications";
@@ -47,7 +47,9 @@ const FILTROS = [
 const coincideFiltro = (tipo, filtro) => {
   if (filtro === "todas") return true;
   if (filtro === "mensajes")      return tipo === "contacto";
-  if (filtro === "interacciones") return tipo === "favorito" || tipo === "seguidor";
+  if (filtro === "interacciones") {
+    return tipo === "favorito" || tipo === "seguidor" || tipo === "resena" || tipo === "calificacion";
+  }
   if (filtro === "publicaciones") return tipo === "nuevo_producto";
   return true;
 };
@@ -62,6 +64,9 @@ const configPorTipo = (tipo) => {
   }
   if (tipo === "nuevo_producto") {
     return { Icono: Megaphone, bg: "bg-purple-100", color: "text-purple-600" };
+  }
+  if (tipo === "resena" || tipo === "calificacion") {
+    return { Icono: Star, bg: "bg-amber-100", color: "text-amber-500" };
   }
   // "contacto" (intención de compra/chat) y cualquier otro caso por defecto
   return { Icono: MessageCircle, bg: "bg-[#DCF3E3]", color: "text-[#287653]" };
@@ -95,6 +100,10 @@ const Notificaciones = () => {
     } finally {
       if (notif.tipo === "nuevo_producto" && notif.productoId) {
         navigate(`/producto?id=${notif.productoId}`);
+      } else if (notif.tipo === "resena" || notif.tipo === "calificacion") {
+        // Va al perfil propio (donde vive la calificación recibida),
+        // no al perfil de quien calificó.
+        navigate(`/vendedor?uid=${notif.referenciaId || notif.paraUid}`);
       } else {
         navigate(`/vendedor?uid=${notif.deUid}`);
       }
@@ -182,6 +191,7 @@ const Notificaciones = () => {
               const esFav       = notif.tipo === "favorito";
               const esSeguidor  = notif.tipo === "seguidor";
               const esNuevoProd = notif.tipo === "nuevo_producto";
+              const esResena    = notif.tipo === "resena" || notif.tipo === "calificacion";
 
               let textoAccion     = "quiere comprar";
               let mostrarProducto = true;
@@ -199,17 +209,45 @@ const Notificaciones = () => {
                     notif.leido ? "opacity-70" : ""
                   }`}
                 >
-                  <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${bg} ${color}`}>
-                    <Icono size={20} />
-                  </span>
+                  {esResena ? (
+                    // Avatar de quien calificó + badge flotante de estrella dorada.
+                    // Si no hay deAvatar (reseñas antiguas o autor sin foto), cae
+                    // al mismo círculo de ícono que el resto de notificaciones.
+                    <span className="relative h-12 w-12 shrink-0">
+                      {notif.deAvatar ? (
+                        <img
+                          src={notif.deAvatar}
+                          alt={notif.deNombre}
+                          className="h-12 w-12 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-500">
+                          <User size={20} />
+                        </span>
+                      )}
+                      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-white shadow-soft ring-2 ring-card">
+                        <Star size={11} fill="currentColor" />
+                      </span>
+                    </span>
+                  ) : (
+                    <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${bg} ${color}`}>
+                      <Icono size={20} />
+                    </span>
+                  )}
 
                   <div className="min-w-0 flex-1">
                     <p className="text-[13.5px] font-semibold leading-snug text-ink/80">
                       <span className="font-extrabold text-ink">{notif.deNombre}</span>{" "}
-                      {textoAccion}{" "}
-                      {mostrarProducto && (
-                        <span className="font-extrabold text-ink">"{notif.productoTitulo}"</span>
-                      )}
+                      {esResena
+                        ? (notif.mensaje || `te calificó con ${notif.estrellas ?? ""} ⭐`)
+                        : (
+                          <>
+                            {textoAccion}{" "}
+                            {mostrarProducto && (
+                              <span className="font-extrabold text-ink">"{notif.productoTitulo}"</span>
+                            )}
+                          </>
+                        )}
                     </p>
                     <span className="mt-1 block text-[12px] font-semibold text-ink/40">
                       {formatearTiempo(notif.timestamp)}

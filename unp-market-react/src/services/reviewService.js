@@ -33,6 +33,11 @@
 //    /usuarios/{vendedorUid}  (campos ya agregados en Fase 3)
 //        totalResenas          number
 //        calificacionPromedio  number  (1 decimal)
+//
+//  FASE 4 — Notificaciones: cada guardarOActualizarResena() también
+//  crea, dentro de la MISMA transacción, un doc en /notificaciones
+//  con tipo: "resena" avisando al vendedor. Ver detalle junto al
+//  tx.set() correspondiente más abajo.
 // ============================================================
 
 import {
@@ -42,6 +47,15 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
+
+// ── Helper: recorta el comentario para el mensaje de notificación ──
+// La notificación es un aviso corto, no el lugar para leer la reseña
+// completa (eso ya se ve en el perfil del vendedor).
+const resumirComentario = (comentario, maxLen = 60) => {
+  const limpio = (comentario || "").trim();
+  if (!limpio) return "";
+  return limpio.length > maxLen ? `${limpio.slice(0, maxLen)}…` : limpio;
+};
 
 // ── Helper: ID determinística de reseña ──────────────────────
 const idResena = (autorUid, vendedorUid) => `${autorUid}_${vendedorUid}`;
@@ -192,6 +206,37 @@ export const guardarOActualizarResena = async ({
         totalResenas:         nuevoTotal,
         calificacionPromedio: nuevoPromedio,
       }, { merge: true });
+
+      // 🔔 Notificación al vendedor — misma transacción: si el batch de
+      // arriba falla y reintenta, la notificación se crea (o recrea) junto
+      // con él, nunca por separado. Se dispara tanto en reseñas nuevas
+      // como en ediciones, porque para el vendedor ambas son "me dejaron
+      // una calificación" (autorUid === vendedorUid ya está bloqueado más
+      // arriba, pero se repite la guarda acá por seguridad/consistencia
+      // con el resto de notificationService.js).
+      //
+      // NOTA de nombres de campo: se usan paraUid/deUid/deNombre/timestamp
+      // (no usuarioUid/autorUid/fecha) porque son los campos que ya lee
+      // useNotifications() vía where("paraUid"...) + orderBy("timestamp"...).
+      // Los campos nuevos para este feature (deAvatar, mensaje, estrellas,
+      // referenciaId) sí se agregan tal cual porque no existían antes.
+      if (autorUid !== vendedorUid) {
+        const notifRef = doc(collection(db, "notificaciones"));
+        tx.set(notifRef, {
+          paraUid:      vendedorUid,           // quien recibe la notificación
+          deUid:        autorUid,              // quien califica
+          deNombre:     autorNombre || "Estudiante UNP",
+          deAvatar:     autorAvatar || "",
+          tipo:         "resena",
+          mensaje:      resumirComentario(comentario)
+            ? `te calificó con ${puntaje} ⭐: "${resumirComentario(comentario)}"`
+            : `te calificó con ${puntaje} ⭐`,
+          estrellas:    puntaje,
+          referenciaId: vendedorUid,           // para navegar al perfil al hacer clic
+          leido:        false,
+          timestamp:    serverTimestamp(),
+        });
+      }
 
       return { esNueva, nuevoTotal, nuevoPromedio };
     });
