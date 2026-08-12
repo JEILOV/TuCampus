@@ -6,7 +6,7 @@ import { ChevronLeft, Camera, Send }    from "lucide-react";
 import { db }                           from "../services/firebase";
 import { useAuth }                      from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
-import { actualizarProducto }           from "../services/productService";
+import { actualizarProducto, normalizarCategoria } from "../services/productService";
 import Spinner                          from "../components/Spinner";
 import Toast, { useToast }              from "../components/Toast";
 
@@ -71,7 +71,14 @@ const EditarProducto = () => {
 
         setTitulo(data.titulo       || "");
         setPrecio(data.precio !== undefined ? String(data.precio) : "");
-        setCategoria(data.categoria || "comida");
+        // 🔧 Migración de taxonomía: si el producto se publicó con una
+        // categoría obsoleta ('dulces', 'salados', 'bebidas'), la
+        // mapeamos aquí a la nueva. Sin esto, el <select> mostraría un
+        // <option> inexistente (quedaría en blanco/desincronizado) y,
+        // más grave, si el usuario guarda sin tocar el campo, se
+        // reenviaría el valor viejo y actualizarProducto lo rechazaría
+        // con "Categoría inválida.".
+        setCategoria(normalizarCategoria(data.categoria) || "comida");
         setDescripcion(data.descripcion || "");
         setImagenOriginal(data.imagen   || "");
         setPreviewUrl(data.imagen       || null);

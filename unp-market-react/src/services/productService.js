@@ -27,6 +27,28 @@ export const obtenerProductoPorId = async (productoId) => {
 // PERMISSION_DENIED aunque el cliente la valide correctamente.
 const CATEGORIAS_VALIDAS = ["comida", "tecnologia", "ropa", "materiales", "servicios", "otros"];
 
+// 🔧 Migración de taxonomía: productos publicados ANTES del cambio de
+// categorías pueden traer valores viejos guardados en Firestore
+// ('dulces', 'salados', 'bebidas'). Sin este mapeo, abrir esos
+// productos en EditarProducto.jsx y guardar sin tocar la categoría
+// dispara "Categoría inválida.", porque el valor viejo nunca fue
+// migrado en la base de datos. Ampliar este mapa si aparecen más
+// categorías legacy.
+const MIGRACION_CATEGORIAS = {
+  dulces:  "comida",
+  salados: "comida",
+  bebidas: "comida",
+};
+
+// Única función de normalización de categoría en todo el repo: valida
+// contra la taxonomía vigente y, si no coincide, intenta migrar desde
+// la taxonomía anterior. Devuelve null si la categoría no es
+// reconocible en ninguna de las dos.
+export const normalizarCategoria = (categoria) => {
+  if (CATEGORIAS_VALIDAS.includes(categoria)) return categoria;
+  return MIGRACION_CATEGORIAS[categoria] || null;
+};
+
 export const crearProducto = async ({ titulo, precio, categoria, descripcion, imagen, user, perfil }) => {
   try {
     if (!user?.uid) {
@@ -41,7 +63,7 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
       throw new Error("El precio debe ser un número mayor a 0 y menor o igual a 10000.");
     }
 
-    const categoriaValida = CATEGORIAS_VALIDAS.includes(categoria) ? categoria : null;
+    const categoriaValida = normalizarCategoria(categoria);
     if (!categoriaValida) {
       throw new Error("Categoría inválida.");
     }
@@ -120,7 +142,7 @@ export const actualizarProducto = async (productoId, { titulo, precio, categoria
       throw new Error("El precio debe ser un número mayor a 0 y menor o igual a 10000.");
     }
 
-    const categoriaValida = CATEGORIAS_VALIDAS.includes(categoria) ? categoria : null;
+    const categoriaValida = normalizarCategoria(categoria);
     if (!categoriaValida) {
       throw new Error("Categoría inválida.");
     }
