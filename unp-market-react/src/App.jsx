@@ -9,6 +9,7 @@ import EditarProducto from "./pages/EditarProducto";
 import Chat           from "./pages/Chat";
 import Notificaciones from "./pages/Notificaciones";
 import Terminos       from "./pages/Terminos";
+import PanelAdminAnuncios from "./pages/PanelAdminAnuncios";
 import RutaProtegida  from "./components/RutaProtegida";
 
 const App = () => (
@@ -27,6 +28,7 @@ const App = () => (
       <Route path="/editar"   element={<RutaProtegida><EditarProducto /></RutaProtegida>} />
       <Route path="/chat"     element={<RutaProtegida><Chat /></RutaProtegida>} />
       <Route path="/notificaciones" element={<RutaProtegida><Notificaciones /></RutaProtegida>} />
+      <Route path="/admin/anuncios" element={<RutaProtegida><PanelAdminAnuncios /></RutaProtegida>} />
 
       {/* Ruta Comodín (404) */}
       <Route path="*" element={<Navigate to="/" replace />} />
