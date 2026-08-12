@@ -26,21 +26,48 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { suscribirAnuncios, ANUNCIOS_FALLBACK } from "../services/adService";
+import { suscribirAnuncios } from "../services/adService";
+
+// 🔧 Skeleton mientras se resuelve la primera respuesta de Firestore.
+// Mismas dimensiones exactas que las tarjetas reales (h-28 w-64
+// rounded-[24px]) para que no haya salto de layout al reemplazarlo.
+const SkeletonAnuncios = () => (
+  <div
+    className="mt-5 flex gap-3 overflow-x-hidden px-4 pb-1"
+    aria-hidden="true"
+  >
+    {[0, 1, 2].map((i) => (
+      <div
+        key={i}
+        className="h-28 w-64 shrink-0 animate-pulse rounded-[24px] bg-ink/10"
+      />
+    ))}
+  </div>
+);
 
 const CarruselAnuncios = () => {
   const navigate = useNavigate();
 
-  // 🔧 Arranca ya con el fallback (no con []) para que no haya un
-  // parpadeo de "carrusel vacío" mientras se resuelve la primera
-  // lectura de Firestore.
-  const [anuncios, setAnuncios] = useState(ANUNCIOS_FALLBACK);
+  // 🔧 Ya NO se inicializa con ANUNCIOS_FALLBACK: eso era lo que
+  // causaba el destello de mocks antes de que llegara la primera
+  // respuesta real de Firestore. Arranca vacío + cargando=true, y
+  // muestra un skeleton hasta que `suscribirAnuncios` invoque el
+  // callback por primera vez (con datos reales, o con
+  // ANUNCIOS_FALLBACK si adService detectó que la colección está
+  // vacía o que la lectura falló — esa sustitución sigue viviendo
+  // en adService.js, no aquí).
+  const [anuncios, setAnuncios] = useState([]);
+  const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = suscribirAnuncios(setAnuncios);
+    const unsubscribe = suscribirAnuncios((lista) => {
+      setAnuncios(lista);
+      setCargando(false);
+    });
     return () => unsubscribe();
   }, []);
 
+  if (cargando) return <SkeletonAnuncios />;
   if (!anuncios || anuncios.length === 0) return null;
 
   const manejarClick = (a) => {
@@ -72,6 +99,8 @@ const CarruselAnuncios = () => {
               <img
                 src={a.imagenUrl}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 className="absolute inset-0 h-full w-full object-cover"
               />
               {/* Overlay para que el texto blanco siga siendo legible

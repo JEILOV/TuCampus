@@ -22,7 +22,12 @@ import {
 import { db }           from "../services/firebase";
 import { logError }     from "../utils/errorHandler";
 
-const PAGE_SIZE = 20;
+// 🔧 Antes era 20. Se reduce a 12 para que la primera pantalla del
+// Home cargue más rápido (menos documentos + menos imágenes que
+// pedir de entrada). El mismo tamaño se reutiliza para cada página
+// siguiente del scroll infinito (cargarMas), así que el "cargar más"
+// también trae de 12 en 12 en vez de 20 en 20.
+const PAGE_SIZE = 12;
 
 const ORDEN_CONFIG = {
   recientes:      { campo: "fecha",                dir: "desc" },

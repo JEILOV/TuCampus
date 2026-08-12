@@ -45,6 +45,8 @@ const ProductCard = ({ producto, onVerDetalle }) => {
           <img
             src={imagen}
             alt={titulo || "Producto"}
+            loading="lazy"
+            decoding="async"
             className={`h-full w-full object-cover${estaAgotado ? " grayscale" : ""}`}
           />
         ) : (
@@ -93,7 +95,13 @@ const ProductCard = ({ producto, onVerDetalle }) => {
           <div className="mt-1.5 flex items-center gap-1.5">
             <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-[10px] font-bold text-primary">
               {avatarVendedor?.trim() ? (
-                <img src={avatarVendedor} alt={vendedorNombre} className="h-full w-full object-cover" />
+                <img
+                  src={avatarVendedor}
+                  alt={vendedorNombre}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 (vendedorNombre || "?")[0].toUpperCase()
               )}
