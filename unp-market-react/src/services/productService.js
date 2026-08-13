@@ -102,6 +102,9 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
       // vendedor — no incluido aquí porque excede el alcance pedido.
       calificacionVendedor: perfil?.calificacionPromedio || 0,
       totalResenasVendedor: perfil?.totalResenas || 0,
+      // 🏫 Multicampus: heredado del perfil del usuario que publica —
+      // así el Home puede filtrar productos por campus (useProducts.js).
+      universidadId:  perfil?.universidadId || null,
       userUid:        user.uid,
       fecha:          serverTimestamp(),
       estado:         "disponible",

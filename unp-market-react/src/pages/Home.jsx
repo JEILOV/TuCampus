@@ -40,7 +40,7 @@ const Home = () => {
   const navigate       = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const { user, favoritos } = useAuth();
+  const { user, perfil, favoritos } = useAuth();
 
   // ── Estado de UI ─────────────────────────────────────────
   const [busqueda,         setBusqueda]         = useState("");
@@ -77,6 +77,7 @@ const Home = () => {
     orden,
     categoriaActiva,
     busquedaFirebase,
+    universidadId: perfil?.universidadId, // 🏫 Multicampus — cada sede ve solo sus productos
     onError: (msg) => mostrarToast(msg, "error"),
   });
 

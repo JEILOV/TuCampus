@@ -5,6 +5,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
+import { detectarUniversidad } from "../config/universidades";
 
 /**
  * Obtiene el perfil PÚBLICO de un usuario/vendedor por su UID.
@@ -131,6 +132,12 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
     const userRef = doc(db, "usuarios", user.uid);
     const snap    = await getDoc(userRef);
 
+    // 🏫 Multicampus: se detecta la universidad por el dominio del correo
+    // institucional. Si por algún motivo no matchea ninguna sede conocida
+    // (no debería pasar, ya que AuthContext bloquea el acceso antes),
+    // queda como null en vez de reventar la creación del perfil.
+    const universidad = detectarUniversidad(user.email);
+
     const perfilBase = {
       uid:       user.uid,
       nombre:    user.displayName || "Estudiante UNP",
@@ -139,6 +146,8 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
       ubicacion: "Piura",
       bio:       "Estudiante de la UNP",
       acercaDe:  "¡Hola! Bienvenido a mi tienda en el campus.",
+      // 🏫 Multicampus — ver src/config/universidades.js
+      universidadId: universidad?.id || null,
       // 🔒 telefono y metodosPago ya NO viven en el doc público.
       // Ver /usuarios/{uid}/privado/contacto.
       aceptaYape: false,

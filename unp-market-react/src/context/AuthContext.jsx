@@ -27,6 +27,7 @@ import {
   guardarFavoritos,
   fusionarFavoritos,
 } from "../utils/favoritesStorage";
+import { esCorreoInstitucionalValido } from "../config/universidades";
 
 // ── 1. Creación del contexto ─────────────────────────────────
 //  Valor inicial null: cualquier componente que llame useAuth()
@@ -57,8 +58,10 @@ export const AuthProvider = ({ children }) => {
       }
 
       // 🚨 BLOQUEO DE SEGURIDAD ABSOLUTO 🚨
-      // Si el correo no es de la UNP, lo expulsamos inmediatamente
-      if (!firebaseUser.email?.endsWith("@alumnos.unp.edu.pe")) {
+      // 🏫 Multicampus: ahora se permite cualquier correo cuyo dominio
+      // esté en el catálogo de src/config/universidades.js (UNP, UCV, UTP).
+      // Si el correo no pertenece a NINGUNA sede soportada, lo expulsamos.
+      if (!esCorreoInstitucionalValido(firebaseUser.email)) {
         console.warn("[AuthContext] Intento de acceso con correo no permitido:", firebaseUser.email);
         await signOut(auth); // Destruye la sesión en Firebase
         

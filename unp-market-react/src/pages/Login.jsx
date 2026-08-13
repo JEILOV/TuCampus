@@ -37,9 +37,7 @@ import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { Zap, ShieldCheck, Smile, ArrowRight } from "lucide-react";
 import { auth }                      from "../services/firebase";
 import { useAuth }                   from "../context/AuthContext";
-
-// ── Constantes ───────────────────────────────────────────────
-const DOMINIO_PERMITIDO = "@alumnos.unp.edu.pe";
+import { esCorreoInstitucionalValido } from "../config/universidades";
 
 // Placeholders de imágenes — reemplazar por los archivos finales.
 const LOGO_UNP     = "/assets/logo-unp-placeholder.png";
@@ -94,9 +92,11 @@ const Login = () => {
       const user   = result.user;
 
       // Validación de dominio: único negocio que vive en Login
-      if (!user.email?.endsWith(DOMINIO_PERMITIDO)) {
+      // 🏫 Multicampus: acepta cualquier dominio institucional del
+      // catálogo (UNP, UCV, UTP) — ver src/config/universidades.js.
+      if (!esCorreoInstitucionalValido(user.email)) {
         await signOut(auth);
-        setToast({ mensaje: "Acceso denegado: Usa tu correo @alumnos.unp.edu.pe" });
+        setToast({ mensaje: "Acceso denegado: Usa tu correo institucional (UNP, UCV o UTP)" });
         setLabelBtn("Iniciar sesión");
         setEnviando(false);
         return;
