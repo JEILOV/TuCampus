@@ -6,6 +6,7 @@ import { useAuth }                          from "../context/AuthContext";
 import { obtenerProductoPorId }             from "../services/productService";
 import { obtenerOCrearChat }                from "../services/chatService";
 import { obtenerPerfilVendedor }            from "../services/userService";
+import { vendedorPorDefecto }               from "../config/universidades";
 import { useFavorites }                     from "../hooks/useFavorites";
 import Spinner                              from "../components/Spinner";
 import { ToastContainer, useToast }         from "../components/Toast";
@@ -146,9 +147,14 @@ const Producto = () => {
   // ── Derivados ───────────────────────────────────────────
   const {
     titulo, precio, imagen, categoria, descripcion,
-    vendedor: nombreVendedor = "Vendedor UNP",
-    avatarVendedor, estado,
+    vendedor: nombreVendedorCrudo,
+    avatarVendedor, estado, universidadId,
   } = producto;
+
+  // 🏫 Multicampus: `producto.universidadId` es un campo obligatorio
+  // (ver esProductoValido en firestore.rules), así que siempre hay
+  // sede disponible para el fallback — ya no asumimos "Vendedor UNP".
+  const nombreVendedor = nombreVendedorCrudo || vendedorPorDefecto(universidadId);
 
   const estaAgotado  = (estado || "").toLowerCase() === "agotado";
   const emoji        = ICONOS_CAT[(categoria || "").toLowerCase()] || "📦";
@@ -242,7 +248,7 @@ const Producto = () => {
                     ({reputacionVendedor.totalResenas})
                   </>
                 ) : (
-                  "Vendedor de la UNP"
+                  vendedorPorDefecto(universidadId, true)
                 )}
               </p>
             </div>

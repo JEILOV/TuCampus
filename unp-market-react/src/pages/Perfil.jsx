@@ -16,6 +16,10 @@ import { db }                          from "../services/firebase";
 import { useAuth }                     from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
 import { obtenerContactoPrivado, guardarContactoPrivado } from "../services/userService";
+import {
+  obtenerColorUniversidad, oscurecerColor,
+  nombreEstudiantePorDefecto, bioEstudiantePorDefecto,
+}                                       from "../config/universidades";
 import Spinner                         from "../components/Spinner";
 import { useToast, ToastContainer }    from "../components/Toast";
 
@@ -346,6 +350,14 @@ const Perfil = () => {
 
   const p = perfil || {};
 
+  // 🎨 Multicampus: el banner usa el color institucional de la sede
+  // del dueño del perfil (degradado color -> color oscurecido), igual
+  // que antes usaba el azul fijo `primary` -> `primary-dark`.
+  const colorSede = obtenerColorUniversidad(p.universidadId);
+  const estiloBanner = p.portada?.trim()
+    ? { backgroundImage: `url('${p.portada}')`, backgroundSize: "cover", backgroundPosition: "center" }
+    : { background: `linear-gradient(to bottom, ${colorSede}, ${oscurecerColor(colorSede, 20)})` };
+
   return (
     <div className="app-shell font-sans pb-6">
 
@@ -353,8 +365,8 @@ const Perfil = () => {
              CABECERA — Banner + Avatar + Nombre
         ════════════════════════════════════════════════════ */}
       <div
-        className="relative flex min-h-[300px] w-full flex-col items-center justify-center overflow-hidden rounded-b-[32px] bg-gradient-to-b from-primary to-primary-dark px-6 pb-10 pt-14"
-        style={p.portada?.trim() ? { backgroundImage: `url('${p.portada}')`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+        className="relative flex min-h-[300px] w-full flex-col items-center justify-center overflow-hidden rounded-b-[32px] px-6 pb-10 pt-14"
+        style={estiloBanner}
       >
         {/* Botón volver */}
         <button
@@ -415,10 +427,10 @@ const Perfil = () => {
           </div>
 
           <h1 className="text-center text-2xl font-extrabold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.4)]">
-            {p.nombre || "Estudiante UNP"}
+            {p.nombre || nombreEstudiantePorDefecto(p.universidadId)}
           </h1>
           <p className="text-[13px] font-bold text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
-            {p.bio || "Estudiante de la UNP"}
+            {p.bio || bioEstudiantePorDefecto(p.universidadId)}
           </p>
           <div className="mt-1 inline-flex items-center gap-1.5 rounded-chip border border-white/40 bg-white/20 px-4 py-1.5 text-[12px] font-bold text-white backdrop-blur">
             <CheckCircle2 size={14} />

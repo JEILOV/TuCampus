@@ -5,7 +5,11 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
-import { detectarUniversidad } from "../config/universidades";
+import {
+  detectarUniversidad,
+  nombreEstudiantePorDefecto,
+  bioEstudiantePorDefecto,
+} from "../config/universidades";
 
 /**
  * Obtiene el perfil PÚBLICO de un usuario/vendedor por su UID.
@@ -140,11 +144,14 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
 
     const perfilBase = {
       uid:       user.uid,
-      nombre:    user.displayName || "Estudiante UNP",
+      // 🏫 Multicampus: si no personalizó su nombre, el default ahora
+      // depende de la sede detectada ("Estudiante UTP", "Estudiante UCV"...)
+      // en vez de asumir siempre UNP.
+      nombre:    user.displayName || nombreEstudiantePorDefecto(universidad?.id),
       email:     user.email,
       avatar:    user.photoURL || "",
       ubicacion: "Piura",
-      bio:       "Estudiante de la UNP",
+      bio:       bioEstudiantePorDefecto(universidad?.id),
       acercaDe:  "¡Hola! Bienvenido a mi tienda en el campus.",
       // 🏫 Multicampus — ver src/config/universidades.js
       universidadId: universidad?.id || null,

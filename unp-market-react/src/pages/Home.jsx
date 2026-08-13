@@ -10,7 +10,7 @@ import BotonNotificaciones                          from "../components/BotonNot
 import ProductCard                                  from "../components/ProductCard";
 import CarruselAnuncios                             from "../components/CarruselAnuncios";
 import { CATEGORY_ICON_MAP }                        from "../components/CategoryIcons";
-import { LISTA_UNIVERSIDADES }                      from "../config/universidades";
+import { LISTA_UNIVERSIDADES, obtenerColorUniversidad } from "../config/universidades";
 
 // ── Constantes ───────────────────────────────────────────────
 // Placeholder de imagen — reemplazar por el archivo final.
@@ -132,12 +132,26 @@ const Home = () => {
 
   const labelOrden = OPCIONES_ORDEN.find((o) => o.id === orden)?.label ?? "Más recientes";
 
+  // 🎨 Multicampus: el color del header sigue la sede que se está
+  // EXPLORANDO (`universidadActiva`), no necesariamente la del perfil
+  // del usuario — mismo criterio que ya usa el selector de campus.
+  //
+  // 🔵 Excepción a pedido: UNP mantiene el azul "clásico" del Design
+  // System (`bg-primary` / #0639B8) en vez del azul institucional del
+  // catálogo (`#0f4c81`). Para el resto de sedes sí se usa el color
+  // dinámico de `universidades.js`.
+  const esUnp = universidadActiva === "unp";
+  const colorHeader = obtenerColorUniversidad(universidadActiva);
+
   // ── Render ───────────────────────────────────────────────
   return (
     <div className="app-shell font-sans">
 
-      {/* HEADER AZUL */}
-      <header className="relative rounded-b-[32px] bg-primary px-6 pb-10 pt-8">
+      {/* HEADER — azul clásico para UNP, color institucional dinámico para el resto */}
+      <header
+        className={`relative rounded-b-[32px] px-6 pb-10 pt-8${esUnp ? " bg-primary" : ""}`}
+        style={esUnp ? undefined : { backgroundColor: colorHeader }}
+      >
         <div className="flex items-center justify-center gap-3">
           <img src={MASCOTA_ICONO} alt="TuCampus" className="h-14 w-14 object-contain" />
           <div className="text-left">

@@ -19,6 +19,11 @@ import {
   obtenerMiResena,
   obtenerResenasDeVendedor,
 } from "../services/reviewService";
+import {
+  obtenerColorUniversidad, oscurecerColor,
+  nombreEstudiantePorDefecto, bioEstudiantePorDefecto, vendedorPorDefecto,
+  UNIVERSIDADES,
+} from "../config/universidades";
 import Spinner    from "../components/Spinner";
 import ModalResena from "../components/ModalResena";
 import ProductCard from "../components/ProductCard";
@@ -61,8 +66,11 @@ const TarjetaResena = ({ resena, esMia, onEditar }) => {
           }
         </div>
         <div className="min-w-0 flex-1">
+          {/* 🏫 El doc de /resenas no guarda `universidadId` del autor,
+              así que aquí solo cabe el fallback genérico (no hay sede
+              que inferir sin una lectura extra al perfil del autor). */}
           <p className="truncate text-[13px] font-bold text-ink">
-            {resena.autorNombre || "Estudiante UNP"}
+            {resena.autorNombre || nombreEstudiantePorDefecto(null)}
           </p>
           <Estrellas valor={resena.estrellas} />
         </div>
@@ -182,12 +190,16 @@ const Vendedor = () => {
 
         if (!datosVendedor && lista.length > 0) {
           const primer = lista[0];
+          // 🏫 Multicampus: `producto.universidadId` es el único rastro
+          // de sede disponible cuando el vendedor no tiene doc propio
+          // en /usuarios (perfiles viejos / edge case).
           datosVendedor = {
-            nombre:   primer.vendedorNombre || primer.vendedor || "Vendedor UNP",
+            nombre:   primer.vendedorNombre || primer.vendedor || vendedorPorDefecto(primer.universidadId),
             avatar:   primer.avatarVendedor || "",
-            bio:      "Estudiante de la UNP",
+            bio:      bioEstudiantePorDefecto(primer.universidadId),
             acercaDe: "¡Hola! Bienvenido a mi tienda.",
             ubicacion: "Piura",
+            universidadId: primer.universidadId || null,
           };
         }
 
@@ -301,6 +313,15 @@ const Vendedor = () => {
 
   const v = vendedor;
 
+  // 🎨 Multicampus: tarjeta/banner del vendedor tematizada con el
+  // color institucional de SU sede (degradado color -> oscurecido),
+  // igual patrón que Perfil.jsx.
+  const colorSede = obtenerColorUniversidad(v.universidadId);
+  const estiloBanner = v.portada?.trim()
+    ? { backgroundImage: `url('${v.portada}')`, backgroundSize: "cover", backgroundPosition: "center" }
+    : { background: `linear-gradient(to bottom, ${colorSede}, ${oscurecerColor(colorSede, 20)})` };
+  const universidadVendedor = UNIVERSIDADES[v.universidadId];
+
   // 🔧 El banner de reputación usaba v.totalResenas / v.calificacionPromedio
   // — campos guardados aparte en el doc del vendedor — mientras que la
   // sección "Opiniones" carga las reseñas reales de /resenas. Si esos
@@ -322,10 +343,10 @@ const Vendedor = () => {
   return (
     <div className="app-shell font-sans pb-8">
 
-      {/* CABECERA — Azul profundo, o imagen de portada tal cual (sin overlay) */}
+      {/* CABECERA — Color de la sede del vendedor, o imagen de portada tal cual (sin overlay) */}
       <div
-        className="relative flex min-h-[300px] w-full flex-col items-center justify-center overflow-hidden rounded-b-[32px] bg-gradient-to-b from-primary to-primary-dark px-6 pb-10 pt-14"
-        style={v.portada?.trim() ? { backgroundImage: `url('${v.portada}')`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+        className="relative flex min-h-[300px] w-full flex-col items-center justify-center overflow-hidden rounded-b-[32px] px-6 pb-10 pt-14"
+        style={estiloBanner}
       >
         <button
           onClick={() => navigate(-1)}
@@ -355,10 +376,10 @@ const Vendedor = () => {
           </div>
 
           <h1 className="text-center text-2xl font-extrabold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.4)]">
-            {v.nombre || "Vendedor UNP"}
+            {v.nombre || vendedorPorDefecto(v.universidadId)}
           </h1>
           <p className="text-[13px] font-bold uppercase tracking-wide text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
-            {v.bio || "Estudiante de la UNP"}
+            {v.bio || bioEstudiantePorDefecto(v.universidadId)}
           </p>
 
           {/* Reputación: promedio de estrellas + total de reseñas.
@@ -391,7 +412,11 @@ const Vendedor = () => {
             <p className="truncate text-[13px] font-extrabold leading-tight text-ink">
               {v.ubicacion || "Piura"}
             </p>
-            <p className="text-[11px] font-semibold text-ink/50">UNP – Piura</p>
+            {/* 🏫 Multicampus: antes decía "UNP – Piura" fijo; ahora
+                muestra la sede real del vendedor. */}
+            <p className="text-[11px] font-semibold text-ink/50">
+              {(universidadVendedor?.id || "SEDE").toUpperCase()} – {v.ubicacion || "Piura"}
+            </p>
           </div>
         </div>
 
