@@ -1,7 +1,7 @@
 // src/pages/Home.jsx
 import { useState, useEffect, useRef }              from "react";
 import { useNavigate, useSearchParams }             from "react-router-dom";
-import { Search, ChevronDown }                      from "lucide-react";
+import { Search, ChevronDown, MapPin }              from "lucide-react";
 import { useAuth }                                  from "../context/AuthContext";
 import { useProducts }                              from "../hooks/useProducts";
 import { useToast, ToastContainer }                 from "../components/Toast";
@@ -10,6 +10,7 @@ import BotonNotificaciones                          from "../components/BotonNot
 import ProductCard                                  from "../components/ProductCard";
 import CarruselAnuncios                             from "../components/CarruselAnuncios";
 import { CATEGORY_ICON_MAP }                        from "../components/CategoryIcons";
+import { LISTA_UNIVERSIDADES }                      from "../config/universidades";
 
 // ── Constantes ───────────────────────────────────────────────
 // Placeholder de imagen — reemplazar por el archivo final.
@@ -50,6 +51,34 @@ const Home = () => {
   const [orden,            setOrden]            = useState("recientes");
   const [menuOrdenAbierto, setMenuOrdenAbierto] = useState(false);
 
+  // 🏫 Multicampus — sede que el Home está EXPLORANDO en este momento.
+  // Se inicializa con la sede real del perfil, pero el estudiante puede
+  // cambiarla desde el selector para curiosear otros campus. Esto NO
+  // afecta a qué universidad se publica un producto nuevo (ver
+  // Publicar.jsx, que lee perfil.universidadId directo de su propio
+  // useAuth() — nunca de este estado).
+  const [universidadActiva,   setUniversidadActiva]   = useState(perfil?.universidadId || "unp");
+  const [selectorCampusAbierto, setSelectorCampusAbierto] = useState(false);
+
+  // 🔧 perfil suele resolver de forma asíncrona (después del primer
+  // render, mientras Firebase Auth aún carga). Si el usuario todavía NO
+  // tocó el selector manualmente, mantenemos universidadActiva
+  // sincronizada con la sede real del perfil apenas esté disponible —
+  // así se evita el caso en que el fallback "unp" se quede pegado para
+  // un estudiante de otra sede solo porque su perfil llegó tarde.
+  const tocoSelectorRef = useRef(false);
+  useEffect(() => {
+    if (!tocoSelectorRef.current && perfil?.universidadId) {
+      setUniversidadActiva(perfil.universidadId);
+    }
+  }, [perfil?.universidadId]);
+
+  const handleCambiarCampus = (universidadId) => {
+    tocoSelectorRef.current = true;
+    setUniversidadActiva(universidadId);
+    setSelectorCampusAbierto(false);
+  };
+
   const tabUrl = searchParams.get("tab") || "inicio";
   const [tabActiva, setTabActiva] = useState(tabUrl);
   useEffect(() => { setTabActiva(tabUrl); }, [tabUrl]);
@@ -77,7 +106,7 @@ const Home = () => {
     orden,
     categoriaActiva,
     busquedaFirebase,
-    universidadId: perfil?.universidadId, // 🏫 Multicampus — cada sede ve solo sus productos
+    universidadId: universidadActiva, // 🏫 Multicampus — sede que se está explorando (puede diferir de la del perfil)
     onError: (msg) => mostrarToast(msg, "error"),
   });
 
@@ -115,6 +144,46 @@ const Home = () => {
             <p className="text-2xl font-extrabold leading-none text-background">TuCampus</p>
             <p className="mt-1 text-[12px] font-medium text-background/75">Conecta. Comparte. Crece.</p>
           </div>
+        </div>
+
+        {/* Selector de Sede — permite explorar productos de otros campus.
+            Solo cambia lo que el Home MUESTRA (universidadActiva); nunca
+            afecta a qué sede se publica un producto. */}
+        <div className="relative z-20 mt-4 flex justify-center">
+          <button
+            onClick={() => setSelectorCampusAbierto((v) => !v)}
+            className="flex items-center gap-1.5 rounded-chip bg-background/15 px-3.5 py-1.5 text-[12px] font-bold text-background backdrop-blur-sm"
+          >
+            <MapPin size={13} strokeWidth={2.5} />
+            {LISTA_UNIVERSIDADES.find((u) => u.id === universidadActiva)?.id?.toUpperCase() ?? "SEDE"}
+            <ChevronDown
+              size={12}
+              strokeWidth={3}
+              className={`transition-transform ${selectorCampusAbierto ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {selectorCampusAbierto && (
+            <>
+              <div onClick={() => setSelectorCampusAbierto(false)} className="fixed inset-0 z-[90]" />
+              <div className="absolute top-full z-[100] mt-2 flex min-w-[220px] flex-col overflow-hidden rounded-card bg-card shadow-softLg">
+                {LISTA_UNIVERSIDADES.map((u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => handleCambiarCampus(u.id)}
+                    className={`flex items-center justify-between px-4 py-3 text-left text-[13px] font-bold ${
+                      universidadActiva === u.id ? "bg-primary/5 text-primary" : "text-ink/60"
+                    }`}
+                  >
+                    <span>📍 {u.nombre}</span>
+                    {perfil?.universidadId === u.id && (
+                      <span className="ml-2 shrink-0 text-[10px] font-semibold text-primary/70">Tu sede</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </header>
 
