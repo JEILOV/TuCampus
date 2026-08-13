@@ -222,8 +222,10 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Carrusel de Anuncios — flyers de eventos/promos del campus */}
-          <CarruselAnuncios />
+          {/* Carrusel de Anuncios — flyers de eventos/promos del campus.
+              🏫 Multicampus: se le pasa la sede activa para traer sus
+              anuncios exclusivos + los globales (ver useAnuncios.js). */}
+          <CarruselAnuncios universidadId={universidadActiva} />
 
           {/* Categorías — carrusel horizontal */}
           <nav

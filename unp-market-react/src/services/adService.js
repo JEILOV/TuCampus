@@ -26,6 +26,11 @@
 //                            navega dentro de la app)
 //      orden:       number  (requerido — controla el orden asc)
 //      activo:      boolean (requerido — filtra qué se muestra)
+//      universidadId: string (requerido — 🏫 Multicampus: "global"
+//                            para que se vea en TODAS las sedes, o
+//                            uno de los ids de universidades.js
+//                            ("unp"|"ucv"|"utp") para que sea
+//                            exclusivo de esa sede)
 //      creadoEn:    Timestamp
 //      actualizadoEn: Timestamp
 //    }
@@ -40,10 +45,17 @@ import { logError } from "../utils/errorHandler";
 
 const COLECCION = "anuncios";
 
+// 🏫 Multicampus: sedes válidas + el pseudo-id "global" que un anuncio
+// puede usar para aparecer en el carrusel de TODAS las sedes.
+export const SEDES_ANUNCIO = ["global", "unp", "ucv", "utp"];
+const SEDE_GLOBAL = "global";
+
 // 🔧 Mismo contenido que tenía el mock original de CarruselAnuncios,
 // solo que ahora con el shape "oficial" (colorFondo/imagenUrl/enlaceUrl)
 // para que el componente no necesite dos formatos distintos según el
 // origen de los datos. Se usa cuando /anuncios está vacía o falla.
+// 🏫 Todos marcados como "global" para que se sigan viendo sin importar
+// qué sede esté explorando el usuario.
 export const ANUNCIOS_FALLBACK = [
   {
     id: "feria-unp",
@@ -52,6 +64,7 @@ export const ANUNCIOS_FALLBACK = [
     colorFondo: "#1c398e", // primary
     imagenUrl: "",
     enlaceUrl: "",
+    universidadId: SEDE_GLOBAL,
   },
   {
     id: "promo-fotocopias",
@@ -60,6 +73,7 @@ export const ANUNCIOS_FALLBACK = [
     colorFondo: "#287653",
     imagenUrl: "",
     enlaceUrl: "",
+    universidadId: SEDE_GLOBAL,
   },
   {
     id: "semana-cultural",
@@ -68,6 +82,7 @@ export const ANUNCIOS_FALLBACK = [
     colorFondo: "#a07850",
     imagenUrl: "",
     enlaceUrl: "",
+    universidadId: SEDE_GLOBAL,
   },
   {
     id: "promo-delivery",
@@ -76,25 +91,48 @@ export const ANUNCIOS_FALLBACK = [
     colorFondo: "#1a1a1a",
     imagenUrl: "",
     enlaceUrl: "",
+    universidadId: SEDE_GLOBAL,
   },
 ];
 
 /**
- * Escucha en tiempo real los anuncios activos, ordenados por `orden` asc.
+ * Escucha en tiempo real los anuncios activos de una sede (los propios
+ * de esa sede + los globales), ordenados por `orden` asc.
  * Llama a `callback(listaDeAnuncios)` en cada cambio.
  *
- * Fallback: si la colección no tiene documentos activos, o si el listener
- * falla (permiso denegado, sin red, etc.), se invoca `callback` con
- * ANUNCIOS_FALLBACK en vez de dejar el carrusel vacío/roto.
+ * 🏫 Multicampus: usa where("universidadId","in",[universidadActiva,
+ * "global"]) para traer en una sola consulta tanto los anuncios
+ * exclusivos del campus activo como los globales. Firestore exige un
+ * índice compuesto para esta combinación (activo == true + universidadId
+ * in [...] + orderBy(orden)) — la consola te dará el link para crearlo
+ * la primera vez que corra en producción; hasta entonces cae al fallback.
  *
+ * Fallback: si la colección no tiene documentos activos para esa sede,
+ * o si el listener falla (permiso denegado, sin red, índice faltante,
+ * etc.), se invoca `callback` con ANUNCIOS_FALLBACK en vez de dejar el
+ * carrusel vacío/roto.
+ *
+ * @param {string} universidadActiva  Sede que se está explorando (ver
+ *                                    universidadActiva en Home.jsx). Si
+ *                                    no se especifica, se asume "unp".
  * @param {(anuncios: object[]) => void} callback
  * @returns {() => void} función para cancelar la suscripción (unsubscribe)
  */
-export const suscribirAnuncios = (callback) => {
+export const suscribirAnuncios = (universidadActiva, callback) => {
+  // 🔧 Compat: si alguien todavía llama suscribirAnuncios(callback) con
+  // la firma vieja (un solo argumento), no rompemos — se interpreta
+  // como "sin sede" y se corrige internamente.
+  if (typeof universidadActiva === "function") {
+    callback = universidadActiva;
+    universidadActiva = "unp";
+  }
+  const sede = universidadActiva || "unp";
+
   try {
     const q = query(
       collection(db, COLECCION),
       where("activo", "==", true),
+      where("universidadId", "in", [sede, SEDE_GLOBAL]),
       orderBy("orden", "asc"),
     );
 
@@ -127,16 +165,21 @@ export const suscribirAnuncios = (callback) => {
 
 /**
  * Crea un nuevo anuncio. `orden` y `activo` tienen valores por defecto
- * razonables si no se especifican.
+ * razonables si no se especifican. `universidadId` por defecto es
+ * "global" (visible en todas las sedes) si no se especifica o si viene
+ * un valor fuera de SEDES_ANUNCIO.
  */
 export const crearAnuncio = async ({
   titulo, subtitulo = "", colorFondo = "#1c398e",
   imagenUrl = "", enlaceUrl = "", orden = 0, activo = true,
+  universidadId = SEDE_GLOBAL,
 }) => {
   const tituloLimpio = String(titulo || "").trim();
   if (!tituloLimpio) {
     throw new Error("El título del anuncio es obligatorio.");
   }
+
+  const sedeLimpia = SEDES_ANUNCIO.includes(universidadId) ? universidadId : SEDE_GLOBAL;
 
   try {
     const ref = await addDoc(collection(db, COLECCION), {
@@ -147,6 +190,7 @@ export const crearAnuncio = async ({
       enlaceUrl: String(enlaceUrl || "").trim(),
       orden: Number(orden) || 0,
       activo: !!activo,
+      universidadId: sedeLimpia,
       creadoEn: serverTimestamp(),
       actualizadoEn: serverTimestamp(),
     });

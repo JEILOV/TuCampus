@@ -30,12 +30,20 @@ import {
   crearAnuncio, actualizarAnuncio,
   alternarActivoAnuncio, eliminarAnuncio,
 } from "../services/adService";
+import { LISTA_UNIVERSIDADES, UNIVERSIDADES } from "../config/universidades";
 import Toast, { useToast } from "../components/Toast";
 
 // 🔧 Editar esta lista con los correos @alumnos.unp.edu.pe (o el que
 // uses para administrar) que deben tener acceso al panel.
 const ADMIN_EMAILS = [
   "0512023070@alumnos.unp.edu.pe",
+];
+
+// 🏫 Multicampus: opciones del selector de Sede / Destinatarios del
+// formulario. "global" primero porque es el valor por defecto.
+const OPCIONES_SEDE = [
+  { id: "global", label: "Todas las sedes (Anuncio Global)" },
+  ...LISTA_UNIVERSIDADES.map((u) => ({ id: u.id, label: `Solo ${u.id.toUpperCase()}` })),
 ];
 
 const inputClass =
@@ -51,6 +59,20 @@ const ESTADO_VACIO = {
   enlaceUrl: "",
   orden: 0,
   activo: true,
+  universidadId: "global",
+};
+
+// 🏫 Badge de sede para el listado del panel — mismo criterio visual
+// que CarruselAnuncios.jsx: "global" -> "TuCampus", sede puntual ->
+// "Exclusivo XXX" con el color institucional de esa sede.
+const badgeDeAnuncio = (a) => {
+  const sedeId = a.universidadId || "global";
+  if (sedeId === "global") return { texto: "TuCampus", color: "#5c5c7a" };
+  const u = UNIVERSIDADES[sedeId];
+  return {
+    texto: `Exclusivo ${u ? u.id.toUpperCase() : sedeId.toUpperCase()}`,
+    color: u?.color || "#5c5c7a",
+  };
 };
 
 const PanelAdminAnuncios = () => {
@@ -102,6 +124,7 @@ const PanelAdminAnuncios = () => {
       enlaceUrl: a.enlaceUrl || "",
       orden: a.orden ?? 0,
       activo: a.activo ?? true,
+      universidadId: a.universidadId || "global",
     });
     setArchivo(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -141,6 +164,7 @@ const PanelAdminAnuncios = () => {
         enlaceUrl: form.enlaceUrl,
         orden: Number(form.orden) || 0,
         activo: !!form.activo,
+        universidadId: form.universidadId || "global",
       };
 
       if (form.id) {
@@ -233,6 +257,22 @@ const PanelAdminAnuncios = () => {
               className={`${inputClass} mt-2`} />
           </div>
 
+          <div className="mb-3.5">
+            <label className={labelClass}>Sede / Destinatarios</label>
+            <select
+              value={form.universidadId}
+              onChange={(e) => setForm({ ...form, universidadId: e.target.value })}
+              className={`${inputClass} mt-2`}
+            >
+              {OPCIONES_SEDE.map((opt) => (
+                <option key={opt.id} value={opt.id}>{opt.label}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] font-semibold text-ink/40">
+              "Todas las sedes" lo muestra en el carrusel de cualquier campus; una sede puntual lo hace exclusivo de ese campus.
+            </p>
+          </div>
+
           <div className="mb-3.5 grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Color de fondo</label>
@@ -300,28 +340,39 @@ const PanelAdminAnuncios = () => {
             Anuncios ({anuncios.length})
           </p>
           <div className="flex flex-col gap-2.5">
-            {anuncios.map((a) => (
-              <div key={a.id}
-                className={`flex items-center gap-3 rounded-2xl bg-card p-3 shadow-soft ${a.activo ? "" : "opacity-50"}`}>
-                <div className="h-12 w-12 shrink-0 rounded-xl" style={{ backgroundColor: a.colorFondo || "#1c398e" }} />
-                <button type="button" onClick={() => cargarParaEditar(a)} className="min-w-0 flex-1 text-left">
-                  <p className="truncate text-[13.5px] font-extrabold text-ink">{a.titulo}</p>
-                  <p className="truncate text-[11.5px] font-semibold text-ink/50">
-                    {a.subtitulo || "Sin subtítulo"} · orden {a.orden ?? 0}
-                  </p>
-                </button>
-                <button type="button" onClick={() => handleToggleActivo(a)}
-                  aria-label={a.activo ? "Desactivar" : "Activar"}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-background text-ink/60">
-                  {a.activo ? <Eye size={17} /> : <EyeOff size={17} />}
-                </button>
-                <button type="button" onClick={() => handleEliminar(a)}
-                  aria-label="Eliminar"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500">
-                  <Trash2 size={17} />
-                </button>
-              </div>
-            ))}
+            {anuncios.map((a) => {
+              const badge = badgeDeAnuncio(a);
+              return (
+                <div key={a.id}
+                  className={`flex items-center gap-3 rounded-2xl bg-card p-3 shadow-soft ${a.activo ? "" : "opacity-50"}`}>
+                  <div className="h-12 w-12 shrink-0 rounded-xl" style={{ backgroundColor: a.colorFondo || "#1c398e" }} />
+                  <button type="button" onClick={() => cargarParaEditar(a)} className="min-w-0 flex-1 text-left">
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-[13.5px] font-extrabold text-ink">{a.titulo}</p>
+                      <span
+                        className="shrink-0 rounded-chip px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wide text-white"
+                        style={{ backgroundColor: badge.color }}
+                      >
+                        {badge.texto}
+                      </span>
+                    </div>
+                    <p className="truncate text-[11.5px] font-semibold text-ink/50">
+                      {a.subtitulo || "Sin subtítulo"} · orden {a.orden ?? 0}
+                    </p>
+                  </button>
+                  <button type="button" onClick={() => handleToggleActivo(a)}
+                    aria-label={a.activo ? "Desactivar" : "Activar"}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-background text-ink/60">
+                    {a.activo ? <Eye size={17} /> : <EyeOff size={17} />}
+                  </button>
+                  <button type="button" onClick={() => handleEliminar(a)}
+                    aria-label="Eliminar"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500">
+                    <Trash2 size={17} />
+                  </button>
+                </div>
+              );
+            })}
             {anuncios.length === 0 && (
               <p className="px-1 text-[13px] font-semibold text-ink/40">
                 Aún no hay anuncios. El carrusel de Home muestra los banners locales por defecto.
