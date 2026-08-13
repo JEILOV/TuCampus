@@ -68,9 +68,13 @@ const Login = () => {
   const [toast,    setToast]    = useState(null);
   const [labelBtn, setLabelBtn] = useState("Iniciar sesión");
 
-  // Redirección reactiva: solo redirige si el usuario es de la UNP
+  // Redirección reactiva: solo redirige si el usuario es de un
+  // dominio institucional soportado (UNP, UCV o UTP).
+  // 🏫 Multicampus: reemplaza al viejo `DOMINIO_PERMITIDO` (constante
+  // hardcodeada a un único dominio UNP que ya no existe) por la
+  // misma validación multicampus que usa handleGoogleLogin más abajo.
   useEffect(() => {
-    if (!cargando && user && user.email?.endsWith(DOMINIO_PERMITIDO)) {
+    if (!cargando && user && esCorreoInstitucionalValido(user.email)) {
       navigate("/", { replace: true });
     }
   }, [user, cargando, navigate]);
