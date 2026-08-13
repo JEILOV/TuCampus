@@ -40,6 +40,7 @@
 
 import { useRef, useState } from "react";
 import { toBlob } from "html-to-image";
+import { QRCodeSVG } from "qrcode.react";
 import { X, Share2, Download, Star } from "lucide-react";
 
 const MASCOTA_ICONO = "/assets/mascota-icono-placeholder.png";
@@ -268,17 +269,20 @@ const GeneradorStoryModal = ({
                   <p className="text-[12px] font-extrabold text-white">Disponible en la UNP</p>
                   <p className="text-[10.5px] font-semibold text-white/60">{dominioCorto}</p>
                 </div>
-                {/* Marco decorativo estilo QR — placeholder visual, no
-                    es un QR real escaneable (no se agregó librería de
-                    generación de QR para no sumar otra dependencia).
-                    Si más adelante se quiere uno funcional, se puede
-                    reemplazar este bloque con `qrcode.react`. */}
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/95">
-                  <div className="grid h-6 w-6 grid-cols-3 grid-rows-3 gap-[2px]">
-                    {[1,1,1, 1,0,1, 1,1,1].map((on, i) => (
-                      <span key={i} className={`rounded-[1px] ${on ? "bg-ink" : "bg-transparent"}`} />
-                    ))}
-                  </div>
+                {/* QR real y escaneable — apunta directo a la URL del
+                    producto. Fondo blanco + padding propio (no solo el
+                    del contenedor) para que quede un margen "silencioso"
+                    (quiet zone) alrededor del código: sin eso, lectores
+                    de cámara/Instagram pueden fallar en detectarlo,
+                    sobre todo con el fondo azul de la story detrás. */}
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-white p-1.5">
+                  <QRCodeSVG
+                    value={productoUrl}
+                    size={44}
+                    bgColor="#ffffff"
+                    fgColor="#0a1c4d"
+                    level="M"
+                  />
                 </div>
               </div>
             </div>
