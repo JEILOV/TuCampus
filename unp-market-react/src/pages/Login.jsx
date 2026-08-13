@@ -376,7 +376,7 @@ const Login = () => {
         </div>
         <div className="flex flex-col items-center gap-1 px-2 text-center">
           <ShieldCheck size={18} />
-          <span className="text-[11px] font-semibold leading-tight">Comunidad UNP</span>
+          <span className="text-[11px] font-semibold leading-tight">Comunidades Universitarias</span>
         </div>
         <div className="flex flex-col items-center gap-1 px-2 text-center">
           <Smile size={18} />
