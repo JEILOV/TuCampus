@@ -23,14 +23,23 @@ const ProductCard = ({ producto, onVerDetalle }) => {
   const {
     id, titulo, precio, imagen, categoria,
     vendedorNombre, avatarVendedor, estado,
-    calificacionVendedor, totalResenasVendedor,
   } = producto;
 
   const estaAgotado = estado === "agotado";
   const catKey = (categoria || "").toLowerCase();
   const IconPlaceholder = CATEGORY_ICON_MAP[catKey] || IconPackage;
 
-  const tieneResenas = (totalResenasVendedor || 0) > 0;
+  // 🔧 Lectura defensiva de la reputación denormalizada. El único
+  // nombre de campo real que escribe productService.crearProducto y
+  // que ahora también refresca reviewService.guardarOActualizarResena
+  // en cada reseña es calificacionVendedor/totalResenasVendedor — no
+  // existe (ni existió) un campo "vendedorCalificacion"/
+  // "vendedorTotalResenas" en este proyecto, así que no se agrega ese
+  // fallback para no sugerir un campo que nunca se escribe. Se usa
+  // `??` en vez de `||` para que un 0 explícito no se pise a sí mismo.
+  const calificacionVendedor = producto.calificacionVendedor ?? 0;
+  const totalResenasVendedor = producto.totalResenasVendedor ?? 0;
+  const tieneResenas = totalResenasVendedor > 0;
 
   return (
     <article
@@ -68,7 +77,7 @@ const ProductCard = ({ producto, onVerDetalle }) => {
           <Star size={12} strokeWidth={2.5} fill="#F5B301" color="#F5B301" />
           {tieneResenas ? (
             <>
-              {(calificacionVendedor || 0).toFixed(1)}
+              {calificacionVendedor.toFixed(1)}
               <span className="font-semibold text-ink/50">({totalResenasVendedor})</span>
             </>
           ) : (

@@ -58,11 +58,13 @@ const ORDEN_CONFIG = {
  *   productos: Array,
  *   cargando: boolean,
  *   todoCargado: boolean,
+ *   errorCarga: boolean,
  *   cargarMas: Function,
+ *   reintentar: Function,
  * }}
  *
  * @example
- *   const { productos, cargando, todoCargado, cargarMas } = useProducts({
+ *   const { productos, cargando, todoCargado, errorCarga, cargarMas, reintentar } = useProducts({
  *     orden, categoriaActiva, busquedaFirebase,
  *     onError: (msg) => mostrarToast(msg, "error"),
  *   });
@@ -71,12 +73,44 @@ export const useProducts = ({ orden, categoriaActiva, busquedaFirebase, onError 
   const [productos,   setProductos]   = useState([]);
   const [cargando,    setCargando]    = useState(false);
   const [todoCargado, setTodoCargado] = useState(false);
+  // 🔧 Se expone como estado (no solo ref) para que Home.jsx pueda,
+  // si quiere, mostrar un botón "Reintentar" cuando la carga falló,
+  // en vez de la app quedándose en un estado de error silencioso.
+  const [errorCarga,  setErrorCarga]  = useState(false);
 
   const ultimoDocRef = useRef(null);
 
-  // ── Función de carga (estable mientras los filtros no cambien) ──
+  // 🔧 Ref espejo de `cargando`, leída de forma síncrona dentro de
+  // cargarMas. Antes `cargando` era una dependencia del useCallback,
+  // así que CADA VEZ que cargando cambiaba (false→true→false) cargarMas
+  // recibía una identidad NUEVA. Si algún efecto en Home.jsx (p. ej. el
+  // IntersectionObserver del scroll infinito) tiene `cargarMas` en su
+  // arreglo de dependencias, cada cambio de identidad reconstruye ese
+  // efecto — y si el sentinel del scroll sigue visible (como pasa
+  // cuando la lista quedó vacía por un error), el observer dispara
+  // cargarMas otra vez de inmediato. Eso era la cascada: error → nueva
+  // identidad → nueva suscripción → nueva llamada → nuevo error → toast
+  // tras toast. Usar una ref para la guarda evita que cargando forme
+  // parte de las dependencias, así que cargarMas ya NO cambia de
+  // identidad en cada carga.
+  const cargandoRef = useRef(false);
+
+  // 🔧 Ref de error: una vez que una carga falla, esta ref bloquea
+  // llamadas automáticas subsecuentes a cargarMas (tanto el disparo de
+  // carga inicial como el "cargar más" del scroll infinito) hasta que
+  // los filtros cambien de verdad (ver el efecto de reset más abajo,
+  // que es el único lugar donde se limpia). Así el toast de error se
+  // dispara una única vez por combinación de filtros, en vez de
+  // reintentar sin control.
+  const erroreRef = useRef(false);
+
+  // ── Función de carga (identidad estable mientras los filtros no cambien) ──
   const cargarMas = useCallback(async (esNuevoFiltro = false) => {
-    if (cargando || (todoCargado && !esNuevoFiltro)) return;
+    if (cargandoRef.current) return;           // ya hay una carga en curso
+    if (erroreRef.current) return;              // la última carga falló: no reintentar solo
+    if (todoCargado && !esNuevoFiltro) return;   // ya no hay más páginas
+
+    cargandoRef.current = true;
     setCargando(true);
 
     try {
@@ -114,16 +148,24 @@ export const useProducts = ({ orden, categoriaActiva, busquedaFirebase, onError 
       }
     } catch (err) {
       logError("[useProducts.cargarMas]", err);
+      // 🔧 Disparo único: erroreRef ya bloqueó cualquier llamada
+      // concurrente/posterior antes de llegar aquí, así que este catch
+      // solo se ejecuta una vez por combinación de filtros.
+      erroreRef.current = true;
+      setErrorCarga(true);
       onError?.("Error al cargar productos");
     } finally {
+      cargandoRef.current = false;
       setCargando(false);
     }
-  }, [cargando, todoCargado, orden, categoriaActiva, busquedaFirebase, onError]);
+  }, [todoCargado, orden, categoriaActiva, busquedaFirebase, onError]);
 
   // ── Reset y recarga al cambiar cualquier filtro ──
   useEffect(() => {
     setTodoCargado(false);
     setProductos([]);
+    setErrorCarga(false);
+    erroreRef.current = false; // único lugar donde se libera la guarda de error
     ultimoDocRef.current = null;
     // La llamada inicial la dispara el efecto de abajo
     // cuando productos vuelve a [] y todoCargado = false
@@ -131,11 +173,20 @@ export const useProducts = ({ orden, categoriaActiva, busquedaFirebase, onError 
 
   // ── Carga inicial (y tras reset de filtros) ──
   useEffect(() => {
-    if (!todoCargado && productos.length === 0 && !cargando) {
+    if (!todoCargado && !errorCarga && productos.length === 0 && !cargandoRef.current) {
       cargarMas(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productos, todoCargado]);
+  }, [productos, todoCargado, errorCarga, cargarMas]);
 
-  return { productos, cargando, todoCargado, cargarMas };
+  // 🔧 Reintento manual explícito — para un botón "Reintentar" en la UI
+  // si Home.jsx quiere ofrecerlo, en vez de reintentos automáticos.
+  const reintentar = useCallback(() => {
+    erroreRef.current = false;
+    setErrorCarga(false);
+    ultimoDocRef.current = null;
+    setTodoCargado(false);
+    setProductos([]);
+  }, []);
+
+  return { productos, cargando, todoCargado, errorCarga, cargarMas, reintentar };
 };

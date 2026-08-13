@@ -9,6 +9,7 @@ import { obtenerPerfilVendedor }            from "../services/userService";
 import { useFavorites }                     from "../hooks/useFavorites";
 import Spinner                              from "../components/Spinner";
 import { ToastContainer, useToast }         from "../components/Toast";
+import GeneradorStoryModal                  from "../components/GeneradorStoryModal";
 
 // ── Constantes ───────────────────────────────────────────────
 // 🔧 Mismo set que Home.jsx / Publicar.jsx / productService.js.
@@ -116,25 +117,12 @@ const Producto = () => {
   };
 
   // ── Compartir ──
-  const handleCompartir = async () => {
-    const url   = window.location.href;
-    const datos = {
-      title: `${producto?.titulo} — TuCampus`,
-      text:  `Mira este producto en TuCampus: ${producto?.titulo} a S/ ${(producto?.precio || 0).toFixed(2)}`,
-      url,
-    };
-    if (navigator.share) {
-      try { await navigator.share(datos); }
-      catch (err) { if (err.name !== "AbortError") console.warn(err); }
-    } else {
-      try {
-        await navigator.clipboard.writeText(url);
-        mostrarToast("¡Link copiado al portapapeles! 🔗");
-      } catch {
-        mostrarToast("Copia este link: " + url);
-      }
-    }
-  };
+  // 🔧 Antes esto llamaba directo a navigator.share con solo texto/link.
+  // Ahora abre el modal de Story visual (GeneradorStoryModal), que es
+  // quien arma el PNG 9:16 y decide cómo compartirlo (Web Share API con
+  // archivo, o descarga + portapapeles como fallback).
+  const [mostrandoStory, setMostrandoStory] = useState(false);
+  const handleCompartir = () => setMostrandoStory(true);
 
   // ── Estado: Cargando ────────────────────────────────────
   if (cargando) return <Spinner mensaje="Cargando producto..." />;
@@ -332,6 +320,21 @@ const Producto = () => {
 
       {/* ── TOASTS ── */}
       <ToastContainer toasts={toasts} />
+
+      {/* ── Modal de Story para compartir ── */}
+      {mostrandoStory && (
+        <GeneradorStoryModal
+          producto={producto}
+          emoji={emoji}
+          nombreVendedor={nombreVendedor}
+          avatarVendedor={avatarVendedor}
+          calificacion={reputacionVendedor?.calificacionPromedio || 0}
+          totalResenas={reputacionVendedor?.totalResenas || 0}
+          productoUrl={window.location.href}
+          onClose={() => setMostrandoStory(false)}
+          onToast={mostrarToast}
+        />
+      )}
 
     </div>
   );

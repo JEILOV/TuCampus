@@ -149,11 +149,39 @@ export const guardarOActualizarResena = async ({
     // sí queden guardadas) — eso desincroniza el banner de reputación
     // del listado real de reseñas.
     //
+    // 🔧 Lista de productos del vendedor — se obtiene ANTES de abrir la
+    // transacción, con un getDocs normal. El SDK de Firestore para web
+    // NO soporta pasarle una Query a tx.get() dentro de una transacción
+    // (a diferencia del SDK de Admin/Node): tx.get() solo acepta
+    // referencias a documentos individuales. El intento anterior,
+    // `tx.get(productosVendedorQuery)`, compilaba sin error pero
+    // reventaba en tiempo de ejecución con "Cannot read properties of
+    // undefined (reading 'path')", porque internamente el SDK esperaba
+    // un DocumentReference y recibía un objeto Query. Guardamos solo
+    // las referencias (`.ref`) — no necesitamos su contenido, solo
+    // vamos a sobrescribir dos campos más abajo.
+    const productosVendedorSnap = await getDocs(
+      query(collection(db, "productos"), where("userUid", "==", vendedorUid)),
+    );
+    const productosVendedorRefs = productosVendedorSnap.docs.map((d) => d.ref);
+
     // AHORA: runTransaction() vuelve a leer los documentos dentro de la
     // transacción y Firestore reintenta automáticamente si algo cambió
     // entre la lectura y la escritura, garantizando que el contador
     // siempre refleje exactamente las reseñas que existen.
     const resultado = await runTransaction(db, async (tx) => {
+      // 🔧 Sincronización de reputación en /productos: además de
+      // /resenas y /usuarios, TODOS los productos publicados por este
+      // vendedor guardan una copia denormalizada de su reputación
+      // (calificacionVendedor / totalResenasVendedor — ver
+      // productService.crearProducto) para poder mostrarla en
+      // ProductCard.jsx sin tener que leer /usuarios por cada tarjeta
+      // del Home. Antes de este fix, esa copia solo se escribía UNA
+      // VEZ al publicar el producto y nunca se refrescaba cuando
+      // llegaban reseñas nuevas — por eso el Home seguía mostrando
+      // "⭐ Nuevo" aunque el vendedor ya tuviera calificaciones reales
+      // en su perfil (Producto.jsx y Vendedor.jsx sí se veían bien
+      // porque leen la reputación directo de /usuarios, no la copia).
       const [resenaSnap, vendedorSnap] = await Promise.all([
         tx.get(resenaRef),
         tx.get(vendedorRef),
@@ -206,6 +234,28 @@ export const guardarOActualizarResena = async ({
         totalResenas:         nuevoTotal,
         calificacionPromedio: nuevoPromedio,
       }, { merge: true });
+
+      // 🔧 Re-escribe la copia denormalizada en CADA producto activo
+      // del vendedor, dentro de la misma transacción atómica: o se
+      // actualiza junto con la reseña y el perfil, o no se actualiza
+      // nada. No hace falta tx.get() de cada producto primero: no
+      // leemos su contenido actual, solo sobrescribimos estos dos
+      // campos, y Transaction.update() del SDK web no exige haber
+      // leído el documento antes para poder escribirlo. Así
+      // ProductCard.jsx en el Home queda consistente con Producto.jsx
+      // y Vendedor.jsx apenas se confirma la reseña.
+      //
+      // ⚠️ Límite de Firestore: una transacción admite hasta 500
+      // escrituras. Un vendedor con más de ~495 productos publicados
+      // (fuera de lo esperable en un marketplace estudiantil) haría
+      // fallar esta transacción completa; si eso llega a pasar habría
+      // que migrar a un writeBatch por lotes o a una Cloud Function.
+      productosVendedorRefs.forEach((ref) => {
+        tx.update(ref, {
+          calificacionVendedor: nuevoPromedio,
+          totalResenasVendedor: nuevoTotal,
+        });
+      });
 
       // 🔔 Notificación al vendedor — misma transacción: si el batch de
       // arriba falla y reintenta, la notificación se crea (o recrea) junto
