@@ -115,6 +115,12 @@ export default async function handler(req, res) {
   }
 
   // ── 3. Envío vía FCM ────────────────────────────────────────────
+  // 🔧 Debug: cantidad de tokens que llegaron en la petición — útil
+  // para descartar que el problema sea que notificarPorUid/
+  // notificarNuevoProductoEnSede no encontraron tokens y llamaron
+  // acá con un arreglo vacío o con menos tokens de los esperados.
+  console.log(`[api/enviar-push] tokens recibidos: ${listaTokens.length}`);
+
   try {
     const respuesta = await admin.messaging().sendEachForMulticast({
       tokens: listaTokens,
@@ -128,12 +134,36 @@ export default async function handler(req, res) {
       },
     });
 
+    // 🔧 Debug: resultado real de FCM — un successCount alto pero sin
+    // notificación visible en el dispositivo apunta a un problema de
+    // permiso/SW/OS, no del payload; un failureCount alto apunta a
+    // tokens vencidos o mal formados.
+    console.log(
+      `[api/enviar-push] successCount=${respuesta.successCount} failureCount=${respuesta.failureCount}`
+    );
+
     const tokensInvalidos = [];
-    respuesta.responses.forEach((r, i) => {
-      if (!r.success && CODIGOS_TOKEN_INVALIDO.has(r.error?.code)) {
-        tokensInvalidos.push(listaTokens[i]);
-      }
-    });
+    if (respuesta.failureCount > 0) {
+      const fallos = respuesta.responses
+        .map((r, i) => ({ r, token: listaTokens[i] }))
+        .filter(({ r }) => !r.success);
+
+      // Detalle de cada fallo: código de error de FCM por token —
+      // distingue "token vencido" (esperable, se limpia solo) de un
+      // error real (credenciales, payload, cuota, etc.).
+      console.log(
+        "[api/enviar-push] fallos:",
+        fallos.map(({ r, token }) => ({
+          token: `${token.slice(0, 12)}…`,
+          code: r.error?.code,
+          message: r.error?.message,
+        }))
+      );
+
+      fallos.forEach(({ r, token }) => {
+        if (CODIGOS_TOKEN_INVALIDO.has(r.error?.code)) tokensInvalidos.push(token);
+      });
+    }
 
     return res.status(200).json({
       successCount: respuesta.successCount,

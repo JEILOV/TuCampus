@@ -150,13 +150,40 @@ export const solicitarPermisoNotificaciones = async (usuarioId, universidadId) =
  * cerrada, quien muestra la notificación del sistema es
  * public/firebase-messaging-sw.js (onBackgroundMessage), no esto.
  *
- * @param {(payload: object) => void} callback
+ * 🔧 El payload de FCM en primer plano SIEMPRE llega dentro de
+ * `payload.notification` (title/body) cuando el backend lo envía así
+ * (ver api/enviar-push.js), pero por robustez este callback también
+ * cae a `payload.data` si algún día se manda un push data-only —
+ * así el consumidor de `callback` no tiene que preocuparse por la
+ * forma exacta del payload, solo recibe { titulo, cuerpo, url, raw }.
+ *
+ * ⚠️ IMPORTANTE: hoy esta función no tiene ningún caller en la app
+ * (ni App.jsx ni ningún componente la invoca) — con la pestaña en
+ * primer plano, FCM entrega el mensaje pero nada lo muestra. Si
+ * quieren que también se vea algo (toast/banner) con la app abierta,
+ * hay que conectar `escucharNotificacionesPrimerPlano` a un callback
+ * real en el árbol de la app (ej. en App.jsx, junto al login) — este
+ * fix solo deja la función lista para eso, no la conecta.
+ *
+ * @param {(payload: {titulo:string, cuerpo:string, url:string, raw:object}) => void} callback
  * @returns {Promise<() => void>} función para cancelar la suscripción
  */
 export const escucharNotificacionesPrimerPlano = async (callback) => {
   const messaging = await obtenerMessaging();
   if (!messaging) return () => {};
-  return onMessage(messaging, callback);
+
+  return onMessage(messaging, (payload) => {
+    console.log("[notificationService.escucharNotificacionesPrimerPlano] payload recibido:", payload);
+
+    const normalizado = {
+      titulo: payload.notification?.title || payload.data?.title || "TuCampus",
+      cuerpo: payload.notification?.body || payload.data?.body || "Tienes una novedad en tu campus.",
+      url:    payload.data?.url || payload.fcmOptions?.link || "/",
+      raw:    payload,
+    };
+
+    callback(normalizado);
+  });
 };
 
 
@@ -195,8 +222,14 @@ const truncarTexto = (texto, max = 100) => {
 const notificarPorUid = async (uid, { titulo, cuerpo, url }) => {
   if (!uid) return;
   const snap = await getDoc(doc(db, "usuarios", uid));
-  const tokens = snap.exists() ? snap.data().fcmToken : null;
-  if (!Array.isArray(tokens) || tokens.length === 0) return;
+  const tokensCrudos = snap.exists() ? snap.data().fcmToken : null;
+  const tokens = Array.isArray(tokensCrudos)
+    ? tokensCrudos.filter((t) => typeof t === "string" && t.trim().length > 0)
+    : [];
+
+  console.log(`[notificationService.notificarPorUid] uid=${uid} tokens encontrados=${tokens.length}`);
+
+  if (tokens.length === 0) return;
   await enviarPush({ tokens, titulo, cuerpo, url });
 };
 
@@ -286,8 +319,16 @@ export const notificarNuevoProductoEnSede = async ({ universidadId, titulo, prod
     snap.docs.forEach((d) => {
       if (d.id === excluirUid) return;
       const t = d.data().fcmToken;
-      if (Array.isArray(t)) tokens.push(...t);
+      if (!Array.isArray(t)) return;
+      t.forEach((token) => {
+        if (typeof token === "string" && token.trim().length > 0) tokens.push(token);
+      });
     });
+
+    console.log(
+      `[notificationService.notificarNuevoProductoEnSede] universidadId=${universidadId} usuarios encontrados=${snap.size} tokens encontrados=${tokens.length}`
+    );
+
     if (tokens.length === 0) return;
 
     await enviarPush({

@@ -11,9 +11,15 @@ import Notificaciones from "./pages/Notificaciones";
 import Terminos       from "./pages/Terminos";
 import PanelAdminAnuncios from "./pages/PanelAdminAnuncios";
 import RutaProtegida  from "./components/RutaProtegida";
+import NotificacionToast from "./components/NotificacionToast";
 
 const App = () => (
   <BrowserRouter>
+    {/* Toast de push en primer plano — fuera de <Routes> a propósito,
+        así se mantiene montado (y puede seguir escuchando) sin
+        importar por qué ruta esté navegando el usuario. */}
+    <NotificacionToast />
+
     <Routes>
       {/* Rutas Públicas */}
       <Route path="/"          element={<Home />} />
