@@ -18,21 +18,29 @@
 //  ("Todas las sedes"). Cada anuncio exclusivo de un campus muestra
 //  un badge con su sede; los globales muestran el badge "TuCampus".
 //
-//  NAVEGACIÓN AL HACER CLIC (a.enlaceUrl):
-//    - Empieza con "http" → se abre en pestaña nueva (auspicio
-//      externo, formulario, red social, etc.).
-//    - Empieza con "/"    → navegación interna con react-router
-//      (ej. "/producto?id=xxx" para promocionar un producto).
-//    - Vacío/ausente      → la tarjeta no hace nada al tocarla,
-//      solo es informativa.
+//  NAVEGACIÓN AL HACER CLIC:
+//    - Si el anuncio tiene `imagenFlyerUrl` (Flyer Extendido) → se
+//      abre un modal a pantalla completa con el afiche (ver
+//      ModalFlyerAnuncio.jsx). Dentro del modal, si TAMBIÉN hay
+//      `enlaceUrl`, se ofrece un botón "Ver más" para navegar a él.
+//    - Si NO tiene `imagenFlyerUrl`, se usa el comportamiento
+//      anterior con `a.enlaceUrl`:
+//        · Empieza con "http" → se abre en pestaña nueva (auspicio
+//          externo, formulario, red social, etc.).
+//        · Empieza con "/"    → navegación interna con react-router
+//          (ej. "/producto?id=xxx" para promocionar un producto).
+//        · Vacío/ausente      → la tarjeta no hace nada al tocarla,
+//          solo es informativa.
 //
 //  USO:
 //    <CarruselAnuncios universidadId={universidadActiva} />
 // ============================================================
 
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAnuncios } from "../hooks/useAnuncios";
 import { UNIVERSIDADES } from "../config/universidades";
+import ModalFlyerAnuncio from "./ModalFlyerAnuncio";
 
 // 🔧 Skeleton mientras se resuelve la primera respuesta de Firestore.
 // Mismas dimensiones exactas que las tarjetas reales (h-28 w-64
@@ -59,18 +67,36 @@ const CarruselAnuncios = ({ universidadId }) => {
   // y dibuja el carrusel.
   const { anuncios, cargando } = useAnuncios(universidadId);
 
+  // 🖼️ Flyer Extendido: anuncio actualmente abierto en el modal de
+  // afiche completo (null = modal cerrado).
+  const [flyerAbierto, setFlyerAbierto] = useState(null);
+
   if (cargando) return <SkeletonAnuncios />;
   if (!anuncios || anuncios.length === 0) return null;
 
-  const manejarClick = (a) => {
-    const enlace = (a.enlaceUrl || "").trim();
-    if (!enlace) return;
+  // Navega/abre `enlace` según su formato — usado tanto por el click
+  // directo en la tarjeta (sin flyer) como por el botón "Ver más"
+  // dentro del modal del flyer.
+  const irAlEnlace = (enlace) => {
+    const limpio = (enlace || "").trim();
+    if (!limpio) return;
 
-    if (enlace.startsWith("http")) {
-      window.open(enlace, "_blank", "noopener,noreferrer");
-    } else if (enlace.startsWith("/")) {
-      navigate(enlace);
+    if (limpio.startsWith("http")) {
+      window.open(limpio, "_blank", "noopener,noreferrer");
+    } else if (limpio.startsWith("/")) {
+      navigate(limpio);
     }
+  };
+
+  const manejarClick = (a) => {
+    // Si el anuncio tiene flyer, se abre el modal en vez de navegar
+    // de inmediato — la navegación al enlace queda como acción
+    // explícita ("Ver más") dentro del modal.
+    if ((a.imagenFlyerUrl || "").trim()) {
+      setFlyerAbierto(a);
+      return;
+    }
+    irAlEnlace(a.enlaceUrl);
   };
 
   // 🏫 Multicampus: texto + color del badge de sede. "global" (o
@@ -87,6 +113,7 @@ const CarruselAnuncios = ({ universidadId }) => {
   };
 
   return (
+    <>
     <div
       className="mt-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       aria-label="Anuncios y flyers del campus"
@@ -136,6 +163,18 @@ const CarruselAnuncios = ({ universidadId }) => {
         );
       })}
     </div>
+
+    {flyerAbierto && (
+      <ModalFlyerAnuncio
+        anuncio={flyerAbierto}
+        onClose={() => setFlyerAbierto(null)}
+        onIrAlEnlace={(enlace) => {
+          irAlEnlace(enlace);
+          setFlyerAbierto(null);
+        }}
+      />
+    )}
+    </>
   );
 };
 

@@ -32,6 +32,7 @@ import {
 } from "../services/adService";
 import { LISTA_UNIVERSIDADES, UNIVERSIDADES } from "../config/universidades";
 import Toast, { useToast } from "../components/Toast";
+import EstadisticasCampus from "../components/EstadisticasCampus";
 
 // 🔧 Editar esta lista con los correos @alumnos.unp.edu.pe (o el que
 // uses para administrar) que deben tener acceso al panel.
@@ -56,6 +57,7 @@ const ESTADO_VACIO = {
   subtitulo: "",
   colorFondo: "#1c398e",
   imagenUrl: "",
+  imagenFlyerUrl: "",
   enlaceUrl: "",
   orden: 0,
   activo: true,
@@ -82,6 +84,9 @@ const PanelAdminAnuncios = () => {
   const [anuncios, setAnuncios]   = useState([]);
   const [form, setForm]           = useState(ESTADO_VACIO);
   const [archivo, setArchivo]     = useState(null);
+  // 🖼️ Flyer Extendido: archivo de la imagen del afiche completo,
+  // independiente de `archivo` (que es la imagen de fondo de la tarjeta).
+  const [archivoFlyer, setArchivoFlyer] = useState(null);
   const [guardando, setGuardando] = useState(false);
 
   const [toast, setToast] = useState(null);
@@ -112,6 +117,7 @@ const PanelAdminAnuncios = () => {
   const limpiarFormulario = () => {
     setForm(ESTADO_VACIO);
     setArchivo(null);
+    setArchivoFlyer(null);
   };
 
   const cargarParaEditar = (a) => {
@@ -121,16 +127,19 @@ const PanelAdminAnuncios = () => {
       subtitulo: a.subtitulo || "",
       colorFondo: a.colorFondo || "#1c398e",
       imagenUrl: a.imagenUrl || "",
+      imagenFlyerUrl: a.imagenFlyerUrl || "",
       enlaceUrl: a.enlaceUrl || "",
       orden: a.orden ?? 0,
       activo: a.activo ?? true,
       universidadId: a.universidadId || "global",
     });
     setArchivo(null);
+    setArchivoFlyer(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleArchivo = (e) => {
+  // `campo` = "archivo" (imagen de fondo) o "archivoFlyer" (afiche completo)
+  const handleArchivo = (e, setter) => {
     const file = e.target.files[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -138,7 +147,7 @@ const PanelAdminAnuncios = () => {
       e.target.value = "";
       return;
     }
-    setArchivo(file);
+    setter(file);
   };
 
   const handleSubmit = async (e) => {
@@ -156,11 +165,21 @@ const PanelAdminAnuncios = () => {
         imagenUrl = await subirImagenImgBB(comprimido);
       }
 
+      // 🖼️ Flyer Extendido: sube el afiche completo si se seleccionó
+      // un archivo nuevo; si no, conserva la URL ya guardada (o la que
+      // el admin haya escrito/pegado a mano en el input de texto).
+      let imagenFlyerUrl = form.imagenFlyerUrl;
+      if (archivoFlyer) {
+        const comprimidoFlyer = await comprimirImagen(archivoFlyer);
+        imagenFlyerUrl = await subirImagenImgBB(comprimidoFlyer);
+      }
+
       const payload = {
         titulo: form.titulo,
         subtitulo: form.subtitulo,
         colorFondo: form.colorFondo,
         imagenUrl,
+        imagenFlyerUrl,
         enlaceUrl: form.enlaceUrl,
         orden: Number(form.orden) || 0,
         activo: !!form.activo,
@@ -237,6 +256,11 @@ const PanelAdminAnuncios = () => {
       </header>
 
       <main className="relative -mt-5 px-4">
+        {/* ── DASHBOARD DE MÉTRICAS POR SEDE ─────────────── */}
+        <div className="mb-5">
+          <EstadisticasCampus />
+        </div>
+
         {/* ── FORMULARIO ─────────────────────────────────── */}
         <form onSubmit={handleSubmit} className="rounded-[28px] bg-card p-5 shadow-soft">
           <p className="mb-4 text-[15px] font-extrabold text-ink">
@@ -298,8 +322,25 @@ const PanelAdminAnuncios = () => {
             <label className="mt-2 flex cursor-pointer items-center gap-2 rounded-btn border-[1.5px] border-dashed border-ink/15 bg-background px-3.5 py-3 text-[13px] font-bold text-ink/60">
               <ImagePlus size={18} className="shrink-0 text-primary" />
               {archivo ? archivo.name : (form.imagenUrl ? "Imagen actual ✓ Toca para cambiarla" : "Subir imagen de fondo")}
-              <input type="file" accept="image/*" onChange={handleArchivo} className="hidden" />
+              <input type="file" accept="image/*" onChange={(e) => handleArchivo(e, setArchivo)} className="hidden" />
             </label>
+          </div>
+
+          {/* 🖼️ Flyer Extendido: afiche completo mostrado en el modal
+              al tocar la tarjeta del carrusel (ver ModalFlyerAnuncio.jsx) */}
+          <div className="mb-3.5">
+            <label className={labelClass}>Imagen de Flyer / Afiche completo (opcional)</label>
+            <label className="mt-2 flex cursor-pointer items-center gap-2 rounded-btn border-[1.5px] border-dashed border-ink/15 bg-background px-3.5 py-3 text-[13px] font-bold text-ink/60">
+              <ImagePlus size={18} className="shrink-0 text-primary" />
+              {archivoFlyer ? archivoFlyer.name : (form.imagenFlyerUrl ? "Flyer actual ✓ Toca para cambiarlo" : "Subir afiche completo")}
+              <input type="file" accept="image/*" onChange={(e) => handleArchivo(e, setArchivoFlyer)} className="hidden" />
+            </label>
+            <input type="text" placeholder="...o pega directamente la URL del flyer"
+              value={form.imagenFlyerUrl} onChange={(e) => setForm({ ...form, imagenFlyerUrl: e.target.value })}
+              className={`${inputClass} mt-2`} />
+            <p className="mt-1 text-[11px] font-semibold text-ink/40">
+              Si se sube, al tocar la tarjeta en el carrusel se abre un pop-up con el afiche completo en vez de ir directo al enlace.
+            </p>
           </div>
 
           <div className="mb-3.5">
@@ -309,6 +350,7 @@ const PanelAdminAnuncios = () => {
               className={`${inputClass} mt-2`} />
             <p className="mt-1 text-[11px] font-semibold text-ink/40">
               Empieza con "http" para abrir en pestaña nueva, o con "/" para navegar dentro de la app.
+              {form.imagenFlyerUrl && " Con flyer cargado, este enlace aparece como botón \"Ver más\" dentro del pop-up."}
             </p>
           </div>
 
@@ -355,6 +397,14 @@ const PanelAdminAnuncios = () => {
                       >
                         {badge.texto}
                       </span>
+                      {a.imagenFlyerUrl && (
+                        <span
+                          title="Tiene flyer extendido"
+                          className="flex shrink-0 items-center gap-0.5 rounded-chip bg-primary/10 px-1.5 py-0.5 text-[9.5px] font-extrabold text-primary"
+                        >
+                          <ImagePlus size={10} /> Flyer
+                        </span>
+                      )}
                     </div>
                     <p className="truncate text-[11.5px] font-semibold text-ink/50">
                       {a.subtitulo || "Sin subtítulo"} · orden {a.orden ?? 0}

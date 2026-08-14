@@ -20,10 +20,20 @@
 //      subtitulo:   string  (opcional)
 //      colorFondo:  string  (hex, ej. "#1c398e" — usado como
 //                            respaldo/overlay si no hay imagen)
-//      imagenUrl:   string  (opcional — URL pública, ej. ImgBB)
+//      imagenUrl:   string  (opcional — URL pública, ej. ImgBB —
+//                            imagen de FONDO de la tarjeta del carrusel)
+//      imagenFlyerUrl: string (opcional — URL pública del flyer/afiche
+//                            COMPLETO. Si viene seteado, al tocar la
+//                            tarjeta en el carrusel se abre un modal a
+//                            pantalla completa con esta imagen en vez
+//                            de navegar directo a `enlaceUrl` — ver
+//                            ModalFlyerAnuncio.jsx / CarruselAnuncios.jsx)
 //      enlaceUrl:   string  (opcional — "https://..." abre en
 //                            pestaña nueva, o "/producto?id=xxx"
-//                            navega dentro de la app)
+//                            navega dentro de la app. Si el anuncio
+//                            tiene imagenFlyerUrl, este enlace se ofrece
+//                            como botón "Ver más" DENTRO del modal del
+//                            flyer, en vez de abrirse de inmediato)
 //      orden:       number  (requerido — controla el orden asc)
 //      activo:      boolean (requerido — filtra qué se muestra)
 //      universidadId: string (requerido — 🏫 Multicampus: "global"
@@ -171,7 +181,7 @@ export const suscribirAnuncios = (universidadActiva, callback) => {
  */
 export const crearAnuncio = async ({
   titulo, subtitulo = "", colorFondo = "#1c398e",
-  imagenUrl = "", enlaceUrl = "", orden = 0, activo = true,
+  imagenUrl = "", imagenFlyerUrl = "", enlaceUrl = "", orden = 0, activo = true,
   universidadId = SEDE_GLOBAL,
 }) => {
   const tituloLimpio = String(titulo || "").trim();
@@ -187,6 +197,9 @@ export const crearAnuncio = async ({
       subtitulo: String(subtitulo || "").trim(),
       colorFondo,
       imagenUrl: String(imagenUrl || "").trim(),
+      // 🖼️ Flyer Extendido: imagen del afiche completo mostrada en el
+      // modal al tocar la tarjeta (ver esquema arriba). Opcional.
+      imagenFlyerUrl: String(imagenFlyerUrl || "").trim(),
       enlaceUrl: String(enlaceUrl || "").trim(),
       orden: Number(orden) || 0,
       activo: !!activo,
