@@ -25,7 +25,9 @@ const firebaseConfig = {
 };
 
 // getApps() evita la doble inicialización en HMR de Vite
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+// Exportado (antes era privado) porque notificationService.js lo
+// necesita para inicializar Firebase Cloud Messaging (getMessaging(app)).
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const db   = getFirestore(app);
 export const auth = getAuth(app);

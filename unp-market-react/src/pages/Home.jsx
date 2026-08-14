@@ -7,6 +7,7 @@ import { useProducts }                              from "../hooks/useProducts";
 import { useToast, ToastContainer }                 from "../components/Toast";
 import BottomNav                                    from "../components/BottomNav";
 import BotonNotificaciones                          from "../components/BotonNotificaciones";
+import BannerNotificaciones                          from "../components/BannerNotificaciones";
 import ProductCard                                  from "../components/ProductCard";
 import CarruselAnuncios                             from "../components/CarruselAnuncios";
 import { CATEGORY_ICON_MAP }                        from "../components/CategoryIcons";
@@ -221,6 +222,11 @@ const Home = () => {
               />
             </div>
           </div>
+
+          {/* Banner discreto para activar notificaciones push (FCM).
+              Se autooculta apenas el usuario responde o lo cierra —
+              ver src/components/BannerNotificaciones.jsx. */}
+          <BannerNotificaciones />
 
           {/* Carrusel de Anuncios — flyers de eventos/promos del campus.
               🏫 Multicampus: se le pasa la sede activa para traer sus
