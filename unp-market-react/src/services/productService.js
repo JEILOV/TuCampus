@@ -6,6 +6,7 @@ import {
 import { db }              from "./firebase";
 import { generarPrefijos } from "../utils/imageUtils";
 import { traducirError, logError } from "../utils/errorHandler"; // ← corregido: utils/, no services/
+import { notificarNuevoProductoEnSede } from "./notificationService";
 
 export const obtenerProductoPorId = async (productoId) => {
   if (!productoId) return null;
@@ -128,6 +129,17 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
     }
 
     await batch.commit();
+
+    // 🔔 Push a la sede — SIEMPRE después del commit (efecto secundario
+    // best-effort, fire-and-forget: si falla, el producto ya quedó
+    // publicado igual). No se espera su resultado.
+    notificarNuevoProductoEnSede({
+      universidadId: perfil?.universidadId || null,
+      titulo:        tituloLimpio,
+      productoId:    nuevoRef.id,
+      excluirUid:    user.uid, // el vendedor no se autonotifica
+    });
+
     return nuevoRef.id;
   } catch (err) {
     logError("[productService.crearProducto]", err);

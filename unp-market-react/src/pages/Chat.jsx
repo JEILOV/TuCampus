@@ -32,6 +32,7 @@ import {
   bloquearUsuario,
   desbloquearUsuario,
 }                                       from "../services/userService";
+import { notificarNuevoMensaje }       from "../services/notificationService";
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
 import { ToastContainer, useToast }    from "../components/Toast";
 import Spinner                         from "../components/Spinner";
@@ -538,7 +539,17 @@ const Chat = () => {
       // (useChatsNoLeidos, vía chat.noLeidoPor) ya cubre ese aviso en
       // tiempo real — duplicarlo en /notificaciones solo llenaba esa
       // pestaña de spam por cada mensaje del chat.
-      await enviarMensaje(chatId, user.uid, limpio, "texto", respondiendoA);
+      await enviarMensaje(chatId, user.uid, limpio, "texto", respondiendoA).then((resultado) => {
+        if (resultado?.otroUid) {
+          // 🔔 Push al destinatario — fire-and-forget, nunca bloquea el envío.
+          notificarNuevoMensaje({
+            paraUid:  resultado.otroUid,
+            deNombre: perfil?.nombre || user.displayName || "Alguien",
+            mensaje:  limpio,
+            chatId,
+          });
+        }
+      });
       setMensajeRespondiendo(null); // solo se limpia la cita si el envío tuvo éxito
     } catch (err) {
       mostrarToast(err.message || "No se pudo enviar el mensaje", "error");
@@ -546,7 +557,7 @@ const Chat = () => {
     } finally {
       setEnviando(false);
     }
-  }, [texto, chatId, user, enviando, conversacionBloqueada, mostrarToast, armarRespondiendoA]);
+  }, [texto, chatId, user, perfil, enviando, conversacionBloqueada, mostrarToast, armarRespondiendoA]);
 
   // ── Enviar imagen (Fase 6) ─────────────────────────────────
   const handleSeleccionarImagen = async (e) => {
@@ -560,7 +571,16 @@ const Chat = () => {
     try {
       const comprimida = await comprimirImagen(archivo);
       const url = await subirImagenImgBB(comprimida, setProgresoImagen);
-      await enviarMensaje(chatId, user.uid, url, "imagen", respondiendoA);
+      await enviarMensaje(chatId, user.uid, url, "imagen", respondiendoA).then((resultado) => {
+        if (resultado?.otroUid) {
+          notificarNuevoMensaje({
+            paraUid:  resultado.otroUid,
+            deNombre: perfil?.nombre || user.displayName || "Alguien",
+            mensaje:  "📷 Imagen",
+            chatId,
+          });
+        }
+      });
       setMensajeRespondiendo(null); // solo se limpia la cita si el envío tuvo éxito
     } catch (err) {
       mostrarToast(err.message || "No se pudo enviar la imagen", "error");

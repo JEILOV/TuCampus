@@ -47,6 +47,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
+import { notificarNuevaResena } from "./notificationService";
 
 // ── Helper: recorta el comentario para el mensaje de notificación ──
 // La notificación es un aviso corto, no el lugar para leer la reseña
@@ -290,6 +291,16 @@ export const guardarOActualizarResena = async ({
 
       return { esNueva, nuevoTotal, nuevoPromedio };
     });
+
+    // 🔔 Push al vendedor — SIEMPRE después del runTransaction (no es
+    // parte de ella: si Firestore reintenta la transacción por una
+    // colisión de escritura, no queremos reintentar el push también).
+    // Solo se dispara si la reseña es de otra persona, mismo criterio
+    // que la notificación in-app de arriba. Fire-and-forget: no se
+    // espera (notificarNuevaResena ya nunca lanza).
+    if (autorUid !== vendedorUid) {
+      notificarNuevaResena({ vendedorUid, autorNombre, estrellas: puntaje });
+    }
 
     return { id: resenaRef.id, ...resultado };
   } catch (err) {
