@@ -217,9 +217,9 @@ const truncarTexto = (texto, max = 100) => {
  * Helper interno compartido por las 3 funciones de abajo.
  *
  * @param {string} uid
- * @param {{titulo: string, cuerpo: string, url?: string}} mensaje
+ * @param {{titulo: string, cuerpo: string, url?: string, imagen?: string}} mensaje
  */
-const notificarPorUid = async (uid, { titulo, cuerpo, url }) => {
+const notificarPorUid = async (uid, { titulo, cuerpo, url, imagen }) => {
   if (!uid) return;
   const snap = await getDoc(doc(db, "usuarios", uid));
   const tokensCrudos = snap.exists() ? snap.data().fcmToken : null;
@@ -230,7 +230,7 @@ const notificarPorUid = async (uid, { titulo, cuerpo, url }) => {
   console.log(`[notificationService.notificarPorUid] uid=${uid} tokens encontrados=${tokens.length}`);
 
   if (tokens.length === 0) return;
-  await enviarPush({ tokens, titulo, cuerpo, url });
+  await enviarPush({ tokens, titulo, cuerpo, url, imagen });
 };
 
 /**
@@ -241,16 +241,20 @@ const notificarPorUid = async (uid, { titulo, cuerpo, url }) => {
  * @param {Object} params
  * @param {string} params.paraUid   UID de quien recibe el mensaje
  * @param {string} params.deNombre  Nombre de quien lo envía
+ * @param {string} [params.deAvatar] Foto de perfil de quien envía — se
+ *   muestra como vista previa en la notificación (mismo criterio que
+ *   WhatsApp: la foto de quien te escribe, no la tuya).
  * @param {string} params.mensaje   Texto del mensaje (o "📷 Imagen")
  * @param {string} params.chatId
  */
-export const notificarNuevoMensaje = async ({ paraUid, deNombre, mensaje, chatId }) => {
+export const notificarNuevoMensaje = async ({ paraUid, deNombre, deAvatar, mensaje, chatId }) => {
   if (!paraUid || !chatId) return;
   try {
     await notificarPorUid(paraUid, {
       titulo: `💬 ${deNombre || "Nuevo mensaje"}`,
       cuerpo: truncarTexto(mensaje) || "Tienes un mensaje nuevo.",
       url:    `/chat?id=${chatId}`,
+      imagen: deAvatar || undefined,
     });
   } catch (err) {
     logError("[notificationService.notificarNuevoMensaje]", err);
@@ -266,15 +270,19 @@ export const notificarNuevoMensaje = async ({ paraUid, deNombre, mensaje, chatId
  * @param {Object} params
  * @param {string} params.vendedorUid  UID de quien recibe la calificación
  * @param {string} params.autorNombre  Nombre de quien calificó
+ * @param {string} [params.autorAvatar] Foto de perfil de quien calificó —
+ *   mismo campo que reviewService ya guarda como `deAvatar` en la
+ *   notificación in-app; acá se reusa como vista previa del push.
  * @param {number} params.estrellas    1 a 5
  */
-export const notificarNuevaResena = async ({ vendedorUid, autorNombre, estrellas }) => {
+export const notificarNuevaResena = async ({ vendedorUid, autorNombre, autorAvatar, estrellas }) => {
   if (!vendedorUid) return;
   try {
     await notificarPorUid(vendedorUid, {
       titulo: "⭐ Nueva calificación",
       cuerpo: `${autorNombre || "Un estudiante"} te calificó con ${estrellas} ⭐`,
       url:    `/vendedor?uid=${vendedorUid}`,
+      imagen: autorAvatar || undefined,
     });
   } catch (err) {
     logError("[notificationService.notificarNuevaResena]", err);
@@ -303,9 +311,12 @@ const MAX_USUARIOS_POR_SEDE = 300;
  * @param {string} params.universidadId
  * @param {string} params.titulo        Título del producto publicado
  * @param {string} params.productoId
+ * @param {string} [params.imagen]      Foto del producto (`producto.imagen`,
+ *   o su alias `producto.imagenes?.[0]` si en algún momento se pasa a
+ *   soportar galería) — se muestra como vista previa grande del push.
  * @param {string} [params.excluirUid]  UID del vendedor — no se autonotifica
  */
-export const notificarNuevoProductoEnSede = async ({ universidadId, titulo, productoId, excluirUid }) => {
+export const notificarNuevoProductoEnSede = async ({ universidadId, titulo, productoId, imagen, excluirUid }) => {
   if (!universidadId) return;
   try {
     const q = query(
@@ -336,6 +347,7 @@ export const notificarNuevoProductoEnSede = async ({ universidadId, titulo, prod
       titulo: "🛍️ Nuevo producto en tu campus",
       cuerpo: truncarTexto(titulo) || "Hay una publicación nueva en tu campus.",
       url:    productoId ? `/producto?id=${productoId}` : "/",
+      imagen: imagen || undefined,
     });
   } catch (err) {
     logError("[notificationService.notificarNuevoProductoEnSede]", err);

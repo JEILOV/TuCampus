@@ -27,11 +27,12 @@ const MAX_TOKENS_POR_ENVIO = 500; // límite duro de sendEachForMulticast (FCM)
  * @param {string} params.titulo
  * @param {string} params.cuerpo
  * @param {string} [params.url="/"] Ruta a abrir al hacer click en la notificación
+ * @param {string} [params.imagen]  URL de foto de vista previa (producto/avatar) — ver api/enviar-push.js
  * @param {Object} [params.data={}] Payload extra opcional (solo strings)
  * @returns {Promise<{successCount:number, failureCount:number, tokensInvalidos:string[]}|null>}
  *   `null` si no se pudo enviar (sin sesión, sin tokens, error de red, etc.)
  */
-export const enviarPush = async ({ tokens, titulo, cuerpo, url = "/", data = {} }) => {
+export const enviarPush = async ({ tokens, titulo, cuerpo, url = "/", imagen, data = {} }) => {
   const listaTokens = (Array.isArray(tokens) ? tokens : [tokens])
     .filter((t) => typeof t === "string" && t)
     .slice(0, MAX_TOKENS_POR_ENVIO);
@@ -52,7 +53,16 @@ export const enviarPush = async ({ tokens, titulo, cuerpo, url = "/", data = {} 
         "Content-Type": "application/json",
         Authorization: `Bearer ${idToken}`,
       },
-      body: JSON.stringify({ tokens: listaTokens, titulo, cuerpo, url, data }),
+      // `imagen` solo se manda si vino un valor real — así el body no
+      // se llena de `imagen: undefined` en los envíos que no tienen foto.
+      body: JSON.stringify({
+        tokens: listaTokens,
+        titulo,
+        cuerpo,
+        url,
+        data,
+        ...(typeof imagen === "string" && imagen ? { imagen } : {}),
+      }),
     });
 
     if (!respuesta.ok) {

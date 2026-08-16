@@ -137,6 +137,7 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
       universidadId: perfil?.universidadId || null,
       titulo:        tituloLimpio,
       productoId:    nuevoRef.id,
+      imagen:        imagen || undefined,
       excluirUid:    user.uid, // el vendedor no se autonotifica
     });
 

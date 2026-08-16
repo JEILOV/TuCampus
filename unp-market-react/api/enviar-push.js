@@ -22,6 +22,8 @@
 //      titulo: string,
 //      cuerpo: string,
 //      url?:   string,       // ruta a abrir al hacer click (default "/")
+//      imagen?: string,      // URL de la foto de vista previa (ej. la del producto).
+//                             // Acepta también `foto` como alias por compatibilidad.
 //      data?:  object        // payload extra opcional (se castea a string)
 //    }
 //
@@ -61,6 +63,12 @@ if (!admin.apps.length) {
 
 const MAX_TOKENS = 500; // límite duro de admin.messaging().sendEachForMulticast
 
+// Ícono/badge de la notificación en Android — el mismo para todas
+// (badge se muestra monocromo en la barra de estado). Se puede
+// sobreescribir con la env var sin tocar código si cambia el dominio.
+const ICONO_NOTIFICACION =
+  process.env.PUSH_ICON_URL || "https://unp-market-react.vercel.app/icon-192.png";
+
 // Códigos de FCM que significan "este token ya no sirve" (navegador
 // desinstaló la PWA, permiso revocado, token vencido, etc.)
 const CODIGOS_TOKEN_INVALIDO = new Set([
@@ -88,7 +96,7 @@ export default async function handler(req, res) {
   }
 
   // ── 2. Validación del body ────────────────────────────────────
-  const { tokens, titulo, cuerpo, url, data } = req.body || {};
+  const { tokens, titulo, cuerpo, url, imagen, foto, data } = req.body || {};
 
   const listaTokens = Array.isArray(tokens)
     ? tokens.filter((t) => typeof t === "string" && t.length > 0)
@@ -105,6 +113,16 @@ export default async function handler(req, res) {
   }
 
   const urlDestino = typeof url === "string" && url ? url : "/";
+
+  // `imagen` es el nombre oficial; `foto` queda como alias porque
+  // varios callers (reviewService, productService) ya usan ese nombre
+  // de campo en Firestore para la foto del producto/reseña.
+  const imagenPreview =
+    typeof imagen === "string" && imagen
+      ? imagen
+      : typeof foto === "string" && foto
+      ? foto
+      : undefined;
 
   // FCM exige que el payload `data` sea un mapa de string → string.
   const dataPlano = { url: urlDestino };
@@ -127,10 +145,22 @@ export default async function handler(req, res) {
       notification: {
         title: String(titulo).slice(0, 200),
         body: String(cuerpo).slice(0, 500),
+        // Solo se incluye si vino `imagen`/`foto` — un `imageUrl`
+        // vacío o undefined explícito puede hacer que algunos
+        // clientes de FCM rechacen el mensaje.
+        ...(imagenPreview ? { imageUrl: imagenPreview } : {}),
       },
       data: dataPlano,
       webpush: {
         fcmOptions: { link: urlDestino },
+        notification: {
+          // Ícono pequeño (monocromo en la barra de estado de Android)
+          // y el mismo como "badge" — ambos deben ser rutas absolutas.
+          icon: ICONO_NOTIFICACION,
+          badge: ICONO_NOTIFICACION,
+          ...(imagenPreview ? { image: imagenPreview } : {}),
+          vibrate: [200, 100, 200],
+        },
       },
     });
 

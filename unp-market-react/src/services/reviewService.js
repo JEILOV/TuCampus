@@ -299,7 +299,7 @@ export const guardarOActualizarResena = async ({
     // que la notificación in-app de arriba. Fire-and-forget: no se
     // espera (notificarNuevaResena ya nunca lanza).
     if (autorUid !== vendedorUid) {
-      notificarNuevaResena({ vendedorUid, autorNombre, estrellas: puntaje });
+      notificarNuevaResena({ vendedorUid, autorNombre, autorAvatar, estrellas: puntaje });
     }
 
     return { id: resenaRef.id, ...resultado };

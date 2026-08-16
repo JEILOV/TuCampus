@@ -545,6 +545,7 @@ const Chat = () => {
           notificarNuevoMensaje({
             paraUid:  resultado.otroUid,
             deNombre: perfil?.nombre || user.displayName || "Alguien",
+            deAvatar: perfil?.avatar || user.photoURL || undefined,
             mensaje:  limpio,
             chatId,
           });
@@ -576,6 +577,7 @@ const Chat = () => {
           notificarNuevoMensaje({
             paraUid:  resultado.otroUid,
             deNombre: perfil?.nombre || user.displayName || "Alguien",
+            deAvatar: perfil?.avatar || user.photoURL || undefined,
             mensaje:  "📷 Imagen",
             chatId,
           });
