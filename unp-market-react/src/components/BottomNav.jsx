@@ -47,18 +47,38 @@ const Badge = ({ cantidad }) => {
 // para que el ícono/texto activo siga el color de la sede activa (ver
 // CampusContext.jsx). Es una variable CSS global en <html>, así que no
 // hace falta pasar el color por props ni consumir el contexto acá.
-const NavItem = ({ activo, onClick, label, children }) => (
-  <button
-    onClick={onClick}
-    aria-label={label}
-    className={`flex flex-1 flex-col items-center gap-0.5 py-1 transition-colors ${
-      activo ? "text-[var(--color-accent)]" : "text-ink/40"
-    }`}
-  >
-    <span className="relative flex h-6 w-6 items-center justify-center">{children}</span>
-    <span className="text-[10px] font-semibold">{label}</span>
-  </button>
-);
+//
+// 🛡️ Blindado: admite `to` (ruta a la que navegar) y/o `onClick`
+// (efecto adicional antes de navegar, p. ej. resetearSedeActiva) de
+// forma independiente. Ninguno de los dos es obligatorio, y si algo
+// externo pasa un valor que no es función, lo ignoramos en vez de
+// reventar el click — así un consumidor futuro de NavItem no puede
+// tumbar toda la barra de navegación con un prop mal armado.
+const NavItem = ({ activo, to, onClick, label, children }) => {
+  const navigate = useNavigate();
+
+  const manejarClick = () => {
+    if (typeof onClick === "function") {
+      onClick();
+    }
+    if (typeof to === "string" && to.length > 0) {
+      navigate(to);
+    }
+  };
+
+  return (
+    <button
+      onClick={manejarClick}
+      aria-label={label}
+      className={`flex flex-1 flex-col items-center gap-0.5 py-1 transition-colors ${
+        activo ? "text-[var(--color-accent)]" : "text-ink/40"
+      }`}
+    >
+      <span className="relative flex h-6 w-6 items-center justify-center">{children}</span>
+      <span className="text-[10px] font-semibold">{label}</span>
+    </button>
+  );
+};
 
 const BottomNav = ({ activo = null }) => {
   const navigate = useNavigate();
@@ -66,7 +86,11 @@ const BottomNav = ({ activo = null }) => {
 
   // 🏫 Multicampus: "Inicio" es también la salida rápida de la
   // exploración de otra sede — ver CampusContext.jsx.
-  const { resetearSedeActiva } = useCampus();
+  // 🛡️ Desestructurado con fallback: si por lo que sea el contexto
+  // todavía no expone la función (HMR, orden de montaje, un futuro
+  // refactor del provider), `resetearSedeActiva` cae en `undefined`
+  // en vez de tirar el render entero de BottomNav.
+  const { resetearSedeActiva } = useCampus() || {};
 
   // Mismo hook que ya usa el resto de la app — cero listeners nuevos
   // más allá de los que ya existían, solo centralizado acá.
@@ -77,8 +101,14 @@ const BottomNav = ({ activo = null }) => {
   // campus propio del usuario (perfil.universidadId) — así el usuario
   // no queda "atrapado" viendo los colores/productos de otra sede
   // después de irse a Perfil, Chat, etc. y volver.
+  //
+  // 🛡️ Llamada defensiva: si `resetearSedeActiva` no es una función
+  // (contexto ausente o versión vieja de CampusProvider), simplemente
+  // la omitimos — la navegación a "/" nunca debe bloquearse por esto.
   const irAInicio = () => {
-    resetearSedeActiva();
+    if (typeof resetearSedeActiva === "function") {
+      resetearSedeActiva();
+    }
     navigate("/");
   };
 
