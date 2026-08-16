@@ -131,6 +131,17 @@ const GeneradorStoryModal = ({
   })();
 
   // ── Genera el PNG a partir del nodo de la story ──────────────
+  //
+  // ⚠️ FIX CORS Google Fonts: por defecto, html-to-image intenta leer
+  // `cssRules` de CADA <style>/<link> del documento —incluida la hoja
+  // que Tailwind/el navegador carga desde fonts.googleapis.com— para
+  // inlinear las fuentes en el PNG. Como esa hoja está en otro origen
+  // y no siempre expone CORS al `cssRules` (aunque el archivo cargue
+  // bien), el navegador tira `SecurityError: Cannot access rules` y la
+  // promesa de toBlob() nunca resuelve → el botón se queda pegado en
+  // "Generando imagen...". `skipFonts: true` evita ese intento de
+  // lectura por completo (no necesitamos fuentes custom embebidas acá,
+  // la tarjeta usa la tipografía del sistema/Tailwind por defecto).
   const generarImagen = async () => {
     if (!storyRef.current) return null;
     // pixelRatio 4 sobre una tarjeta de 270×480css ≈ 1080×1920px reales
@@ -138,6 +149,8 @@ const GeneradorStoryModal = ({
     return await toBlob(storyRef.current, {
       pixelRatio: 4,
       cacheBust: true,
+      skipFonts: true, // evita el SecurityError al leer cssRules de Google Fonts
+      fontEmbedCSS: "", // refuerzo: aunque alguna versión ignore skipFonts, no hay CSS de fuentes que intentar parsear
     });
   };
 
