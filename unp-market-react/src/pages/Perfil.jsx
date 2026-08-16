@@ -45,6 +45,8 @@ const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
           <img
             src={imagen}
             alt={titulo}
+            loading="lazy"
+            decoding="async"
             className={`h-full w-full object-cover${agotado ? " grayscale opacity-70" : ""}`}
           />
         ) : (
@@ -72,7 +74,7 @@ const TarjetaPerfil = ({ producto, onAgotar, onBorrar, onEditar }) => {
         <div className="flex items-center gap-1.5">
           <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-[10px] font-bold text-primary">
             {avatarVendedor?.trim()
-              ? <img src={avatarVendedor} alt="" className="h-full w-full object-cover" />
+              ? <img src={avatarVendedor} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
               : (nombreVend || "?")[0].toUpperCase()
             }
           </div>
@@ -413,7 +415,7 @@ const Perfil = () => {
           {/* Avatar circular con botón de edición */}
           <div className="relative mb-1">
             <div className="flex h-[100px] w-[100px] items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-primary-dark text-4xl font-bold text-white shadow-softLg">
-              {p.avatar?.trim() ? <img src={p.avatar} alt={p.nombre} className="h-full w-full object-cover" /> : (p.nombre || "U")[0].toUpperCase()}
+              {p.avatar?.trim() ? <img src={p.avatar} alt={p.nombre} decoding="async" className="h-full w-full object-cover" /> : (p.nombre || "U")[0].toUpperCase()}
             </div>
 
             {/* Lápiz naranja */}

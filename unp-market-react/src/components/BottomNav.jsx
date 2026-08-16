@@ -70,7 +70,7 @@ const NavItem = ({ activo, to, onClick, label, children }) => {
     <button
       onClick={manejarClick}
       aria-label={label}
-      className={`flex flex-1 flex-col items-center gap-0.5 py-1 transition-colors ${
+      className={`flex flex-1 flex-col items-center gap-0.5 py-1 transition-all duration-200 ease-out active:scale-90 ${
         activo ? "text-[var(--color-accent)]" : "text-ink/40"
       }`}
     >
@@ -136,8 +136,11 @@ const BottomNav = ({ activo = null }) => {
         aria-label="Publicar"
         className="flex flex-1 flex-col items-center gap-0.5"
       >
-        {/* 🏫 Multicampus: bg-[var(--color-accent)] en vez de bg-primary */}
-        <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-accent)] text-white shadow-softLg transition-transform active:scale-95">
+        {/* 🏫 Multicampus: bg-[var(--color-accent)] en vez de bg-primary.
+            El scale táctil vive solo en el círculo (no en el <button>
+            completo) para que no se compongan dos transforms distintos
+            y el "hundido" al tocar se sienta natural, no exagerado. */}
+        <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-accent)] text-white shadow-softLg transition-transform duration-200 ease-out active:scale-90">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />

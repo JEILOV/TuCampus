@@ -15,12 +15,32 @@ import { logError } from "./errorHandler";
 
 const MAX_DIMENSION = 1080;
 const CALIDAD_JPEG  = 0.70;
+const CALIDAD_WEBP  = 0.75; // WebP mantiene mejor calidad visual a menor peso que JPEG en un % similar
 const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
+
+// 🔧 Optimización de rendimiento: feature-detection de soporte WebP en
+// canvas.toBlob(). Se resuelve UNA sola vez (no en cada compresión) y
+// se cachea en este módulo — es una operación async barata pero no hay
+// motivo para repetirla en cada imagen subida.
+let soportaWebpPromise = null;
+const soportaWebp = () => {
+  if (!soportaWebpPromise) {
+    soportaWebpPromise = new Promise((resolve) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      canvas.toBlob((blob) => resolve(!!blob && blob.type === "image/webp"), "image/webp");
+    });
+  }
+  return soportaWebpPromise;
+};
 
 /**
  * Comprime una imagen usando Canvas.
- * Redimensiona a MAX_DIMENSION px en el lado más largo,
- * mantiene el ratio, y exporta como JPEG al 70%.
+ * Redimensiona a MAX_DIMENSION px en el lado más largo, mantiene el
+ * ratio, y exporta en el formato más liviano disponible: WebP si el
+ * navegador lo soporta (~25-35% más liviano que JPEG a calidad
+ * visual equivalente), o JPEG al 70% como fallback universal.
  *
  * @param {File} file
  * @returns {Promise<Blob>}
@@ -32,7 +52,7 @@ export const comprimirImagen = (file) =>
     reader.onload  = (e) => {
       const img    = new Image();
       img.onerror  = () => reject(new Error("No se pudo cargar la imagen"));
-      img.onload   = () => {
+      img.onload   = async () => {
         let { width, height } = img;
 
         if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
@@ -49,8 +69,13 @@ export const comprimirImagen = (file) =>
         canvas.width  = width;
         canvas.height = height;
         canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+
+        const usarWebp = await soportaWebp();
+        const formato   = usarWebp ? "image/webp" : "image/jpeg";
+        const calidad   = usarWebp ? CALIDAD_WEBP : CALIDAD_JPEG;
+
         // fallback al archivo original si canvas.toBlob devuelve null
-        canvas.toBlob((blob) => resolve(blob ?? file), "image/jpeg", CALIDAD_JPEG);
+        canvas.toBlob((blob) => resolve(blob ?? file), formato, calidad);
       };
       img.src = e.target.result;
     };

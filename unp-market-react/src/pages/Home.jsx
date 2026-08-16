@@ -153,14 +153,14 @@ const Home = () => {
         <div className="relative z-20 mt-4 flex justify-center">
           <button
             onClick={() => setSelectorCampusAbierto((v) => !v)}
-            className="flex items-center gap-1.5 rounded-chip bg-background/15 px-3.5 py-1.5 text-[12px] font-bold text-background backdrop-blur-sm"
+            className="flex items-center gap-1.5 rounded-chip bg-background/15 px-3.5 py-1.5 text-[12px] font-bold text-background backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
           >
             <MapPin size={13} strokeWidth={2.5} />
             {LISTA_UNIVERSIDADES.find((u) => u.id === universidadActiva)?.id?.toUpperCase() ?? "SEDE"}
             <ChevronDown
               size={12}
               strokeWidth={3}
-              className={`transition-transform ${selectorCampusAbierto ? "rotate-180" : ""}`}
+              className={`transition-transform duration-200 ease-out ${selectorCampusAbierto ? "rotate-180" : ""}`}
             />
           </button>
 
@@ -253,16 +253,16 @@ const Home = () => {
                   {/* 🏫 Multicampus: bg-[var(--color-accent)] en vez de
                       bg-primary — sigue la sede que se está explorando. */}
                   <span
-                    className={`flex h-14 w-14 items-center justify-center rounded-card shadow-soft transition-colors ${
+                    className={`flex h-14 w-14 items-center justify-center rounded-card shadow-soft transition-all duration-200 ease-out active:scale-90 ${
                       activa ? "bg-[var(--color-accent)]" : "bg-card"
                     }`}
                   >
                     <Icon color={activa ? "#F7EEDC" : "#102C4D"} />
                   </span>
-                  <span className={`text-[11px] font-semibold ${activa ? "text-[var(--color-accent)]" : "text-ink/60"}`}>
+                  <span className={`text-[11px] font-semibold transition-colors duration-200 ease-out ${activa ? "text-[var(--color-accent)]" : "text-ink/60"}`}>
                     {label}
                   </span>
-                  <span className={`h-[3px] w-4 rounded-full ${activa ? "bg-[var(--color-accent)]" : "bg-transparent"}`} />
+                  <span className={`h-[3px] w-4 rounded-full transition-colors duration-200 ease-out ${activa ? "bg-[var(--color-accent)]" : "bg-transparent"}`} />
                 </button>
               );
             })}

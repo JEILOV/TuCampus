@@ -122,6 +122,8 @@ const Avatar = ({ nombre, avatar, size = 46 }) => {
           <img
             src={avatar}
             alt={nombre}
+            loading="lazy"
+            decoding="async"
             onError={() => setImgFallo(true)}
             style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
           />
@@ -336,6 +338,8 @@ const Burbuja = ({ mensaje, esMio, onResponder }) => {
             <img
               src={mensaje.imagen}
               alt="Imagen enviada en el chat"
+              loading="lazy"
+              decoding="async"
               style={{
                 display: "block", width: "100%", maxWidth: "260px",
                 maxHeight: "320px", objectFit: "cover",

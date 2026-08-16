@@ -181,6 +181,7 @@ const Producto = () => {
           <img
             src={imagen}
             alt={titulo}
+            decoding="async"
             className={`h-full w-full object-cover ${estaAgotado ? "grayscale-[60%] brightness-90" : ""}`}
           />
         ) : (
@@ -232,7 +233,7 @@ const Producto = () => {
           >
             <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#c8a97a] to-[#a07850] text-lg font-bold text-white">
               {avatarVendedor?.trim()
-                ? <img src={avatarVendedor} alt={nombreVendedor} className="h-full w-full object-cover" />
+                ? <img src={avatarVendedor} alt={nombreVendedor} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 : (nombreVendedor || "?")[0].toUpperCase()
               }
             </div>

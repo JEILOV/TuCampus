@@ -160,6 +160,7 @@ const ModalResena = ({
           <button
             onClick={onCerrar}
             disabled={enviando}
+            className="resena-btn-cancelar"
             style={{
               flex: 1, background: "var(--bg-crema)", color: "#5c5c7a",
               border: "1.5px solid #e8e8f0", borderRadius: "14px",
@@ -172,6 +173,7 @@ const ModalResena = ({
           <button
             onClick={handleEnviar}
             disabled={enviando || !calificacion}
+            className="resena-btn-enviar"
             style={{
               flex: 1.4,
               background: calificacion ? "var(--verde-marca)" : "#e8e8f0",
@@ -186,6 +188,21 @@ const ModalResena = ({
           </button>
         </div>
       </div>
+
+      {/* 🔧 Micro-interacción táctil: estilos inline no soportan el
+          pseudo-selector :active, así que se define acá (mismo patrón
+          que ya usa Spinner.jsx para @keyframes). transform en vez de
+          scale de Tailwind porque este modal no está migrado a
+          Tailwind todavía. */}
+      <style>{`
+        .resena-btn-cancelar, .resena-btn-enviar {
+          transition: transform 0.2s ease-out;
+        }
+        .resena-btn-cancelar:active:not(:disabled),
+        .resena-btn-enviar:active:not(:disabled) {
+          transform: scale(0.96);
+        }
+      `}</style>
     </div>
   );
 };

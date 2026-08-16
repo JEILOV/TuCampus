@@ -61,7 +61,7 @@ const TarjetaResena = ({ resena, esMia, onEditar }) => {
       <div className="flex items-center gap-2.5">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary">
           {resena.autorAvatar?.trim()
-            ? <img src={resena.autorAvatar} alt="" className="h-full w-full object-cover" />
+            ? <img src={resena.autorAvatar} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
             : (resena.autorNombre || "?")[0].toUpperCase()
           }
         </div>
@@ -360,7 +360,7 @@ const Vendedor = () => {
           <div className="relative mb-1">
             <div className="flex h-[92px] w-[92px] items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-primary-dark text-3xl font-bold text-white shadow-softLg">
               {v.avatar?.trim()
-                ? <img src={v.avatar} alt={v.nombre} className="h-full w-full object-cover" />
+                ? <img src={v.avatar} alt={v.nombre} decoding="async" className="h-full w-full object-cover" />
                 : (v.nombre || "V")[0].toUpperCase()
               }
             </div>

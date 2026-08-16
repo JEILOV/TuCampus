@@ -125,7 +125,7 @@ const CarruselAnuncios = ({ universidadId }) => {
             key={a.id}
             type="button"
             onClick={() => manejarClick(a)}
-            className="relative flex h-28 w-64 shrink-0 snap-start flex-col justify-end overflow-hidden rounded-[24px] p-4 text-left shadow-soft transition-transform active:scale-[0.98]"
+            className="relative flex h-28 w-64 shrink-0 snap-start flex-col justify-end overflow-hidden rounded-[24px] p-4 text-left shadow-soft transition-all duration-200 ease-out active:scale-[0.98]"
             style={{ backgroundColor: a.colorFondo || "#1c398e" }}
           >
             {a.imagenUrl && (

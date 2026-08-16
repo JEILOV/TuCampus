@@ -16,6 +16,7 @@
 //    <ProductCard producto={p} onVerDetalle={(id) => ...} />
 // ============================================================
 
+import { useState } from "react";
 import { Star } from "lucide-react";
 import { CATEGORY_ICON_MAP, IconPackage } from "./CategoryIcons";
 
@@ -28,6 +29,13 @@ const ProductCard = ({ producto, onVerDetalle }) => {
   const estaAgotado = estado === "agotado";
   const catKey = (categoria || "").toLowerCase();
   const IconPlaceholder = CATEGORY_ICON_MAP[catKey] || IconPackage;
+
+  // 🔧 Rendimiento/CLS: el contenedor ya reserva el espacio exacto
+  // (aspect-square), así que no hay salto de layout al cargar. Este
+  // estado es solo para el efecto de aparición: un skeleton shimmer
+  // sutil mientras la imagen decodifica, con fade-in al terminar, en
+  // vez de un "pop" brusco cuando la conexión es lenta.
+  const [imagenCargada, setImagenCargada] = useState(false);
 
   // 🔧 Lectura defensiva de la reputación denormalizada. El único
   // nombre de campo real que escribe productService.crearProducto y
@@ -44,20 +52,32 @@ const ProductCard = ({ producto, onVerDetalle }) => {
   return (
     <article
       onClick={() => onVerDetalle(id)}
-      className={`h-fit w-full cursor-pointer self-start overflow-hidden rounded-card bg-card shadow-soft transition-transform active:scale-[0.98]${
+      className={`h-fit w-full cursor-pointer self-start overflow-hidden rounded-card bg-card shadow-soft transition-all duration-200 ease-out active:scale-[0.98]${
         estaAgotado ? " opacity-70" : ""
       }`}
     >
       {/* Imagen 1:1 con precio flotante */}
       <div className="relative aspect-square w-full bg-background">
         {imagen && imagen.trim() ? (
-          <img
-            src={imagen}
-            alt={titulo || "Producto"}
-            loading="lazy"
-            decoding="async"
-            className={`h-full w-full object-cover${estaAgotado ? " grayscale" : ""}`}
-          />
+          <>
+            {/* Skeleton shimmer — visible hasta que la imagen real termine
+                de decodificar. Mismo tamaño exacto que la imagen final
+                (absolute inset-0 dentro del contenedor aspect-square), así
+                que no hay salto de layout, solo una transición de opacidad. */}
+            {!imagenCargada && (
+              <div className="absolute inset-0 animate-pulse bg-ink/10" aria-hidden="true" />
+            )}
+            <img
+              src={imagen}
+              alt={titulo || "Producto"}
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setImagenCargada(true)}
+              className={`h-full w-full object-cover transition-opacity duration-300 ease-out${
+                imagenCargada ? " opacity-100" : " opacity-0"
+              }${estaAgotado ? " grayscale" : ""}`}
+            />
+          </>
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <IconPlaceholder color="#a07850" />
