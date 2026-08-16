@@ -42,8 +42,39 @@ import { useRef, useState } from "react";
 import { toBlob } from "html-to-image";
 import { QRCodeSVG } from "qrcode.react";
 import { X, Share2, Download, Star } from "lucide-react";
+import { UNIVERSIDADES, obtenerColorAccent } from "../config/universidades";
 
 const MASCOTA_ICONO = "/assets/mascota-icono-placeholder.png";
+
+// 🏫 Multicampus — Story Card: tematización por sede del PRODUCTO
+// (`producto.universidadId`), no de la sede que el usuario esté
+// explorando en Home (`--color-accent` global). En la práctica ambas
+// suelen coincidir porque useProducts ya filtra por sede activa, pero
+// esta tarjeta se genera a partir de UN producto concreto, así que se
+// ancla a su propio dueño — más correcto y sigue funcionando igual si
+// en el futuro se comparte desde un contexto que mezcle sedes.
+//
+// Clases Tailwind completas (no interpoladas) a propósito: Tailwind
+// solo genera CSS para clases que puede leer como texto literal en el
+// código fuente — un template string como `from-${color}-900` no
+// generaría nada. Este mapa es la única fuente de verdad para los 3
+// degradados; agregar una sede nueva implica agregar una entrada aquí
+// Y en universidades.js (mismo criterio que el resto del proyecto).
+const TEMA_STORY_POR_SEDE = {
+  unp: {
+    gradiente: "bg-gradient-to-br from-blue-900 to-blue-700",
+    qrFg: "#1e3a8a", // blue-900 — coincide con el degradado, legible sobre blanco
+  },
+  ucv: {
+    gradiente: "bg-gradient-to-br from-red-950 to-red-800",
+    qrFg: "#450a0a", // red-950
+  },
+  utp: {
+    gradiente: "bg-gradient-to-br from-zinc-950 to-zinc-900",
+    qrFg: "#09090b", // zinc-950
+  },
+};
+const TEMA_STORY_POR_DEFECTO = TEMA_STORY_POR_SEDE.unp;
 
 // Slug simple para el nombre del archivo descargado.
 const slugify = (texto) =>
@@ -83,6 +114,16 @@ const GeneradorStoryModal = ({
   const precio   = (producto?.precio || 0).toFixed(2);
   const imagen   = (producto?.imagen || "").trim();
   const tieneResenas = totalResenas > 0;
+
+  // 🏫 Multicampus — sede del producto y su temática visual/textual.
+  const universidadId = producto?.universidadId;
+  const universidad    = UNIVERSIDADES[universidadId];
+  const nombreSede      = universidad ? universidad.id.toUpperCase() : "TuCampus";
+  const tema             = TEMA_STORY_POR_SEDE[universidadId] || TEMA_STORY_POR_DEFECTO;
+  // Botón "Compartir": color de acento oficial de la sede del producto
+  // (mismo mapa que usa CampusContext para --color-accent, pero
+  // resuelto para ESTA sede puntual, no la que esté activa en Home).
+  const colorAccentBoton = obtenerColorAccent(universidadId);
 
   const dominioCorto = (() => {
     try { return new URL(productoUrl).host; }
@@ -181,10 +222,7 @@ const GeneradorStoryModal = ({
         <div className="mx-auto w-[270px]">
           <div
             ref={storyRef}
-            className="relative h-[480px] w-[270px] overflow-hidden rounded-[28px]"
-            style={{
-              background: "linear-gradient(160deg, #0a1c4d 0%, #0639B8 55%, #072a8f 100%)",
-            }}
+            className={`relative h-[480px] w-[270px] overflow-hidden rounded-[28px] ${tema.gradiente}`}
           >
             {/* Halo decorativo */}
             <div
@@ -266,7 +304,7 @@ const GeneradorStoryModal = ({
               {/* Footer distintivo */}
               <div className="mb-6 flex items-center justify-between border-t border-white/15 pt-3">
                 <div>
-                  <p className="text-[12px] font-extrabold text-white">Disponible en la UNP</p>
+                  <p className="text-[12px] font-extrabold text-white">Disponible en la {nombreSede}</p>
                   <p className="text-[10.5px] font-semibold text-white/60">{dominioCorto}</p>
                 </div>
                 {/* QR real y escaneable — apunta directo a la URL del
@@ -274,13 +312,16 @@ const GeneradorStoryModal = ({
                     del contenedor) para que quede un margen "silencioso"
                     (quiet zone) alrededor del código: sin eso, lectores
                     de cámara/Instagram pueden fallar en detectarlo,
-                    sobre todo con el fondo azul de la story detrás. */}
+                    sobre todo con el fondo oscuro de la story detrás.
+                    🏫 fgColor sigue el mismo tono base que el degradado
+                    de fondo de esta sede (ver TEMA_STORY_POR_SEDE), en
+                    vez del azul UNP fijo que tenía antes. */}
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-white p-1.5">
                   <QRCodeSVG
                     value={productoUrl}
                     size={44}
                     bgColor="#ffffff"
-                    fgColor="#0a1c4d"
+                    fgColor={tema.qrFg}
                     level="M"
                   />
                 </div>
@@ -295,7 +336,14 @@ const GeneradorStoryModal = ({
             type="button"
             onClick={handleCompartir}
             disabled={generando}
-            className="flex items-center justify-center gap-2 rounded-btn bg-primary py-3.5 text-[14.5px] font-extrabold text-white shadow-soft disabled:opacity-60"
+            // 🏫 Multicampus: color de acento de la sede DEL PRODUCTO
+            // (no bg-[var(--color-accent)], que sigue la sede que el
+            // usuario esté EXPLORANDO en Home — puede no coincidir si
+            // este modal se abre desde otro contexto). Se aplica vía
+            // style porque el valor es dinámico (viene de
+            // obtenerColorAccent), no una clase Tailwind estática.
+            style={{ backgroundColor: colorAccentBoton }}
+            className="flex items-center justify-center gap-2 rounded-btn py-3.5 text-[14.5px] font-extrabold text-white shadow-soft transition-all duration-200 ease-out active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100"
           >
             <Share2 size={18} />
             {generando ? "Generando imagen..." : "Compartir en Stories / WhatsApp"}
