@@ -29,6 +29,7 @@
 
 import { useNavigate }      from "react-router-dom";
 import { useAuth }          from "../context/AuthContext";
+import { useCampus }        from "../context/CampusContext";
 import { useChatsNoLeidos } from "../hooks/useChatsNoLeidos";
 
 // ── Badge numérico reutilizable (notifs y mensajes usan el mismo estilo) ──
@@ -63,16 +64,30 @@ const BottomNav = ({ activo = null }) => {
   const navigate = useNavigate();
   const { user }  = useAuth();
 
+  // 🏫 Multicampus: "Inicio" es también la salida rápida de la
+  // exploración de otra sede — ver CampusContext.jsx.
+  const { resetearSedeActiva } = useCampus();
+
   // Mismo hook que ya usa el resto de la app — cero listeners nuevos
   // más allá de los que ya existían, solo centralizado acá.
   const mensajesNoLeidos = useChatsNoLeidos(user?.uid);
+
+  // 🏫 Multicampus: al volver a "Inicio" desde CUALQUIER página,
+  // descartamos la sede que se estuviera explorando y regresamos al
+  // campus propio del usuario (perfil.universidadId) — así el usuario
+  // no queda "atrapado" viendo los colores/productos de otra sede
+  // después de irse a Perfil, Chat, etc. y volver.
+  const irAInicio = () => {
+    resetearSedeActiva();
+    navigate("/");
+  };
 
   return (
     <nav
       className="fixed inset-x-0 bottom-4 z-40 mx-auto flex w-[calc(100%-32px)] max-w-[420px] items-end justify-between rounded-btn bg-card px-3 pb-2 pt-2 shadow-softLg"
       aria-label="Navegación principal"
     >
-      <NavItem activo={activo === "inicio"} onClick={() => navigate("/")} label="Inicio">
+      <NavItem activo={activo === "inicio"} onClick={irAInicio} label="Inicio">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-full w-full">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <polyline points="9 22 9 12 15 12 15 22" />

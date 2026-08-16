@@ -58,7 +58,7 @@ const Home = () => {
   // estado local: así el selector de acá también recolorea BottomNav
   // y el badge de notificaciones (ver CampusContext.jsx para el porqué
   // y el detalle de cómo se sincroniza con perfil.universidadId).
-  const { sedeActiva: universidadActiva, setSedeActiva } = useCampus();
+  const { sedeActiva: universidadActiva, setSedeActiva, resetearSedeActiva, explorandoOtraSede } = useCampus();
   const [selectorCampusAbierto, setSelectorCampusAbierto] = useState(false);
 
   const handleCambiarCampus = (universidadId) => {
@@ -186,6 +186,23 @@ const Home = () => {
             </>
           )}
         </div>
+
+        {/* 🏫 Multicampus: chip "estás explorando otra sede" — solo se
+            muestra si sedeActiva difiere de perfil.universidadId. Un
+            solo click descarta la exploración y vuelve al campus propio
+            (mismo resetearSedeActiva que usa el botón "Inicio" del
+            BottomNav — ver CampusContext.jsx). */}
+        {explorandoOtraSede && (
+          <div className="relative z-20 mt-2.5 flex justify-center">
+            <button
+              onClick={resetearSedeActiva}
+              className="flex items-center gap-1.5 rounded-chip bg-background/10 px-3 py-1 text-[11px] font-semibold text-background/85 backdrop-blur-sm"
+            >
+              Estás explorando {LISTA_UNIVERSIDADES.find((u) => u.id === universidadActiva)?.nombre ?? "otra sede"}
+              <span className="font-extrabold underline underline-offset-2">Volver a mi campus</span>
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Botón flotante de notificaciones — fijo en la esquina superior
