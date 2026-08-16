@@ -27,12 +27,15 @@ const MAX_TOKENS_POR_ENVIO = 500; // límite duro de sendEachForMulticast (FCM)
  * @param {string} params.titulo
  * @param {string} params.cuerpo
  * @param {string} [params.url="/"] Ruta a abrir al hacer click en la notificación
- * @param {string} [params.imagen]  URL de foto de vista previa (producto/avatar) — ver api/enviar-push.js
+ * @param {string} [params.avatar] Foto de PERFIL de quien origina el evento
+ *   (chat/reseña) — se muestra como `icon`, el círculo chico, nunca expandido.
+ * @param {string} [params.imagen] Foto de PRODUCTO — se muestra como `image`,
+ *   la vista previa grande expandida. No usar para avatares de usuario.
  * @param {Object} [params.data={}] Payload extra opcional (solo strings)
  * @returns {Promise<{successCount:number, failureCount:number, tokensInvalidos:string[]}|null>}
  *   `null` si no se pudo enviar (sin sesión, sin tokens, error de red, etc.)
  */
-export const enviarPush = async ({ tokens, titulo, cuerpo, url = "/", imagen, data = {} }) => {
+export const enviarPush = async ({ tokens, titulo, cuerpo, url = "/", avatar, imagen, data = {} }) => {
   const listaTokens = (Array.isArray(tokens) ? tokens : [tokens])
     .filter((t) => typeof t === "string" && t)
     .slice(0, MAX_TOKENS_POR_ENVIO);
@@ -53,14 +56,16 @@ export const enviarPush = async ({ tokens, titulo, cuerpo, url = "/", imagen, da
         "Content-Type": "application/json",
         Authorization: `Bearer ${idToken}`,
       },
-      // `imagen` solo se manda si vino un valor real — así el body no
-      // se llena de `imagen: undefined` en los envíos que no tienen foto.
+      // `avatar`/`imagen` solo se mandan si vino un valor real — así
+      // el body no se llena de claves `undefined` en los envíos que
+      // no tienen foto.
       body: JSON.stringify({
         tokens: listaTokens,
         titulo,
         cuerpo,
         url,
         data,
+        ...(typeof avatar === "string" && avatar ? { avatar } : {}),
         ...(typeof imagen === "string" && imagen ? { imagen } : {}),
       }),
     });

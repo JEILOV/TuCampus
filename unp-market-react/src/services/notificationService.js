@@ -217,9 +217,9 @@ const truncarTexto = (texto, max = 100) => {
  * Helper interno compartido por las 3 funciones de abajo.
  *
  * @param {string} uid
- * @param {{titulo: string, cuerpo: string, url?: string, imagen?: string}} mensaje
+ * @param {{titulo: string, cuerpo: string, url?: string, avatar?: string, imagen?: string}} mensaje
  */
-const notificarPorUid = async (uid, { titulo, cuerpo, url, imagen }) => {
+const notificarPorUid = async (uid, { titulo, cuerpo, url, avatar, imagen }) => {
   if (!uid) return;
   const snap = await getDoc(doc(db, "usuarios", uid));
   const tokensCrudos = snap.exists() ? snap.data().fcmToken : null;
@@ -230,7 +230,7 @@ const notificarPorUid = async (uid, { titulo, cuerpo, url, imagen }) => {
   console.log(`[notificationService.notificarPorUid] uid=${uid} tokens encontrados=${tokens.length}`);
 
   if (tokens.length === 0) return;
-  await enviarPush({ tokens, titulo, cuerpo, url, imagen });
+  await enviarPush({ tokens, titulo, cuerpo, url, avatar, imagen });
 };
 
 /**
@@ -242,8 +242,9 @@ const notificarPorUid = async (uid, { titulo, cuerpo, url, imagen }) => {
  * @param {string} params.paraUid   UID de quien recibe el mensaje
  * @param {string} params.deNombre  Nombre de quien lo envía
  * @param {string} [params.deAvatar] Foto de perfil de quien envía — se
- *   muestra como vista previa en la notificación (mismo criterio que
- *   WhatsApp: la foto de quien te escribe, no la tuya).
+ *   muestra como el `icon` (círculo chico) de la notificación, mismo
+ *   criterio que WhatsApp: la foto de quien te escribe, no la tuya.
+ *   NUNCA se manda como `imagen` (esa es solo para fotos de producto).
  * @param {string} params.mensaje   Texto del mensaje (o "📷 Imagen")
  * @param {string} params.chatId
  */
@@ -254,7 +255,10 @@ export const notificarNuevoMensaje = async ({ paraUid, deNombre, deAvatar, mensa
       titulo: `💬 ${deNombre || "Nuevo mensaje"}`,
       cuerpo: truncarTexto(mensaje) || "Tienes un mensaje nuevo.",
       url:    `/chat?id=${chatId}`,
-      imagen: deAvatar || undefined,
+      // 🔧 `avatar` (icon chico), NUNCA `imagen` (image expandida) —
+      // así el avatar del remitente sale como el círculo al costado
+      // del mensaje, no como una foto gigante ocupando la notificación.
+      avatar: deAvatar || undefined,
     });
   } catch (err) {
     logError("[notificationService.notificarNuevoMensaje]", err);
@@ -272,7 +276,8 @@ export const notificarNuevoMensaje = async ({ paraUid, deNombre, deAvatar, mensa
  * @param {string} params.autorNombre  Nombre de quien calificó
  * @param {string} [params.autorAvatar] Foto de perfil de quien calificó —
  *   mismo campo que reviewService ya guarda como `deAvatar` en la
- *   notificación in-app; acá se reusa como vista previa del push.
+ *   notificación in-app; acá se reusa como `icon` (círculo chico),
+ *   nunca como `imagen` expandida.
  * @param {number} params.estrellas    1 a 5
  */
 export const notificarNuevaResena = async ({ vendedorUid, autorNombre, autorAvatar, estrellas }) => {
@@ -282,7 +287,8 @@ export const notificarNuevaResena = async ({ vendedorUid, autorNombre, autorAvat
       titulo: "⭐ Nueva calificación",
       cuerpo: `${autorNombre || "Un estudiante"} te calificó con ${estrellas} ⭐`,
       url:    `/vendedor?uid=${vendedorUid}`,
-      imagen: autorAvatar || undefined,
+      // 🔧 `avatar` (icon chico) — mismo criterio que notificarNuevoMensaje.
+      avatar: autorAvatar || undefined,
     });
   } catch (err) {
     logError("[notificationService.notificarNuevaResena]", err);

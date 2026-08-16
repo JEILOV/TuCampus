@@ -21,11 +21,25 @@
 //      tokens: string[],     // 1 a 500 tokens FCM (límite de sendEachForMulticast)
 //      titulo: string,
 //      cuerpo: string,
-//      url?:   string,       // ruta a abrir al hacer click (default "/")
-//      imagen?: string,      // URL de la foto de vista previa (ej. la del producto).
-//                             // Acepta también `foto` como alias por compatibilidad.
+//      url?:    string,      // ruta a abrir al hacer click (default "/")
+//      avatar?: string,      // foto de PERFIL de quien origina el evento (chat/reseña)
+//                             // → se muestra como `icon`: el círculo chico al costado
+//                             //   del mensaje, NUNCA expandido.
+//      imagen?: string,      // foto de PRODUCTO (ej. nueva publicación en la sede)
+//                             // → se muestra como `image`: la vista previa grande
+//                             //   expandida. Acepta también `foto` como alias.
 //      data?:  object        // payload extra opcional (se castea a string)
 //    }
+//
+//  🔧 SOLO `data` (payload data-only) — A PROPÓSITO no se manda un
+//  bloque `notification` en la raíz ni `webpush.notification`. Si se
+//  incluye `notification`, el navegador/OS (sobre todo Android) puede
+//  auto-mostrar la notificación con ese payload ADEMÁS de que
+//  `onBackgroundMessage` en firebase-messaging-sw.js dispare su propio
+//  `showNotification()` — eso es lo que causaba las notificaciones
+//  duplicadas. Con `data`-only, `onBackgroundMessage` es la ÚNICA
+//  fuente que llama a `showNotification()`, así que solo puede salir
+//  una notificación por mensaje. Ver firebase-messaging-sw.js.
 //
 //  RESPUESTA (200):
 //    { successCount, failureCount, tokensInvalidos: string[] }
@@ -63,12 +77,6 @@ if (!admin.apps.length) {
 
 const MAX_TOKENS = 500; // límite duro de admin.messaging().sendEachForMulticast
 
-// Ícono/badge de la notificación en Android — el mismo para todas
-// (badge se muestra monocromo en la barra de estado). Se puede
-// sobreescribir con la env var sin tocar código si cambia el dominio.
-const ICONO_NOTIFICACION =
-  process.env.PUSH_ICON_URL || "https://unp-market-react.vercel.app/icon-192.png";
-
 // Códigos de FCM que significan "este token ya no sirve" (navegador
 // desinstaló la PWA, permiso revocado, token vencido, etc.)
 const CODIGOS_TOKEN_INVALIDO = new Set([
@@ -96,7 +104,7 @@ export default async function handler(req, res) {
   }
 
   // ── 2. Validación del body ────────────────────────────────────
-  const { tokens, titulo, cuerpo, url, imagen, foto, data } = req.body || {};
+  const { tokens, titulo, cuerpo, url, avatar, imagen, foto, data } = req.body || {};
 
   const listaTokens = Array.isArray(tokens)
     ? tokens.filter((t) => typeof t === "string" && t.length > 0)
@@ -114,9 +122,9 @@ export default async function handler(req, res) {
 
   const urlDestino = typeof url === "string" && url ? url : "/";
 
-  // `imagen` es el nombre oficial; `foto` queda como alias porque
-  // varios callers (reviewService, productService) ya usan ese nombre
-  // de campo en Firestore para la foto del producto/reseña.
+  // `imagen` es el nombre oficial para la foto de PRODUCTO; `foto`
+  // queda como alias porque reviewService/productService ya usan ese
+  // nombre de campo en Firestore.
   const imagenPreview =
     typeof imagen === "string" && imagen
       ? imagen
@@ -124,13 +132,28 @@ export default async function handler(req, res) {
       ? foto
       : undefined;
 
+  // `avatar`: foto de PERFIL de quien origina el evento (chat/reseña).
+  // Se muestra como `icon` — el círculo chico, no la imagen expandida.
+  const avatarIcono = typeof avatar === "string" && avatar ? avatar : undefined;
+
   // FCM exige que el payload `data` sea un mapa de string → string.
-  const dataPlano = { url: urlDestino };
+  // Acá va TODO lo necesario para que firebase-messaging-sw.js arme
+  // la notificación a mano (ver nota "SOLO data" más arriba) — título,
+  // cuerpo, ícono e imagen expandida viajan como texto plano, nunca
+  // como el bloque `notification` nativo de FCM.
+  const dataPlano = {};
   if (data && typeof data === "object") {
     Object.entries(data).forEach(([clave, valor]) => {
       if (valor !== undefined && valor !== null) dataPlano[clave] = String(valor);
     });
   }
+  // Las claves reservadas van DESPUÉS del spread de `data` para que
+  // nunca puedan ser pisadas por un valor arbitrario del caller.
+  dataPlano.url   = urlDestino;
+  dataPlano.title = String(titulo).slice(0, 200);
+  dataPlano.body  = String(cuerpo).slice(0, 500);
+  if (avatarIcono)   dataPlano.icon  = avatarIcono;
+  if (imagenPreview) dataPlano.image = imagenPreview;
 
   // ── 3. Envío vía FCM ────────────────────────────────────────────
   // 🔧 Debug: cantidad de tokens que llegaron en la petición — útil
@@ -142,25 +165,16 @@ export default async function handler(req, res) {
   try {
     const respuesta = await admin.messaging().sendEachForMulticast({
       tokens: listaTokens,
-      notification: {
-        title: String(titulo).slice(0, 200),
-        body: String(cuerpo).slice(0, 500),
-        // Solo se incluye si vino `imagen`/`foto` — un `imageUrl`
-        // vacío o undefined explícito puede hacer que algunos
-        // clientes de FCM rechacen el mensaje.
-        ...(imagenPreview ? { imageUrl: imagenPreview } : {}),
-      },
+      // 🔧 Data-only a propósito — ver nota arriba. `webpush.notification`
+      // TAMBIÉN se omite por la misma razón: incluirlo dispara el mismo
+      // auto-display que causaba las notificaciones duplicadas.
       data: dataPlano,
       webpush: {
+        // fcmOptions.link es inofensivo: solo se usa como fallback si
+        // algún cliente maneja el click sin pasar por nuestro
+        // notificationclick de firebase-messaging-sw.js — no dispara
+        // un showNotification por sí solo.
         fcmOptions: { link: urlDestino },
-        notification: {
-          // Ícono pequeño (monocromo en la barra de estado de Android)
-          // y el mismo como "badge" — ambos deben ser rutas absolutas.
-          icon: ICONO_NOTIFICACION,
-          badge: ICONO_NOTIFICACION,
-          ...(imagenPreview ? { image: imagenPreview } : {}),
-          vibrate: [200, 100, 200],
-        },
       },
     });
 

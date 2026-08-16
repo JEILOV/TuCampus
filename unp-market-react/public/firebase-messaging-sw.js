@@ -8,6 +8,15 @@
 //  mensaje es onMessage() en src/services/notificationService.js
 //  (ver escucharNotificacionesPrimerPlano).
 //
+//  🔧 Este SW es la ÚNICA fuente que llama a showNotification().
+//  api/enviar-push.js manda el payload SOLO en `data` (nunca un
+//  bloque `notification` en la raíz ni `webpush.notification`) —
+//  si el payload trajera `notification`, el navegador/OS (sobre
+//  todo Android) lo auto-muestra por su cuenta ADEMÁS de que este
+//  handler llame a showNotification(), resultando en 2 notificaciones
+//  por cada mensaje. Con payload data-only, onBackgroundMessage()
+//  es el único que decide qué se muestra.
+//
 //  💸 Costo: $0.00 — FCM es gratuito, sin límite de envíos, en
 //  cualquier plan de Firebase (incluido Spark).
 //
@@ -34,22 +43,38 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Logo de TuCampus — mismo ícono que usa el resto de la app
-// (ver MASCOTA_ICONO en Home.jsx). Reemplazar cuando exista el
-// logo final (ver público/assets/*-placeholder.png).
-const ICONO_NOTIFICACION = "/assets/mascota-icono-placeholder.png";
+// Logo de TuCampus — icon/badge por DEFECTO cuando el evento no trae
+// `avatar` (ej. "nuevo producto en tu sede"). Mismo ícono que usa el
+// resto de la app (ver MASCOTA_ICONO en Home.jsx). Reemplazar cuando
+// exista el logo final (ver público/assets/*-placeholder.png).
+const ICONO_DEFECTO = "/assets/mascota-icono-placeholder.png";
 
 messaging.onBackgroundMessage((payload) => {
+  // El payload llega SOLO en `data` (ver nota arriba) — el fallback a
+  // `payload.notification` queda por robustez, por si algún día se
+  // manda un push con ese formato desde otro origen (ej. una prueba
+  // manual desde la consola de Firebase).
   const titulo = payload.notification?.title || payload.data?.title || "TuCampus";
   const cuerpo =
     payload.notification?.body || payload.data?.body || "Tienes una novedad en tu campus.";
-  // Enlace a abrir al hacer click — ver notificationclick más abajo.
   const enlace = payload.data?.url || payload.fcmOptions?.link || "/";
+
+  // `icon`: círculo chico al costado del mensaje — el avatar de quien
+  // originó el evento (remitente del chat, autor de la reseña). Si no
+  // vino avatar (ej. "nuevo producto en tu sede"), cae al logo de la app.
+  const icono = payload.data?.icon || ICONO_DEFECTO;
+
+  // `image`: vista previa GRANDE expandida — solo para fotos de
+  // PRODUCTO. A propósito no cae a ningún default: si no vino, la
+  // notificación simplemente no se expande con una foto.
+  const imagenGrande = payload.data?.image || undefined;
 
   self.registration.showNotification(titulo, {
     body: cuerpo,
-    icon: ICONO_NOTIFICACION,
-    badge: ICONO_NOTIFICACION,
+    icon: icono,
+    badge: ICONO_DEFECTO,
+    ...(imagenGrande ? { image: imagenGrande } : {}),
+    vibrate: [200, 100, 200],
     tag: payload.data?.tag || "tucampus-notificacion",
     data: { url: enlace },
   });
