@@ -29,6 +29,31 @@ export const UNIVERSIDADES = {
 // (perfiles viejos sin `universidadId`, o datos aún cargando).
 const COLOR_POR_DEFECTO = UNIVERSIDADES.unp.color;
 
+// 🎨 Colores de ACENTO/INTERACCIÓN por sede — DISTINTO del `color`
+// institucional de arriba (que tematiza banners/headers con tonos más
+// apagados). Este segundo set es para elementos interactivos (botón
+// activo, indicador de tab, badge, FAB de Publicar): tonos más
+// intensos/saturados a propósito, para que se sientan "clickeables".
+// Se expone vía la variable CSS `--color-accent` (ver CampusContext.jsx)
+// y se consume en clases Tailwind arbitrarias: `bg-[var(--color-accent)]`.
+const COLOR_ACCENT_POR_SEDE = {
+  unp: "#1D4ED8", // Azul institucional (bg-blue-600)
+  ucv: "#991B1B", // Rojo oscuro e intenso
+  utp: "#09090B", // Negro profundo / grafito
+};
+
+const COLOR_ACCENT_POR_DEFECTO = COLOR_ACCENT_POR_SEDE.unp;
+
+/**
+ * 🎨 Color de ACENTO (interacción) de una sede por su `universidadId`.
+ * Ver COLOR_ACCENT_POR_SEDE arriba para la diferencia con `color`
+ * (el institucional, más apagado, usado en banners/headers).
+ * @param {string|null|undefined} universidadId
+ * @returns {string} Color hex, ej. "#1D4ED8"
+ */
+export const obtenerColorAccent = (universidadId) =>
+  COLOR_ACCENT_POR_SEDE[universidadId] || COLOR_ACCENT_POR_DEFECTO;
+
 // Lista derivada, útil para iterar (selects, validaciones, etc.)
 export const LISTA_UNIVERSIDADES = Object.values(UNIVERSIDADES);
 

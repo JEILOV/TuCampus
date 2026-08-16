@@ -42,12 +42,16 @@ const Badge = ({ cantidad }) => {
 };
 
 // ── Item de navegación estándar (Inicio, Favoritos, Mensajes, Perfil) ──
+// 🏫 Multicampus: `text-[var(--color-accent)]` en vez de `text-primary`
+// para que el ícono/texto activo siga el color de la sede activa (ver
+// CampusContext.jsx). Es una variable CSS global en <html>, así que no
+// hace falta pasar el color por props ni consumir el contexto acá.
 const NavItem = ({ activo, onClick, label, children }) => (
   <button
     onClick={onClick}
     aria-label={label}
     className={`flex flex-1 flex-col items-center gap-0.5 py-1 transition-colors ${
-      activo ? "text-primary" : "text-ink/40"
+      activo ? "text-[var(--color-accent)]" : "text-ink/40"
     }`}
   >
     <span className="relative flex h-6 w-6 items-center justify-center">{children}</span>
@@ -87,7 +91,8 @@ const BottomNav = ({ activo = null }) => {
         aria-label="Publicar"
         className="flex flex-1 flex-col items-center gap-0.5"
       >
-        <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-softLg transition-transform active:scale-95">
+        {/* 🏫 Multicampus: bg-[var(--color-accent)] en vez de bg-primary */}
+        <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-accent)] text-white shadow-softLg transition-transform active:scale-95">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />

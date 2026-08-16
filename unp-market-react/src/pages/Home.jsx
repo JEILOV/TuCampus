@@ -3,6 +3,7 @@ import { useState, useEffect, useRef }              from "react";
 import { useNavigate, useSearchParams }             from "react-router-dom";
 import { Search, ChevronDown, MapPin }              from "lucide-react";
 import { useAuth }                                  from "../context/AuthContext";
+import { useCampus }                                from "../context/CampusContext";
 import { useProducts }                              from "../hooks/useProducts";
 import { useToast, ToastContainer }                 from "../components/Toast";
 import BottomNav                                    from "../components/BottomNav";
@@ -53,30 +54,15 @@ const Home = () => {
   const [menuOrdenAbierto, setMenuOrdenAbierto] = useState(false);
 
   // 🏫 Multicampus — sede que el Home está EXPLORANDO en este momento.
-  // Se inicializa con la sede real del perfil, pero el estudiante puede
-  // cambiarla desde el selector para curiosear otros campus. Esto NO
-  // afecta a qué universidad se publica un producto nuevo (ver
-  // Publicar.jsx, que lee perfil.universidadId directo de su propio
-  // useAuth() — nunca de este estado).
-  const [universidadActiva,   setUniversidadActiva]   = useState(perfil?.universidadId || "unp");
+  // Ahora vive en CampusContext (compartido con toda la app) en vez de
+  // estado local: así el selector de acá también recolorea BottomNav
+  // y el badge de notificaciones (ver CampusContext.jsx para el porqué
+  // y el detalle de cómo se sincroniza con perfil.universidadId).
+  const { sedeActiva: universidadActiva, setSedeActiva } = useCampus();
   const [selectorCampusAbierto, setSelectorCampusAbierto] = useState(false);
 
-  // 🔧 perfil suele resolver de forma asíncrona (después del primer
-  // render, mientras Firebase Auth aún carga). Si el usuario todavía NO
-  // tocó el selector manualmente, mantenemos universidadActiva
-  // sincronizada con la sede real del perfil apenas esté disponible —
-  // así se evita el caso en que el fallback "unp" se quede pegado para
-  // un estudiante de otra sede solo porque su perfil llegó tarde.
-  const tocoSelectorRef = useRef(false);
-  useEffect(() => {
-    if (!tocoSelectorRef.current && perfil?.universidadId) {
-      setUniversidadActiva(perfil.universidadId);
-    }
-  }, [perfil?.universidadId]);
-
   const handleCambiarCampus = (universidadId) => {
-    tocoSelectorRef.current = true;
-    setUniversidadActiva(universidadId);
+    setSedeActiva(universidadId);
     setSelectorCampusAbierto(false);
   };
 
@@ -247,17 +233,19 @@ const Home = () => {
                   onClick={() => setCategoriaActiva(key)}
                   className="flex shrink-0 flex-col items-center gap-1.5"
                 >
+                  {/* 🏫 Multicampus: bg-[var(--color-accent)] en vez de
+                      bg-primary — sigue la sede que se está explorando. */}
                   <span
                     className={`flex h-14 w-14 items-center justify-center rounded-card shadow-soft transition-colors ${
-                      activa ? "bg-primary" : "bg-card"
+                      activa ? "bg-[var(--color-accent)]" : "bg-card"
                     }`}
                   >
                     <Icon color={activa ? "#F7EEDC" : "#102C4D"} />
                   </span>
-                  <span className={`text-[11px] font-semibold ${activa ? "text-primary" : "text-ink/60"}`}>
+                  <span className={`text-[11px] font-semibold ${activa ? "text-[var(--color-accent)]" : "text-ink/60"}`}>
                     {label}
                   </span>
-                  <span className={`h-[3px] w-4 rounded-full ${activa ? "bg-primary" : "bg-transparent"}`} />
+                  <span className={`h-[3px] w-4 rounded-full ${activa ? "bg-[var(--color-accent)]" : "bg-transparent"}`} />
                 </button>
               );
             })}

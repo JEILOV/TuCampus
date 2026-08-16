@@ -26,6 +26,13 @@
   --gris-claro:    #E5E5E5;
   --blanco-puro:   #FFFFFF;
 
+  /* 🏫 Multicampus: color de acento reactivo a la sede activa — el
+     valor real lo pisa CampusContext.jsx en cuanto React monta (vía
+     document.documentElement.style.setProperty), este default es solo
+     para que no haya un flash del color anterior (rojo) antes de eso.
+     Ver src/config/universidades.js → obtenerColorAccent(). */
+  --color-accent: #1D4ED8;
+
   /* Aliases para que el resto de tu app (aún no migrada) no se rompa */
   --green-primary:   var(--verde-marca);
   --yellow-accent:   var(--naranja-marca);
@@ -487,7 +494,10 @@ html, body {
   right: -3px;
   min-width: 18px;
   height: 18px;
-  background: #ef4444;
+  /* 🏫 Multicampus: sigue el color de acento de la sede activa (ver
+     CampusContext.jsx) en vez de un rojo fijo — el rojo queda como
+     fallback por si var() no resolviera por algún motivo. */
+  background: var(--color-accent, #ef4444);
   color: white;
   font-size: 0.65rem;
   font-weight: 800;
