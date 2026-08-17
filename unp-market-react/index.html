@@ -11,6 +11,35 @@
       rel="stylesheet"
     />
     <title>TuCampus</title>
+
+    <!-- 🌐 SEO / OpenGraph — dominio propio oficial.
+         No existían estas etiquetas antes; se agregan apuntando a
+         tucampus.net.pe para que compartidos (WhatsApp, redes, etc.)
+         y buscadores resuelvan siempre al dominio real, no a un
+         preview de Vercel. -->
+    <link rel="canonical" href="https://tucampus.net.pe/" />
+    <meta name="description" content="TuCampus — el marketplace de tu universidad. Compra y vende entre estudiantes de tu campus." />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="TuCampus" />
+    <meta property="og:title" content="TuCampus" />
+    <meta property="og:description" content="El marketplace de tu universidad. Compra y vende entre estudiantes de tu campus." />
+    <meta property="og:url" content="https://tucampus.net.pe/" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="TuCampus" />
+    <meta name="twitter:description" content="El marketplace de tu universidad. Compra y vende entre estudiantes de tu campus." />
+
+    <!-- 📱 PWA — instalabilidad -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0639B8" />
+
+    <!-- Chrome/Android (estándar moderno) + fallback Safari/iOS -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="TuCampus" />
+    <link rel="apple-touch-icon" href="/assets/icon-192.png" />
   </head>
   <body>
     <div id="root"></div>

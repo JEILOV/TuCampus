@@ -31,7 +31,7 @@
 //        avatarVendedor={avatarVendedor}
 //        calificacion={reputacionVendedor?.calificacionPromedio || 0}
 //        totalResenas={reputacionVendedor?.totalResenas || 0}
-//        productoUrl={window.location.href}
+//        productoUrl={window.location.href} // fallback si no hay producto.id — ver SITIO_URL/urlCanonica abajo
 //        onClose={() => setMostrandoStory(false)}
 //        onToast={mostrarToast}
 //      />
@@ -45,6 +45,14 @@ import { X, Share2, Download, Star } from "lucide-react";
 import { UNIVERSIDADES, obtenerColorAccent } from "../config/universidades";
 
 const MASCOTA_ICONO = "/assets/mascota-icono-placeholder.png";
+
+// 🌐 Dominio propio oficial. El QR y el texto del pie de la story
+// SIEMPRE deben apuntar acá — nunca a `window.location.href` (que en
+// preview/staging/localhost sería otro host distinto al que la gente
+// realmente va a escanear/visitar). `productoUrl` (prop) se conserva
+// solo como fallback para `navigator.share({ url })` cuando por algún
+// motivo no llega `producto.id`.
+const SITIO_URL = "https://tucampus.net.pe";
 
 // 🏫 Multicampus — Story Card: tematización por sede del PRODUCTO
 // (`producto.universidadId`), no de la sede que el usuario esté
@@ -125,9 +133,18 @@ const GeneradorStoryModal = ({
   // resuelto para ESTA sede puntual, no la que esté activa en Home).
   const colorAccentBoton = obtenerColorAccent(universidadId);
 
+  // 🌐 URL canónica del producto — se arma con el dominio propio +
+  // el id real (ruta usada en toda la app: /producto?id=...., ver
+  // App.jsx + Producto.jsx). Si por lo que sea no llega `producto.id`,
+  // cae a `productoUrl` (prop, hoy `window.location.href` desde
+  // Producto.jsx) para no romper el compartir.
+  const urlCanonica = producto?.id
+    ? `${SITIO_URL}/producto?id=${producto.id}`
+    : (productoUrl || SITIO_URL);
+
   const dominioCorto = (() => {
-    try { return new URL(productoUrl).host; }
-    catch { return "tucampus.app"; }
+    try { return new URL(urlCanonica).host; }
+    catch { return "tucampus.net.pe"; }
   })();
 
   // ── Genera el PNG a partir del nodo de la story ──────────────
@@ -170,17 +187,17 @@ const GeneradorStoryModal = ({
           files: [file],
           title: titulo,
           text: `¡Mira "${titulo}" en TuCampus!`,
-          url: productoUrl,
+          url: urlCanonica,
         });
       } else {
         // Fallback: navegadores de escritorio (o sin soporte de
         // compartir archivos) — descarga automática + link copiado.
         descargarBlob(blob, nombreArchivo);
         try {
-          await navigator.clipboard.writeText(productoUrl);
+          await navigator.clipboard.writeText(urlCanonica);
           onToast?.("Imagen descargada y link copiado al portapapeles 🔗", "success");
         } catch {
-          onToast?.(`Imagen descargada. Copiá el link manualmente: ${productoUrl}`, "success");
+          onToast?.(`Imagen descargada. Copiá el link manualmente: ${urlCanonica}`, "success");
         }
       }
     } catch (err) {
@@ -331,7 +348,7 @@ const GeneradorStoryModal = ({
                     vez del azul UNP fijo que tenía antes. */}
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-white p-1.5">
                   <QRCodeSVG
-                    value={productoUrl}
+                    value={urlCanonica}
                     size={44}
                     bgColor="#ffffff"
                     fgColor={tema.qrFg}

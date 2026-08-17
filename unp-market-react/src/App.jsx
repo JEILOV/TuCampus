@@ -4,6 +4,7 @@ import Home           from "./pages/Home";
 import Login          from "./pages/Login";
 import RutaProtegida  from "./components/RutaProtegida";
 import NotificacionToast from "./components/NotificacionToast";
+import InstalarPWABanner from "./components/InstalarPWABanner";
 import Spinner        from "./components/Spinner";
 
 // 🚀 Code splitting (rendimiento): Home y Login se importan de forma
@@ -34,6 +35,13 @@ const App = () => (
         así se mantiene montado (y puede seguir escuchando) sin
         importar por qué ruta esté navegando el usuario. */}
     <NotificacionToast />
+
+    {/* Banner discreto de "Instalar TuCampus" — mismo patrón que
+        NotificacionToast: fuera de <Routes> para que sobreviva a la
+        navegación y aparezca en cualquier pantalla. Se autooculta si
+        el navegador no soporta instalación (ej. iOS Safari) o si el
+        usuario ya la descartó recientemente (ver el propio componente). */}
+    <InstalarPWABanner />
 
     {/* Suspense ÚNICO envolviendo todas las rutas: mientras el chunk de
         la página lazy pedida termina de descargar, se muestra el mismo
