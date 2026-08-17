@@ -87,6 +87,16 @@ const Home = () => {
     return () => observerRef.current?.disconnect();
   }, [cargarMas, todoCargado]);
 
+  // 🔧 Cuenta de favoritos de un producto — mismo criterio flexible que
+  // pide el ordenamiento "Más populares": `favoritosCount` (contador
+  // denormalizado, si existiera) > `favoritos.length` (array) >
+  // `likes.length` (alias legado) > 0 si nada de eso existe. Ningún
+  // producto queda excluido por no tener el campo — a diferencia de
+  // orderBy() en Firestore, acá los que no tienen favoritos simplemente
+  // quedan al final, no se pierden.
+  const contarFavoritos = (p) =>
+    p?.favoritosCount ?? p?.favoritos?.length ?? p?.likes?.length ?? 0;
+
   // ── Filtrado client-side ──────────────────────────────────
   // Se aplica sobre lo que ya trajo useProducts (server-side ya filtró
   // por sede/categoría/keywords/orden). Acá se afinan:
@@ -95,13 +105,18 @@ const Home = () => {
   //   · condición (Nuevo/Como nuevo/Usado — ver nota en FeedFiltros.jsx
   //     sobre por qué hoy no hay productos con este campo)
   //   · rango de precio mín/máx
+  //   · "Más populares": useProducts (ORDEN_CONFIG) no reconoce
+  //     'populares' y por lo tanto pide al servidor el orden por
+  //     defecto ("recientes") — acá se re-ordena en memoria por
+  //     cantidad de favoritos, evitando así tener que crear un nuevo
+  //     índice compuesto en Firestore solo para este criterio.
   const productosFiltrados = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
-    const { condicion, precioMin, precioMax } = filtrosAvanzados;
+    const { condicion, precioMin, precioMax, orden } = filtrosAvanzados;
     const min = precioMin !== "" ? Number(precioMin) : null;
     const max = precioMax !== "" ? Number(precioMax) : null;
 
-    return productos.filter((p) => {
+    const filtrados = productos.filter((p) => {
       if (texto) {
         const enTitulo      = (p.titulo || "").toLowerCase().includes(texto);
         const enDescripcion = (p.descripcion || "").toLowerCase().includes(texto);
@@ -116,6 +131,13 @@ const Home = () => {
 
       return true;
     });
+
+    if (orden === "populares") {
+      // [...filtrados] para no mutar el array devuelto por el filter.
+      return [...filtrados].sort((a, b) => contarFavoritos(b) - contarFavoritos(a));
+    }
+
+    return filtrados;
   }, [productos, busqueda, filtrosAvanzados]);
 
   const hayFiltrosActivos =

@@ -54,6 +54,7 @@ export const CONDICIONES = [
 
 export const OPCIONES_ORDEN = [
   { id: "recientes",   label: "Más recientes" },
+  { id: "populares",   label: "Más populares" },
   { id: "precio_asc",  label: "Precio: Menor a mayor" },
   { id: "precio_desc", label: "Precio: Mayor a menor" },
 ];
@@ -326,7 +327,6 @@ const FeedFiltros = ({
               </button>
             </div>
           </div>
-        </div>
         </div>
       )}
     </div>
