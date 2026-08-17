@@ -31,6 +31,7 @@
 // ============================================================
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Search, X, SlidersHorizontal } from "lucide-react";
 
 // 🔧 Mismo set que productService.CATEGORIAS_VALIDAS / firestore.rules
@@ -205,22 +206,30 @@ const FeedFiltros = ({
       </div>
 
       {/* ── Drawer inferior: Filtros avanzados ──
-          🔧 z-index en dos capas explícitas, por encima de BottomNav
-          (fixed, z-40): el overlay oscuro en z-[59] (tapa también la
-          barra inferior mientras el drawer está abierto) y el panel
-          del drawer en z-[60] (siempre encima del overlay). */}
-      {drawerAbierto && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center">
+          🔧 Portal a document.body: FeedFiltros vive dentro del árbol de
+          Home (dentro de <main>), mientras que BottomNav se monta en la
+          raíz de App — ambos comparten el DOM, pero cada subárbol de
+          React puede terminar en un stacking context distinto según los
+          ancestros (transform/filter/etc.), donde un z-index alto ya no
+          alcanza para "escapar" del contexto padre. createPortal saca
+          este nodo del árbol DOM de Home por completo y lo monta como
+          hijo directo de <body>, al mismo nivel que BottomNav, así que
+          un z-index simple (sin trucos) alcanza para quedar por encima
+          de CUALQUIER otro elemento global (BottomNav, toasts, etc.).
+          El contenedor del portal usa z-[100]; overlay y panel quedan
+          en capas relativas dentro de esa misma capa. */}
+      {drawerAbierto && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-end justify-center">
           {/* Overlay/backdrop — clic afuera cierra el drawer */}
           <div
             onClick={cerrarDrawer}
             aria-hidden="true"
-            className="absolute inset-0 z-[59] bg-ink/45 backdrop-blur-sm"
+            className="absolute inset-0 bg-ink/45 backdrop-blur-sm"
           />
 
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative z-[60] w-full max-w-[480px] rounded-t-[32px] bg-card px-5 pt-3 shadow-softLg"
+            className="relative w-full max-w-[480px] rounded-t-[32px] bg-card px-5 pt-3 shadow-softLg"
             style={{ paddingBottom: "max(2rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
           >
             {/* Handle visual */}
@@ -327,7 +336,8 @@ const FeedFiltros = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
