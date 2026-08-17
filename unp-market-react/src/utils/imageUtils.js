@@ -141,6 +141,46 @@ export const subirImagenImgBB = (file, onProgress) => {
 };
 
 /**
+ * Comprime y sube hasta N imágenes, EN SECUENCIA (no en paralelo).
+ *
+ * 🔧 Por qué secuencial y no Promise.all: ImgBB (plan gratuito) es
+ * sensible a ráfagas de requests concurrentes desde el mismo IP/key
+ * (errores 400/429 intermitentes bajo carga). Subir de a una imagen
+ * es más lento pero 100% confiable, y además permite reportar un
+ * progreso GLOBAL coherente (0–100 sobre el total del lote) en vez de
+ * 4 barras independientes que terminan en momentos distintos.
+ *
+ * Si una imagen falla, la función corta ahí mismo (no sube parcial en
+ * silencio) — el componente que llama decide cómo informar el error.
+ *
+ * @param {File[]} archivos                        Archivos originales (sin comprimir)
+ * @param {(pct: number) => void} [onProgress]      Progreso global 0–100
+ * @returns {Promise<string[]>}                     URLs públicas, mismo orden que `archivos`
+ */
+export const subirImagenes = async (archivos, onProgress) => {
+  const lista  = (archivos || []).filter(Boolean);
+  const total  = lista.length;
+  const urls   = [];
+
+  if (total === 0) return urls;
+
+  for (let i = 0; i < total; i++) {
+    const comprimida = await comprimirImagen(lista[i]);
+    // eslint-disable-next-line no-await-in-loop
+    const url = await subirImagenImgBB(comprimida, (pctArchivoActual) => {
+      // Cada imagen ocupa 1/total del progreso global; dentro de su
+      // tramo, avanza según el % real de bytes subidos de ESA imagen.
+      const pctGlobal = Math.round(((i + pctArchivoActual / 100) / total) * 100);
+      onProgress?.(pctGlobal);
+    });
+    urls.push(url);
+  }
+
+  onProgress?.(100);
+  return urls;
+};
+
+/**
  * Genera todos los prefijos de búsqueda de un texto (para Firestore array-contains).
  * Ej: "galleta" → ["g", "ga", "gal", "gall", "galle", "gallet", "galleta"]
  *

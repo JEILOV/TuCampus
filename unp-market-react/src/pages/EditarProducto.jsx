@@ -2,13 +2,16 @@
 import { useState, useEffect, useRef }  from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { doc, getDoc }                  from "firebase/firestore";
-import { ChevronLeft, Camera, Send }    from "lucide-react";
+import { ChevronLeft, Camera, Send, X, Plus } from "lucide-react";
 import { db }                           from "../services/firebase";
 import { useAuth }                      from "../context/AuthContext";
-import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
+import { subirImagenes }                from "../utils/imageUtils";
 import { actualizarProducto, normalizarCategoria } from "../services/productService";
 import Spinner                          from "../components/Spinner";
 import Toast, { useToast }              from "../components/Toast";
+
+// 🖼️ Mismo tope que Publicar.jsx / productService.js.
+const MAX_FOTOS = 4;
 
 // Mismo ícono de mascota que usa Publicar.jsx / Home.jsx, para
 // mantener el header idéntico entre ambas pantallas.
@@ -31,9 +34,12 @@ const EditarProducto = () => {
   const [precio,         setPrecio]         = useState("");
   const [categoria,      setCategoria]      = useState("comida");
   const [descripcion,    setDescripcion]    = useState("");
-  const [archivo,        setArchivo]        = useState(null);
-  const [previewUrl,     setPreviewUrl]     = useState(null);
-  const [imagenOriginal, setImagenOriginal] = useState("");
+  // 🖼️ Hasta MAX_FOTOS "slots", en el orden en que se muestran/envían.
+  // kind: "existing" (ya en Firestore, `url` es la URL pública real,
+  // no hay que volver a subirla) | "new" (recién elegida en este
+  // dispositivo, `url` es un object URL de preview y `file` es lo que
+  // hay que comprimir + subir al guardar).
+  const [fotos,          setFotos]          = useState([]);
   const [btnTexto,       setBtnTexto]       = useState("Guardar Cambios");
   const [enviando,       setEnviando]       = useState(false);
   const [cargando,       setCargando]       = useState(true);
@@ -80,8 +86,21 @@ const EditarProducto = () => {
         // con "Categoría inválida.".
         setCategoria(normalizarCategoria(data.categoria) || "comida");
         setDescripcion(data.descripcion || "");
-        setImagenOriginal(data.imagen   || "");
-        setPreviewUrl(data.imagen       || null);
+
+        // 🔧 Retrocompatibilidad: productos publicados antes de este
+        // cambio no tienen `imagenes` (array) — solo `imagen` (string).
+        // Mismo fallback que Producto.jsx.
+        const imagenesExistentes = Array.isArray(data.imagenes) && data.imagenes.length > 0
+          ? data.imagenes
+          : [data.imagen].filter(Boolean);
+
+        setFotos(
+          imagenesExistentes.slice(0, MAX_FOTOS).map((url, idx) => ({
+            id:   `existing-${idx}-${url}`,
+            kind: "existing",
+            url,
+          })),
+        );
       } catch (err) {
         console.error("Error al cargar el producto:", err);
         mostrarToast("No se pudo cargar el producto.", "error");
@@ -93,33 +112,61 @@ const EditarProducto = () => {
     cargar();
   }, [productoId, user, navigate]);
 
-  // Limpiar object URL al desmontar
+  // Limpiar los object URL de fotos NUEVAS al desmontar (las
+  // "existing" son URLs remotas reales, no hay nada que revocar ahí).
   useEffect(() => {
     return () => {
-      if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+      fotos.forEach((f) => { if (f.kind === "new") URL.revokeObjectURL(f.url); });
     };
-  }, [previewUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const MAX_IMAGEN_MB = 5;
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const filesSeleccionados = Array.from(e.target.files || []);
+    e.target.value = "";
 
-    if (!file.type.startsWith("image/")) {
-      mostrarToast("El archivo debe ser una imagen (JPG o PNG).", "error");
-      e.target.value = "";
-      return;
-    }
-    if (file.size > MAX_IMAGEN_MB * 1024 * 1024) {
-      mostrarToast(`La imagen supera ${MAX_IMAGEN_MB}MB. Elige una más liviana.`, "error");
-      e.target.value = "";
+    if (filesSeleccionados.length === 0) return;
+
+    const espacioDisponible = MAX_FOTOS - fotos.length;
+    if (espacioDisponible <= 0) {
+      mostrarToast(`Ya tienes el máximo de ${MAX_FOTOS} fotos.`, "error");
       return;
     }
 
-    setArchivo(file);
-    if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(URL.createObjectURL(file));
+    const nuevas = [];
+    const descartadosPorLimite = filesSeleccionados.length > espacioDisponible;
+
+    for (const file of filesSeleccionados.slice(0, espacioDisponible)) {
+      if (!file.type.startsWith("image/")) {
+        mostrarToast("Cada archivo debe ser una imagen (JPG o PNG).", "error");
+        continue;
+      }
+      if (file.size > MAX_IMAGEN_MB * 1024 * 1024) {
+        mostrarToast(`"${file.name}" supera ${MAX_IMAGEN_MB}MB. Elige una más liviana.`, "error");
+        continue;
+      }
+      nuevas.push({
+        id:   `new-${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
+        kind: "new",
+        file,
+        url:  URL.createObjectURL(file),
+      });
+    }
+
+    if (nuevas.length > 0) setFotos((prev) => [...prev, ...nuevas]);
+    if (descartadosPorLimite) {
+      mostrarToast(`Solo se agregaron ${espacioDisponible} foto(s): el máximo es ${MAX_FOTOS}.`, "error");
+    }
+  };
+
+  const quitarFoto = (id) => {
+    setFotos((prev) => {
+      const objetivo = prev.find((f) => f.id === id);
+      if (objetivo?.kind === "new") URL.revokeObjectURL(objetivo.url);
+      return prev.filter((f) => f.id !== id);
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -150,20 +197,27 @@ const EditarProducto = () => {
 
     setEnviando(true);
     try {
-      let imagenFinal = imagenOriginal;
+      const fotosNuevas = fotos.filter((f) => f.kind === "new");
 
-      if (archivo) {
-        setBtnTexto("Comprimiendo imagen...");
-        const fileComprimido = await comprimirImagen(archivo);
-        setBtnTexto("Subiendo imagen...");
-        imagenFinal = await subirImagenImgBB(fileComprimido);
+      let urlsNuevas = [];
+      if (fotosNuevas.length > 0) {
+        setBtnTexto(fotosNuevas.length > 1 ? "Subiendo fotos..." : "Subiendo imagen...");
+        urlsNuevas = await subirImagenes(fotosNuevas.map((f) => f.file));
       }
+
+      // 🔧 Reconstruye el array final RESPETANDO el orden visual actual
+      // (drag no soportado, pero sí quitar/agregar en cualquier orden):
+      // cada slot "existing" aporta su URL tal cual, cada "new" toma la
+      // siguiente URL recién subida, en el mismo orden en que se subieron.
+      let cursor = 0;
+      const imagenesFinal = fotos.map((f) =>
+        f.kind === "existing" ? f.url : urlsNuevas[cursor++],
+      );
 
       setBtnTexto("Guardando...");
       await actualizarProducto(productoId, {
         titulo, precio: precioNum, categoria, descripcion,
-        imagen: imagenFinal,
-        imagenOriginal,
+        imagenes: imagenesFinal,
       });
 
       navigate("/perfil", { state: { toastEditar: true } });
@@ -174,17 +228,6 @@ const EditarProducto = () => {
       setEnviando(false);
       enviandoRef.current = false;
     }
-  };
-
-  const imagenAreaTexto = () => {
-    if (!archivo) {
-      return imagenOriginal
-        ? "Imagen actual ✓  Toca para cambiarla"
-        : "Toca para abrir la cámara o galería";
-    }
-    const nombre   = archivo.name.length > 30 ? archivo.name.substring(0, 27) + "..." : archivo.name;
-    const tamanoMB = (archivo.size / 1024 / 1024).toFixed(1);
-    return `Imagen seleccionada ✓  ${nombre} · ${tamanoMB}MB → se comprimirá al subir`;
   };
 
   // ✅ Pantalla de carga limpia utilizando el nuevo Spinner
@@ -220,29 +263,68 @@ const EditarProducto = () => {
       <main className="relative -mt-6 px-4">
         <form onSubmit={handleSubmit} className="rounded-t-[32px] bg-card p-5 pb-6 shadow-soft">
 
-          {/* FOTO */}
+          {/* FOTOS (hasta 4) */}
           <div className="mb-5">
-            <label className={labelClass}>Foto del producto *</label>
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className={`mt-2 cursor-pointer rounded-2xl border-2 border-dashed bg-background p-5 text-center transition-colors ${
-                (archivo || imagenOriginal) ? "border-[#287653]" : "border-ink/15"
-              }`}
-            >
-              {!previewUrl && (
+            <div className="flex items-baseline justify-between">
+              <label className={labelClass}>Fotos del producto</label>
+              <span className="text-[11px] font-semibold text-ink/40">{fotos.length}/{MAX_FOTOS}</span>
+            </div>
+
+            {fotos.length === 0 ? (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-2 cursor-pointer rounded-2xl border-2 border-dashed border-ink/15 bg-background p-5 text-center transition-colors"
+              >
                 <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Camera size={26} />
                 </span>
-              )}
+                <p className="mt-2 text-[14.5px] font-extrabold text-ink">Toca para abrir la cámara o galería</p>
+                <p className="mt-1 text-[12px] font-semibold text-ink/40">
+                  Hasta {MAX_FOTOS} fotos · JPG, PNG · Máx. 5MB c/u
+                </p>
+              </div>
+            ) : (
+              <div className="mt-2 grid grid-cols-4 gap-2">
+                {fotos.map((f, idx) => (
+                  <div key={f.id} className="relative aspect-square overflow-hidden rounded-2xl bg-background">
+                    <img src={f.url} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" />
+                    {idx === 0 && (
+                      <span className="absolute bottom-1 left-1 rounded-chip bg-black/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                        Portada
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => quitarFoto(f.id)}
+                      aria-label={`Quitar foto ${idx + 1}`}
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
+                    >
+                      <X size={12} strokeWidth={3} />
+                    </button>
+                  </div>
+                ))}
 
-              <p className="mt-2 text-[13px] font-bold text-ink/70">{imagenAreaTexto()}</p>
+                {fotos.length < MAX_FOTOS && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    aria-label="Agregar foto"
+                    className="flex aspect-square items-center justify-center rounded-2xl border-2 border-dashed border-ink/15 bg-background text-ink/30 transition-colors hover:border-primary/40 hover:text-primary"
+                  >
+                    <Plus size={22} />
+                  </button>
+                )}
+              </div>
+            )}
 
-              {previewUrl && (
-                <img src={previewUrl} alt="Preview"
-                  className="mt-3 h-[150px] w-full rounded-2xl object-cover" />
-              )}
-            </div>
-            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+            />
           </div>
 
           {/* TÍTULO */}

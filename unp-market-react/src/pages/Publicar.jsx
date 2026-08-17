@@ -2,13 +2,18 @@
 import { useState, useEffect, useRef }          from "react";
 import { useNavigate }                          from "react-router-dom";
 import { doc, getDoc, collection, writeBatch, serverTimestamp } from "firebase/firestore";
-import { ChevronLeft, Camera, Lightbulb, Send } from "lucide-react";
+import { ChevronLeft, Camera, Lightbulb, Send, X, Plus } from "lucide-react";
 import { db }                                   from "../services/firebase";
 import { useAuth }                              from "../context/AuthContext";
-import { comprimirImagen, subirImagenImgBB }    from "../utils/imageUtils";
+import { subirImagenes }                        from "../utils/imageUtils";
 import { obtenerContactoPrivado }               from "../services/userService";
 import { crearProducto }                        from "../services/productService";
 import Toast, { useToast }                      from "../components/Toast"; // ✅ Nuevo import
+
+// 🖼️ Múltiples fotos por producto — ver EditarProducto.jsx (misma
+// constante, mismo comportamiento) y productService.js (mismo tope
+// del lado del servidor).
+const MAX_FOTOS = 4;
 
 // Placeholder — reemplazar por el archivo final de la mascota (mismo
 // ícono que ya usa el header de Home.jsx, para mantener consistencia).
@@ -28,8 +33,10 @@ const Publicar = () => {
   const [precio,      setPrecio]      = useState("");
   const [categoria,   setCategoria]   = useState("comida");
   const [descripcion, setDescripcion] = useState("");
-  const [archivo,     setArchivo]     = useState(null);
-  const [previewUrl,  setPreviewUrl]  = useState(null);
+  // 🖼️ Hasta MAX_FOTOS archivos. `previews` guarda { id, file, url }
+  // por foto: `url` es un object URL (URL.createObjectURL) que se debe
+  // revocar al quitar la foto o desmontar, para no filtrar memoria.
+  const [previews,    setPreviews]    = useState([]);
   const [btnTexto,    setBtnTexto]    = useState("Publicar Producto");
   const [enviando,    setEnviando]    = useState(false);
   const [progreso,    setProgreso]    = useState(0); // 🔧 feedback real de subida (0–100)
@@ -46,35 +53,64 @@ const Publicar = () => {
   // síncrona, sin esperar al render.
   const enviandoRef = useRef(false);
 
-  // Limpiar object URL al desmontar
+  // Limpiar TODOS los object URL al desmontar (no solo al cambiar,
+  // sino también los que ya existían al momento de desmontar).
   useEffect(() => {
-    return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); };
-  }, [previewUrl]);
+    return () => { previews.forEach((p) => URL.revokeObjectURL(p.url)); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const MAX_IMAGEN_MB = 5;
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const filesSeleccionados = Array.from(e.target.files || []);
+    e.target.value = ""; // permite volver a elegir el mismo archivo más adelante
 
-    // 🔧 Validar ANTES de aceptar el archivo: sin esto, un archivo
-    // gigante o de tipo inválido puede colgar la compresión con
-    // Canvas más adelante y terminar en un "Error al publicar"
-    // genérico que no le dice nada al usuario sobre la causa real.
-    if (!file.type.startsWith("image/")) {
-      mostrarToast("El archivo debe ser una imagen (JPG o PNG).", "error");
-      e.target.value = "";
-      return;
-    }
-    if (file.size > MAX_IMAGEN_MB * 1024 * 1024) {
-      mostrarToast(`La imagen supera ${MAX_IMAGEN_MB}MB. Elige una más liviana.`, "error");
-      e.target.value = "";
+    if (filesSeleccionados.length === 0) return;
+
+    const espacioDisponible = MAX_FOTOS - previews.length;
+    if (espacioDisponible <= 0) {
+      mostrarToast(`Ya elegiste el máximo de ${MAX_FOTOS} fotos.`, "error");
       return;
     }
 
-    setArchivo(file);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(URL.createObjectURL(file));
+    const nuevos = [];
+    let descartadosPorLimite = filesSeleccionados.length > espacioDisponible;
+
+    for (const file of filesSeleccionados.slice(0, espacioDisponible)) {
+      // 🔧 Validar ANTES de aceptar el archivo: sin esto, un archivo
+      // gigante o de tipo inválido puede colgar la compresión con
+      // Canvas más adelante y terminar en un "Error al publicar"
+      // genérico que no le dice nada al usuario sobre la causa real.
+      if (!file.type.startsWith("image/")) {
+        mostrarToast("Cada archivo debe ser una imagen (JPG o PNG).", "error");
+        continue;
+      }
+      if (file.size > MAX_IMAGEN_MB * 1024 * 1024) {
+        mostrarToast(`"${file.name}" supera ${MAX_IMAGEN_MB}MB. Elige una más liviana.`, "error");
+        continue;
+      }
+      nuevos.push({
+        id:   `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
+        file,
+        url:  URL.createObjectURL(file),
+      });
+    }
+
+    if (nuevos.length > 0) {
+      setPreviews((prev) => [...prev, ...nuevos]);
+    }
+    if (descartadosPorLimite) {
+      mostrarToast(`Solo se agregaron ${espacioDisponible} foto(s): el máximo es ${MAX_FOTOS}.`, "error");
+    }
+  };
+
+  const quitarFoto = (id) => {
+    setPreviews((prev) => {
+      const objetivo = prev.find((p) => p.id === id);
+      if (objetivo) URL.revokeObjectURL(objetivo.url);
+      return prev.filter((p) => p.id !== id);
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -125,22 +161,16 @@ const Publicar = () => {
     setEnviando(true);
     setProgreso(0);
     try {
-      setBtnTexto("Comprimiendo imagen...");
-      const fileComprimido = archivo ? await comprimirImagen(archivo) : null;
-      setProgreso(15);
-
-      setBtnTexto("Subiendo imagen...");
-      const imagenFinal = await subirImagenImgBB(fileComprimido, (pct) => {
-        // La compresión ya ocupó los primeros 15 puntos; el 85% restante
-        // se reparte según el progreso real de bytes subidos a ImgBB.
-        setProgreso(15 + Math.round(pct * 0.8));
-      });
-      setProgreso(95);
+      setBtnTexto(previews.length > 1 ? "Subiendo fotos..." : "Subiendo imagen...");
+      const imagenesFinal = await subirImagenes(
+        previews.map((p) => p.file),
+        (pct) => setProgreso(pct),
+      );
 
       setBtnTexto("Publicando...");
       const nuevoId = await crearProducto({
         titulo, precio: precioNum, categoria, descripcion,
-        imagen: imagenFinal, user, perfil,
+        imagenes: imagenesFinal, user, perfil,
       });
       setProgreso(100);
 
@@ -181,13 +211,6 @@ const Publicar = () => {
     }
   };
 
-  const imagenAreaTexto = () => {
-    if (!archivo) return "Toca para abrir la cámara o galería";
-    const nombre   = archivo.name.length > 30 ? archivo.name.substring(0, 27) + "..." : archivo.name;
-    const tamanoMB = (archivo.size / 1024 / 1024).toFixed(1);
-    return `Imagen seleccionada ✓  ${nombre} · ${tamanoMB}MB → se comprimirá al subir`;
-  };
-
   return (
     <div className="app-shell bg-background pb-8 font-sans">
 
@@ -218,36 +241,68 @@ const Publicar = () => {
       <main className="relative -mt-6 px-4">
         <form onSubmit={handleSubmit} className="rounded-t-[32px] bg-card p-5 pb-6 shadow-soft">
 
-          {/* FOTO */}
+          {/* FOTOS (hasta 4) */}
           <div className="mb-5">
-            <label className={labelClass}>Foto del producto *</label>
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className={`mt-2 cursor-pointer rounded-2xl border-2 border-dashed bg-background p-5 text-center transition-colors ${
-                archivo ? "border-[#287653]" : "border-ink/15"
-              }`}
-            >
-              {!previewUrl && (
+            <div className="flex items-baseline justify-between">
+              <label className={labelClass}>Fotos del producto</label>
+              <span className="text-[11px] font-semibold text-ink/40">{previews.length}/{MAX_FOTOS}</span>
+            </div>
+
+            {previews.length === 0 ? (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-2 cursor-pointer rounded-2xl border-2 border-dashed border-ink/15 bg-background p-5 text-center transition-colors"
+              >
                 <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Camera size={26} />
                 </span>
-              )}
+                <p className="mt-2 text-[14.5px] font-extrabold text-ink">Toca para abrir la cámara o galería</p>
+                <p className="mt-1 text-[12px] font-semibold text-ink/40">
+                  Hasta {MAX_FOTOS} fotos · JPG, PNG · Máx. 5MB c/u
+                </p>
+              </div>
+            ) : (
+              <div className="mt-2 grid grid-cols-4 gap-2">
+                {previews.map((p, idx) => (
+                  <div key={p.id} className="relative aspect-square overflow-hidden rounded-2xl bg-background">
+                    <img src={p.url} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" />
+                    {idx === 0 && (
+                      <span className="absolute bottom-1 left-1 rounded-chip bg-black/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                        Portada
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => quitarFoto(p.id)}
+                      aria-label={`Quitar foto ${idx + 1}`}
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
+                    >
+                      <X size={12} strokeWidth={3} />
+                    </button>
+                  </div>
+                ))}
 
-              {!archivo ? (
-                <>
-                  <p className="mt-2 text-[14.5px] font-extrabold text-ink">{imagenAreaTexto()}</p>
-                  <p className="mt-1 text-[12px] font-semibold text-ink/40">Formatos: JPG, PNG · Máx. 5MB</p>
-                </>
-              ) : (
-                <p className="mt-2 text-[12.5px] font-bold text-ink/60">{imagenAreaTexto()}</p>
-              )}
+                {previews.length < MAX_FOTOS && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    aria-label="Agregar foto"
+                    className="flex aspect-square items-center justify-center rounded-2xl border-2 border-dashed border-ink/15 bg-background text-ink/30 transition-colors hover:border-primary/40 hover:text-primary"
+                  >
+                    <Plus size={22} />
+                  </button>
+                )}
+              </div>
+            )}
 
-              {previewUrl && (
-                <img src={previewUrl} alt="Preview"
-                  className="mt-3 h-[150px] w-full rounded-2xl object-cover" />
-              )}
-            </div>
-            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+            />
           </div>
 
           {/* TÍTULO */}

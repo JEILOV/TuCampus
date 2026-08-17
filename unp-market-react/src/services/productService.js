@@ -50,7 +50,23 @@ export const normalizarCategoria = (categoria) => {
   return MIGRACION_CATEGORIAS[categoria] || null;
 };
 
-export const crearProducto = async ({ titulo, precio, categoria, descripcion, imagen, user, perfil }) => {
+// 🖼️ Múltiples fotos por producto (hasta 4).
+// Único lugar que decide cómo se guarda `imagen` (portada, string —
+// campo legado que YA leen ProductCard.jsx, GeneradorStoryModal.jsx,
+// notificationService.js, etc.) vs `imagenes` (array nuevo, opcional).
+// Blindaje de entrada: acepta `imagenes` (array) y/o `imagen` (string
+// suelto, retrocompatible con quien todavía llame a esta función con
+// la firma vieja) y siempre devuelve una lista limpia y acotada a 4.
+const MAX_FOTOS_PRODUCTO = 4;
+const normalizarImagenes = (imagenes, imagenSuelta) => {
+  const fuente = Array.isArray(imagenes) && imagenes.length > 0 ? imagenes : [imagenSuelta];
+  return fuente
+    .map((url) => (typeof url === "string" ? url.trim() : ""))
+    .filter(Boolean)
+    .slice(0, MAX_FOTOS_PRODUCTO);
+};
+
+export const crearProducto = async ({ titulo, precio, categoria, descripcion, imagen, imagenes, user, perfil }) => {
   try {
     if (!user?.uid) {
       throw new Error("Usuario no autenticado.");
@@ -75,7 +91,12 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
       throw new Error("Título y descripción son obligatorios.");
     }
 
-    const prefijos = generarPrefijos(tituloLimpio);
+    const prefijos       = generarPrefijos(tituloLimpio);
+    const imagenesLimpias = normalizarImagenes(imagenes, imagen);
+    // 🔒 Retrocompatibilidad total: `imagen` sigue siendo la portada
+    // (primera foto) para que Home/ProductCard/GeneradorStoryModal, que
+    // NUNCA leen `imagenes`, sigan funcionando sin ningún cambio.
+    const imagenPortada  = imagenesLimpias[0] || "";
     const batch    = writeBatch(db);
 
     const nuevoRef = doc(collection(db, "productos"));
@@ -84,7 +105,13 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
       precio:         precioNum,
       categoria:      categoriaValida,
       descripcion:    descripcionLimpia,
-      imagen:         imagen || "",
+      imagen:         imagenPortada,
+      // 🆕 Array multi-foto (hasta 4). Se guarda SIEMPRE que haya al
+      // menos 1 foto, incluso con un solo elemento — así Producto.jsx
+      // tiene una única fuente de verdad cuando existe, y su propio
+      // fallback (`imagenes?.length > 0 ? imagenes : [imagenUrl]`)
+      // cubre los productos viejos que nunca tuvieron este campo.
+      ...(imagenesLimpias.length > 0 ? { imagenes: imagenesLimpias } : {}),
       vendedor:       perfil?.nombre   || user.displayName || "Vendedor UNP",
       vendedorNombre: perfil?.nombre   || user.displayName || "Vendedor UNP",
       avatarVendedor: perfil?.avatar   || "",
@@ -137,7 +164,7 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
       universidadId: perfil?.universidadId || null,
       titulo:        tituloLimpio,
       productoId:    nuevoRef.id,
-      imagen:        imagen || undefined,
+      imagen:        imagenPortada || undefined,
       excluirUid:    user.uid, // el vendedor no se autonotifica
     });
 
@@ -148,7 +175,7 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
   }
 };
 
-export const actualizarProducto = async (productoId, { titulo, precio, categoria, descripcion, imagen, imagenOriginal }) => {
+export const actualizarProducto = async (productoId, { titulo, precio, categoria, descripcion, imagen, imagenOriginal, imagenes }) => {
   try {
     // 🔧 Mismo blindaje que crearProducto: la regla de `update` también
     // exige esProductoValido() sobre el documento resultante, así que
@@ -170,12 +197,24 @@ export const actualizarProducto = async (productoId, { titulo, precio, categoria
     }
 
     const prefijos = generarPrefijos(tituloLimpio);
+
+    // 🖼️ Igual criterio que crearProducto: `imagenes` (array, hasta 4)
+    // es la fuente de verdad si viene informado; `imagen`/`imagenOriginal`
+    // son el fallback de la firma vieja (edición sin tocar la foto o
+    // llamadores que aún no migraron). `imagen` (portada) se recalcula
+    // siempre a partir de la primera foto del array final.
+    const imagenesLimpias = normalizarImagenes(imagenes, imagen || imagenOriginal);
+    const imagenPortada   = imagenesLimpias[0] || "";
+
     await updateDoc(doc(db, "productos", productoId), {
       titulo:       tituloLimpio,
       precio:       precioNum,
       categoria:    categoriaValida,
       descripcion:  descripcionLimpia,
-      imagen:       imagen || imagenOriginal || "",
+      imagen:       imagenPortada,
+      // Ver nota en crearProducto: se guarda el array completo cuando
+      // hay al menos 1 foto, para que Producto.jsx tenga el carrusel.
+      ...(imagenesLimpias.length > 0 ? { imagenes: imagenesLimpias } : {}),
       keywords:     prefijos,
       fechaEdicion: serverTimestamp(),
     });
