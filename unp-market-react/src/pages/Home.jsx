@@ -1,7 +1,7 @@
 // src/pages/Home.jsx
-import { useState, useEffect, useRef }              from "react";
+import { useState, useEffect, useMemo, useRef }     from "react";
 import { useNavigate, useSearchParams }             from "react-router-dom";
-import { Search, ChevronDown, MapPin }              from "lucide-react";
+import { ChevronDown, MapPin, SearchX }             from "lucide-react";
 import { useAuth }                                  from "../context/AuthContext";
 import { useCampus }                                from "../context/CampusContext";
 import { useProducts }                              from "../hooks/useProducts";
@@ -11,32 +11,14 @@ import BotonNotificaciones                          from "../components/BotonNot
 import BannerNotificaciones                          from "../components/BannerNotificaciones";
 import ProductCard                                  from "../components/ProductCard";
 import CarruselAnuncios                             from "../components/CarruselAnuncios";
-import { CATEGORY_ICON_MAP }                        from "../components/CategoryIcons";
+import FeedFiltros, {
+  FILTROS_AVANZADOS_INICIALES,
+}                                                    from "../components/FeedFiltros";
 import { LISTA_UNIVERSIDADES, obtenerColorUniversidad } from "../config/universidades";
 
 // ── Constantes ───────────────────────────────────────────────
 // Placeholder de imagen — reemplazar por el archivo final.
 const MASCOTA_ICONO = "/assets/mascota-icono-placeholder.png";
-
-// 🔧 Categorías ampliadas — deben coincidir EXACTAMENTE (misma key)
-// con el <select> de Publicar.jsx / EditarProducto.jsx y con
-// CATEGORIAS_VALIDAS en services/productService.js.
-const CATEGORIAS = [
-  { key: "todos",      label: "Todos" },
-  { key: "comida",     label: "Comida & Snacks" },
-  { key: "tecnologia", label: "Tecnología" },
-  { key: "ropa",       label: "Ropa & Moda" },
-  { key: "materiales", label: "Materiales & Libros" },
-  { key: "servicios",  label: "Servicios & Tipeos" },
-  { key: "otros",      label: "Otros" },
-];
-
-const OPCIONES_ORDEN = [
-  { id: "recientes",       label: "Más recientes"   },
-  { id: "precio_asc",      label: "Menor precio"    },
-  { id: "precio_desc",     label: "Mayor precio"    },
-  { id: "mejor_valorados", label: "Mejor valorados ⭐" },
-];
 
 // ── Componente principal ─────────────────────────────────────
 const Home = () => {
@@ -46,12 +28,14 @@ const Home = () => {
   const { user, perfil, favoritos } = useAuth();
 
   // ── Estado de UI ─────────────────────────────────────────
-  const [busqueda,         setBusqueda]         = useState("");
-  const [busquedaFirebase, setBusquedaFirebase] = useState("");
-  const [categoriaActiva,  setCategoriaActiva]  = useState("todos");
-  const [toasts,           setToasts]           = useState([]);
-  const [orden,            setOrden]            = useState("recientes");
-  const [menuOrdenAbierto, setMenuOrdenAbierto] = useState(false);
+  // 🔧 `busqueda` ahora llega YA debounced (250ms) desde FeedFiltros —
+  // Home.jsx ya no necesita su propio setTimeout duplicado. Se sigue
+  // usando tanto para el filtro server-side (keywords, vía useProducts)
+  // como para el filtro client-side fino de título+descripción de abajo.
+  const [busqueda,          setBusqueda]          = useState("");
+  const [categoriaActiva,   setCategoriaActiva]   = useState("todos");
+  const [filtrosAvanzados,  setFiltrosAvanzados]  = useState(FILTROS_AVANZADOS_INICIALES);
+  const [toasts,            setToasts]            = useState([]);
 
   // 🏫 Multicampus — sede que el Home está EXPLORANDO en este momento.
   // Ahora vive en CampusContext (compartido con toda la app) en vez de
@@ -82,17 +66,11 @@ const Home = () => {
   // ✅ Toast helper unificado (modo array)
   const mostrarToast = useToast(setToasts);
 
-  // ── Debounce búsqueda ────────────────────────────────────
-  useEffect(() => {
-    const timer = setTimeout(() => setBusquedaFirebase(busqueda), 500);
-    return () => clearTimeout(timer);
-  }, [busqueda]);
-
-  // ── Hook: Productos ──────────────────────────────────────
+  // ── Hook: Productos (server-side: sede, categoría, orden, keywords) ──
   const { productos, cargando, todoCargado, cargarMas } = useProducts({
-    orden,
+    orden: filtrosAvanzados.orden,
     categoriaActiva,
-    busquedaFirebase,
+    busquedaFirebase: busqueda,
     universidadId: universidadActiva, // 🏫 Multicampus — sede que se está explorando (puede diferir de la del perfil)
     onError: (msg) => mostrarToast(msg, "error"),
   });
@@ -109,15 +87,51 @@ const Home = () => {
     return () => observerRef.current?.disconnect();
   }, [cargarMas, todoCargado]);
 
-  // ── Handlers ─────────────────────────────────────────────
-  const productosFiltrados = productos.filter((p) =>
-    busqueda.trim() === "" ||
-    (p.titulo || "").toLowerCase().includes(busqueda.toLowerCase())
-  );
+  // ── Filtrado client-side ──────────────────────────────────
+  // Se aplica sobre lo que ya trajo useProducts (server-side ya filtró
+  // por sede/categoría/keywords/orden). Acá se afinan:
+  //   · texto libre en título O descripción (más permisivo que el
+  //     array-contains exacto de keywords que hace Firestore)
+  //   · condición (Nuevo/Como nuevo/Usado — ver nota en FeedFiltros.jsx
+  //     sobre por qué hoy no hay productos con este campo)
+  //   · rango de precio mín/máx
+  const productosFiltrados = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
+    const { condicion, precioMin, precioMax } = filtrosAvanzados;
+    const min = precioMin !== "" ? Number(precioMin) : null;
+    const max = precioMax !== "" ? Number(precioMax) : null;
+
+    return productos.filter((p) => {
+      if (texto) {
+        const enTitulo      = (p.titulo || "").toLowerCase().includes(texto);
+        const enDescripcion = (p.descripcion || "").toLowerCase().includes(texto);
+        if (!enTitulo && !enDescripcion) return false;
+      }
+
+      if (condicion !== "todos" && p.condicion !== condicion) return false;
+
+      const precio = Number(p.precio) || 0;
+      if (min !== null && precio < min) return false;
+      if (max !== null && precio > max) return false;
+
+      return true;
+    });
+  }, [productos, busqueda, filtrosAvanzados]);
+
+  const hayFiltrosActivos =
+    busqueda.trim() !== "" ||
+    categoriaActiva !== "todos" ||
+    filtrosAvanzados.condicion !== "todos" ||
+    filtrosAvanzados.precioMin !== "" ||
+    filtrosAvanzados.precioMax !== "";
+
+  const handleResetearFiltros = () => {
+    setBusqueda("");
+    setCategoriaActiva("todos");
+    setFiltrosAvanzados(FILTROS_AVANZADOS_INICIALES);
+  };
 
   const handleVerDetalle = (id) => navigate(`/producto?id=${id}`);
-
-  const labelOrden = OPCIONES_ORDEN.find((o) => o.id === orden)?.label ?? "Más recientes";
 
   // 🎨 Multicampus: el color del header sigue la sede que se está
   // EXPLORANDO (`universidadActiva`), no necesariamente la del perfil
@@ -212,18 +226,18 @@ const Home = () => {
 
       {tabActiva === "inicio" && (
         <>
-          {/* Buscador — se monta sobre el borde inferior del header */}
-          <div className="relative z-10 -mt-5 px-4">
-            <div className="flex items-center gap-2.5 rounded-btn bg-card px-4 py-3.5 shadow-softLg">
-              <Search size={18} className="shrink-0 text-ink/40" />
-              <input
-                type="text"
-                placeholder="Buscar postres, libros, tipeos..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full bg-transparent text-sm font-semibold text-ink placeholder:font-medium placeholder:text-ink/40 focus:outline-none"
-              />
-            </div>
+          {/* Buscador + Chips de categoría + Filtros avanzados — se monta
+              sobre el borde inferior del header. Reemplaza al bloque de
+              búsqueda simple + categorías con íconos que había antes:
+              ahora todo vive en un único componente reusable. */}
+          <div className="relative z-10 -mt-5">
+            <FeedFiltros
+              categoriaActiva={categoriaActiva}
+              onCategoriaChange={setCategoriaActiva}
+              filtros={filtrosAvanzados}
+              onAplicarFiltros={setFiltrosAvanzados}
+              onBusquedaChange={setBusqueda}
+            />
           </div>
 
           {/* Banner discreto para activar notificaciones push (FCM).
@@ -235,38 +249,6 @@ const Home = () => {
               🏫 Multicampus: se le pasa la sede activa para traer sus
               anuncios exclusivos + los globales (ver useAnuncios.js). */}
           <CarruselAnuncios universidadId={universidadActiva} />
-
-          {/* Categorías — carrusel horizontal */}
-          <nav
-            aria-label="Categorías"
-            className="mt-5 flex gap-5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {CATEGORIAS.map(({ key, label }) => {
-              const Icon = CATEGORY_ICON_MAP[key];
-              const activa = categoriaActiva === key;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setCategoriaActiva(key)}
-                  className="flex shrink-0 flex-col items-center gap-1.5"
-                >
-                  {/* 🏫 Multicampus: bg-[var(--color-accent)] en vez de
-                      bg-primary — sigue la sede que se está explorando. */}
-                  <span
-                    className={`flex h-14 w-14 items-center justify-center rounded-card shadow-soft transition-all duration-200 ease-out active:scale-90 ${
-                      activa ? "bg-[var(--color-accent)]" : "bg-card"
-                    }`}
-                  >
-                    <Icon color={activa ? "#F7EEDC" : "#102C4D"} />
-                  </span>
-                  <span className={`text-[11px] font-semibold transition-colors duration-200 ease-out ${activa ? "text-[var(--color-accent)]" : "text-ink/60"}`}>
-                    {label}
-                  </span>
-                  <span className={`h-[3px] w-4 rounded-full transition-colors duration-200 ease-out ${activa ? "bg-[var(--color-accent)]" : "bg-transparent"}`} />
-                </button>
-              );
-            })}
-          </nav>
         </>
       )}
 
@@ -274,44 +256,41 @@ const Home = () => {
         <section className="px-4 pb-28 pt-5">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-extrabold text-ink">Destacados</h2>
-            <div className="relative">
-              <button
-                onClick={() => setMenuOrdenAbierto(!menuOrdenAbierto)}
-                className="flex items-center gap-1.5 rounded-chip bg-card px-3.5 py-1.5 text-[13px] font-bold text-ink shadow-soft"
-              >
-                {labelOrden}
-                <ChevronDown
-                  size={14}
-                  strokeWidth={2.5}
-                  className={`transition-transform ${menuOrdenAbierto ? "rotate-180" : ""}`}
-                />
-              </button>
-              {menuOrdenAbierto && (
-                <>
-                  <div onClick={() => setMenuOrdenAbierto(false)} className="fixed inset-0 z-[90]" />
-                  <div className="absolute right-0 top-full z-[100] mt-2 flex min-w-[150px] flex-col overflow-hidden rounded-card bg-card shadow-softLg">
-                    {OPCIONES_ORDEN.map((opt) => (
-                      <button
-                        key={opt.id}
-                        onClick={() => { setOrden(opt.id); setMenuOrdenAbierto(false); }}
-                        className={`px-4 py-3 text-left text-[13px] font-bold ${
-                          orden === opt.id ? "bg-primary/5 text-primary" : "text-ink/60"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            {hayFiltrosActivos && (
+              <span className="text-[12px] font-bold text-ink/40">
+                {productosFiltrados.length} resultado{productosFiltrados.length === 1 ? "" : "s"}
+              </span>
+            )}
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            {productosFiltrados.map((p) => (
-              <ProductCard key={p.id} producto={p} onVerDetalle={handleVerDetalle} />
-            ))}
-          </div>
+          {productosFiltrados.length > 0 ? (
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              {productosFiltrados.map((p) => (
+                <ProductCard key={p.id} producto={p} onVerDetalle={handleVerDetalle} />
+              ))}
+            </div>
+          ) : !cargando ? (
+            // ── Empty state: sin coincidencias con los filtros actuales ──
+            <div className="mt-10 flex flex-col items-center gap-3 px-6 text-center">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-ink/5">
+                <SearchX size={28} className="text-ink/30" strokeWidth={2} />
+              </span>
+              <p className="text-[15px] font-extrabold text-ink">
+                No encontramos productos con esos filtros
+              </p>
+              <p className="text-[13px] font-semibold text-ink/50">
+                Probá con otra palabra clave o ajustá los filtros aplicados.
+              </p>
+              {hayFiltrosActivos && (
+                <button
+                  onClick={handleResetearFiltros}
+                  className="mt-1 rounded-btn bg-primary px-5 py-2.5 text-[13.5px] font-extrabold text-white shadow-soft transition-transform active:scale-95"
+                >
+                  Limpiar búsqueda y filtros
+                </button>
+              )}
+            </div>
+          ) : null}
 
           {!todoCargado && <div ref={sentinelRef} className="h-2" />}
 
