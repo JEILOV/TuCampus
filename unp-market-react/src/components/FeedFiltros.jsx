@@ -203,15 +203,24 @@ const FeedFiltros = ({
         </button>
       </div>
 
-      {/* ── Drawer inferior: Filtros avanzados ── */}
+      {/* ── Drawer inferior: Filtros avanzados ──
+          🔧 z-index en dos capas explícitas, por encima de BottomNav
+          (fixed, z-40): el overlay oscuro en z-[59] (tapa también la
+          barra inferior mientras el drawer está abierto) y el panel
+          del drawer en z-[60] (siempre encima del overlay). */}
       {drawerAbierto && (
-        <div
-          onClick={cerrarDrawer}
-          className="fixed inset-0 z-[200] flex items-end justify-center bg-ink/45 backdrop-blur-sm"
-        >
+        <div className="fixed inset-0 z-[60] flex items-end justify-center">
+          {/* Overlay/backdrop — clic afuera cierra el drawer */}
+          <div
+            onClick={cerrarDrawer}
+            aria-hidden="true"
+            className="absolute inset-0 z-[59] bg-ink/45 backdrop-blur-sm"
+          />
+
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[480px] rounded-t-[32px] bg-card px-5 pb-8 pt-3 shadow-softLg"
+            className="relative z-[60] w-full max-w-[480px] rounded-t-[32px] bg-card px-5 pt-3 shadow-softLg"
+            style={{ paddingBottom: "max(2rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
           >
             {/* Handle visual */}
             <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-ink/15" />
@@ -317,6 +326,7 @@ const FeedFiltros = ({
               </button>
             </div>
           </div>
+        </div>
         </div>
       )}
     </div>
