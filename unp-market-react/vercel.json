@@ -1,6 +1,17 @@
 {
   "rewrites": [
     {
+      "source": "/producto",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|WhatsApp|TelegramBot|Twitterbot|Discordbot|LinkedInBot|Slackbot|SkypeUriPreview|Pinterest|redditbot|vkShare|Applebot|W3C_Validator|Googlebot|Bingbot|Embedly|Iframely|Outbrain|Quora Link Preview|Viber|Line).*"
+        }
+      ],
+      "destination": "/api/og-preview"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
