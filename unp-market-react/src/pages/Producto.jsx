@@ -112,6 +112,7 @@ const Producto = () => {
       const chat = await obtenerOCrearChat(currentUser.uid, producto.userUid, {
         productoId,
         productoTitulo:  producto.titulo,
+        productoPrecio:  producto.precio,
         productoImagen:  producto.imagen,
         compradorNombre: perfil?.nombre || currentUser.displayName,
         compradorAvatar: perfil?.avatar || currentUser.photoURL,
