@@ -50,6 +50,19 @@ export const normalizarCategoria = (categoria) => {
   return MIGRACION_CATEGORIAS[categoria] || null;
 };
 
+// 🏷️ Condición del producto — misma fuente de verdad que
+// esProductoValido() en firestore.rules (campo opcional/con fallback
+// ahí para no romper productos publicados antes de este campo).
+const CONDICIONES_VALIDAS = ["nuevo", "como_nuevo", "usado"];
+const CONDICION_POR_DEFECTO = "usado";
+
+// Valida contra la taxonomía vigente; si el valor no es reconocible
+// (undefined, string vacío, dato corrupto) cae al valor por defecto en
+// vez de bloquear la publicación — a diferencia de la categoría, la
+// condición nunca debe impedir guardar el producto.
+export const normalizarCondicion = (condicion) =>
+  CONDICIONES_VALIDAS.includes(condicion) ? condicion : CONDICION_POR_DEFECTO;
+
 // 🖼️ Múltiples fotos por producto (hasta 4).
 // Único lugar que decide cómo se guarda `imagen` (portada, string —
 // campo legado que YA leen ProductCard.jsx, GeneradorStoryModal.jsx,
@@ -66,7 +79,7 @@ const normalizarImagenes = (imagenes, imagenSuelta) => {
     .slice(0, MAX_FOTOS_PRODUCTO);
 };
 
-export const crearProducto = async ({ titulo, precio, categoria, descripcion, imagen, imagenes, user, perfil }) => {
+export const crearProducto = async ({ titulo, precio, categoria, condicion, descripcion, imagen, imagenes, user, perfil }) => {
   try {
     if (!user?.uid) {
       throw new Error("Usuario no autenticado.");
@@ -84,6 +97,8 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
     if (!categoriaValida) {
       throw new Error("Categoría inválida.");
     }
+
+    const condicionValida = normalizarCondicion(condicion);
 
     const tituloLimpio      = String(titulo || "").trim().slice(0, 200);
     const descripcionLimpia = String(descripcion || "").trim().slice(0, 500);
@@ -104,6 +119,8 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
       titulo:         tituloLimpio,
       precio:         precioNum,
       categoria:      categoriaValida,
+      // 🏷️ Condición del producto (Nuevo / Como nuevo / Usado).
+      condicion:      condicionValida,
       descripcion:    descripcionLimpia,
       imagen:         imagenPortada,
       // 🆕 Array multi-foto (hasta 4). Se guarda SIEMPRE que haya al
@@ -175,11 +192,11 @@ export const crearProducto = async ({ titulo, precio, categoria, descripcion, im
   }
 };
 
-export const actualizarProducto = async (productoId, { titulo, precio, categoria, descripcion, imagen, imagenOriginal, imagenes }) => {
+export const actualizarProducto = async (productoId, { titulo, precio, categoria, condicion, descripcion, imagen, imagenOriginal, imagenes }) => {
   try {
     // 🔧 Mismo blindaje que crearProducto: la regla de `update` también
     // exige esProductoValido() sobre el documento resultante, así que
-    // editar un producto está sujeto exactamente a las mismas 6 reglas.
+    // editar un producto está sujeto exactamente a las mismas reglas.
     const precioNum = Number(precio);
     if (!Number.isFinite(precioNum) || precioNum <= 0 || precioNum > 10000) {
       throw new Error("El precio debe ser un número mayor a 0 y menor o igual a 10000.");
@@ -189,6 +206,8 @@ export const actualizarProducto = async (productoId, { titulo, precio, categoria
     if (!categoriaValida) {
       throw new Error("Categoría inválida.");
     }
+
+    const condicionValida = normalizarCondicion(condicion);
 
     const tituloLimpio      = String(titulo || "").trim().slice(0, 200);
     const descripcionLimpia = String(descripcion || "").trim().slice(0, 500);
@@ -210,6 +229,8 @@ export const actualizarProducto = async (productoId, { titulo, precio, categoria
       titulo:       tituloLimpio,
       precio:       precioNum,
       categoria:    categoriaValida,
+      // 🏷️ Condición del producto (Nuevo / Como nuevo / Usado).
+      condicion:    condicionValida,
       descripcion:  descripcionLimpia,
       imagen:       imagenPortada,
       // Ver nota en crearProducto: se guarda el array completo cuando

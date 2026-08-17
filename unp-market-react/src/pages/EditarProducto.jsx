@@ -6,12 +6,20 @@ import { ChevronLeft, Camera, Send, X, Plus } from "lucide-react";
 import { db }                           from "../services/firebase";
 import { useAuth }                      from "../context/AuthContext";
 import { subirImagenes }                from "../utils/imageUtils";
-import { actualizarProducto, normalizarCategoria } from "../services/productService";
+import { actualizarProducto, normalizarCategoria, normalizarCondicion } from "../services/productService";
 import Spinner                          from "../components/Spinner";
 import Toast, { useToast }              from "../components/Toast";
 
 // 🖼️ Mismo tope que Publicar.jsx / productService.js.
 const MAX_FOTOS = 4;
+
+// 🏷️ Mismo set (values) que en Publicar.jsx / productService.js /
+// firestore.rules.
+const CONDICIONES = [
+  { value: "nuevo",      label: "Nuevo" },
+  { value: "como_nuevo", label: "Como nuevo" },
+  { value: "usado",      label: "Usado" },
+];
 
 // Mismo ícono de mascota que usa Publicar.jsx / Home.jsx, para
 // mantener el header idéntico entre ambas pantallas.
@@ -33,6 +41,7 @@ const EditarProducto = () => {
   const [titulo,         setTitulo]         = useState("");
   const [precio,         setPrecio]         = useState("");
   const [categoria,      setCategoria]      = useState("comida");
+  const [condicion,      setCondicion]      = useState("usado");
   const [descripcion,    setDescripcion]    = useState("");
   // 🖼️ Hasta MAX_FOTOS "slots", en el orden en que se muestran/envían.
   // kind: "existing" (ya en Firestore, `url` es la URL pública real,
@@ -85,6 +94,10 @@ const EditarProducto = () => {
         // reenviaría el valor viejo y actualizarProducto lo rechazaría
         // con "Categoría inválida.".
         setCategoria(normalizarCategoria(data.categoria) || "comida");
+        // 🔧 Retrocompatibilidad: productos publicados antes de este
+        // campo no traen `condicion` — normalizarCondicion() cae al
+        // valor por defecto ("usado") en vez de dejar el selector vacío.
+        setCondicion(normalizarCondicion(data.condicion));
         setDescripcion(data.descripcion || "");
 
         // 🔧 Retrocompatibilidad: productos publicados antes de este
@@ -216,7 +229,7 @@ const EditarProducto = () => {
 
       setBtnTexto("Guardando...");
       await actualizarProducto(productoId, {
-        titulo, precio: precioNum, categoria, descripcion,
+        titulo, precio: precioNum, categoria, condicion, descripcion,
         imagenes: imagenesFinal,
       });
 
@@ -361,6 +374,28 @@ const EditarProducto = () => {
                 <option value="servicios">🛠️ Servicios & Tipeos</option>
                 <option value="otros">📦 Otros</option>
               </select>
+            </div>
+          </div>
+
+          {/* CONDICIÓN */}
+          <div className="mb-4">
+            <label className={labelClass}>Condición</label>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {CONDICIONES.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setCondicion(c.value)}
+                  aria-pressed={condicion === c.value}
+                  className={`rounded-btn border-[1.5px] py-2.5 text-[12.5px] font-extrabold transition-colors ${
+                    condicion === c.value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-ink/10 bg-background text-ink/60"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
             </div>
           </div>
 

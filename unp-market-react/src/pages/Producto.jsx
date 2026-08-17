@@ -19,6 +19,15 @@ const ICONOS_CAT = {
   materiales: "📚", servicios: "🛠️", otros: "📦",
 };
 
+// 🏷️ Condición del producto — mismo set (values) que
+// CONDICIONES_VALIDAS en productService.js. Campo opcional/retrocompatible:
+// productos publicados antes de este campo simplemente no muestran badge.
+const CONDICION_LABEL = {
+  nuevo:      "Nuevo",
+  como_nuevo: "Como nuevo",
+  usado:      "Usado",
+};
+
 // ── Componente principal ─────────────────────────────────────
 const Producto = () => {
   const navigate               = useNavigate();
@@ -158,8 +167,11 @@ const Producto = () => {
   const {
     titulo, precio, imagen, categoria, descripcion,
     vendedor: nombreVendedorCrudo,
-    avatarVendedor, estado, universidadId,
+    avatarVendedor, estado, universidadId, condicion,
   } = producto;
+
+  // 🏷️ Producto sin `condicion` (publicado antes de este campo) → sin badge.
+  const condicionLabel = CONDICION_LABEL[condicion] || null;
 
   // 🔧 Retrocompatibilidad: productos publicados antes del soporte
   // multi-foto no tienen `imagenes` (array) — solo `imagen` (string).
@@ -267,9 +279,16 @@ const Producto = () => {
           </div>
         )}
 
-        <span className="absolute bottom-6 left-5 z-[6] rounded-chip bg-black/60 px-3.5 py-1.5 text-[13px] font-bold uppercase tracking-wide text-white backdrop-blur">
-          {categoria || "Sin categoría"}
-        </span>
+        <div className="absolute bottom-6 left-5 z-[6] flex items-center gap-1.5">
+          <span className="rounded-chip bg-black/60 px-3.5 py-1.5 text-[13px] font-bold uppercase tracking-wide text-white backdrop-blur">
+            {categoria || "Sin categoría"}
+          </span>
+          {condicionLabel && (
+            <span className="rounded-chip bg-white/85 px-3 py-1.5 text-[12px] font-bold text-ink backdrop-blur">
+              {condicionLabel}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ════════════════════════════════════════════════════

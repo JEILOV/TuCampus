@@ -15,6 +15,15 @@ import Toast, { useToast }                      from "../components/Toast"; // �
 // del lado del servidor).
 const MAX_FOTOS = 4;
 
+// 🏷️ Condición del producto — mismo set (values) que
+// CONDICIONES_VALIDAS en productService.js y que la whitelist de
+// esProductoValido() en firestore.rules. Ver también EditarProducto.jsx.
+const CONDICIONES = [
+  { value: "nuevo",      label: "Nuevo" },
+  { value: "como_nuevo", label: "Como nuevo" },
+  { value: "usado",      label: "Usado" },
+];
+
 // Placeholder — reemplazar por el archivo final de la mascota (mismo
 // ícono que ya usa el header de Home.jsx, para mantener consistencia).
 const MASCOTA_ICONO = "/assets/mascota-icono-placeholder.png";
@@ -32,6 +41,8 @@ const Publicar = () => {
   const [titulo,      setTitulo]      = useState("");
   const [precio,      setPrecio]      = useState("");
   const [categoria,   setCategoria]   = useState("comida");
+  // 🏷️ Default "usado": es el caso más común en un marketplace estudiantil.
+  const [condicion,   setCondicion]   = useState("usado");
   const [descripcion, setDescripcion] = useState("");
   // 🖼️ Hasta MAX_FOTOS archivos. `previews` guarda { id, file, url }
   // por foto: `url` es un object URL (URL.createObjectURL) que se debe
@@ -169,7 +180,7 @@ const Publicar = () => {
 
       setBtnTexto("Publicando...");
       const nuevoId = await crearProducto({
-        titulo, precio: precioNum, categoria, descripcion,
+        titulo, precio: precioNum, categoria, condicion, descripcion,
         imagenes: imagenesFinal, user, perfil,
       });
       setProgreso(100);
@@ -341,6 +352,28 @@ const Publicar = () => {
                 <option value="servicios">🛠️ Servicios & Tipeos</option>
                 <option value="otros">📦 Otros</option>
               </select>
+            </div>
+          </div>
+
+          {/* CONDICIÓN */}
+          <div className="mb-4">
+            <label className={labelClass}>Condición</label>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {CONDICIONES.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setCondicion(c.value)}
+                  aria-pressed={condicion === c.value}
+                  className={`rounded-btn border-[1.5px] py-2.5 text-[12.5px] font-extrabold transition-colors ${
+                    condicion === c.value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-ink/10 bg-background text-ink/60"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
             </div>
           </div>
 
