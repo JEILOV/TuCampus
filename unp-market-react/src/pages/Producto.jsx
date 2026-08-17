@@ -1,5 +1,5 @@
 // src/pages/Producto.jsx
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams }     from "react-router-dom";
 import { ChevronLeft, Heart, MessageCircle, Star, Share2, XCircle } from "lucide-react";
 import { useAuth }                          from "../context/AuthContext";
@@ -125,6 +125,16 @@ const Producto = () => {
   const [mostrandoStory, setMostrandoStory] = useState(false);
   const handleCompartir = () => setMostrandoStory(true);
 
+  // ── Carrusel de fotos ──
+  // 🖼️ Índice de la foto activa + refs para el swipe táctil sobre el
+  // contenedor de imagen. Reseteamos el índice si cambia el producto
+  // (ej. navegación entre productos sin desmontar), para no quedar
+  // apuntando a una foto fuera de rango.
+  const [indiceFoto, setIndiceFoto] = useState(0);
+  const touchStartX = useRef(null);
+
+  useEffect(() => { setIndiceFoto(0); }, [productoId]);
+
   // ── Estado: Cargando ────────────────────────────────────
   if (cargando) return <Spinner mensaje="Cargando producto..." />;
 
@@ -151,6 +161,13 @@ const Producto = () => {
     avatarVendedor, estado, universidadId,
   } = producto;
 
+  // 🔧 Retrocompatibilidad: productos publicados antes del soporte
+  // multi-foto no tienen `imagenes` (array) — solo `imagen` (string).
+  // Mismo fallback que EditarProducto.jsx.
+  const galeria = Array.isArray(producto.imagenes) && producto.imagenes.length > 0
+    ? producto.imagenes
+    : [imagen].filter(Boolean);
+
   // 🏫 Multicampus: `producto.universidadId` es un campo obligatorio
   // (ver esProductoValido en firestore.rules), así que siempre hay
   // sede disponible para el fallback — ya no asumimos "Vendedor UNP".
@@ -168,7 +185,21 @@ const Producto = () => {
              IMAGEN PRINCIPAL — mismo lenguaje visual que
              el header de Vendedor.jsx (rounded-b-[32px])
         ════════════════════════════════════════════════════ */}
-      <div className="relative h-[320px] w-full overflow-hidden rounded-b-[32px] bg-ink/5">
+      <div
+        className="relative h-[320px] w-full overflow-hidden rounded-b-[32px] bg-ink/5"
+        onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+        onTouchEnd={(e) => {
+          if (touchStartX.current === null || galeria.length <= 1) return;
+          const delta = e.changedTouches[0].clientX - touchStartX.current;
+          touchStartX.current = null;
+          const UMBRAL = 40; // px mínimos para contar como swipe
+          if (delta <= -UMBRAL) {
+            setIndiceFoto((i) => Math.min(i + 1, galeria.length - 1)); // swipe izq → siguiente
+          } else if (delta >= UMBRAL) {
+            setIndiceFoto((i) => Math.max(i - 1, 0)); // swipe der → anterior
+          }
+        }}
+      >
         <button
           onClick={() => navigate(-1)}
           aria-label="Volver"
@@ -177,13 +208,51 @@ const Producto = () => {
           <ChevronLeft size={20} />
         </button>
 
-        {imagen?.trim() ? (
-          <img
-            src={imagen}
-            alt={titulo}
-            decoding="async"
-            className={`h-full w-full object-cover ${estaAgotado ? "grayscale-[60%] brightness-90" : ""}`}
-          />
+        {galeria.length > 0 ? (
+          <>
+            {/* 🖼️ Riel deslizante: todas las fotos en fila, desplazado con
+                transform según el índice activo — swipe suave, sin
+                remontar <img> al cambiar de foto. */}
+            <div
+              className={`flex h-full w-full transition-transform duration-300 ease-out ${estaAgotado ? "grayscale-[60%] brightness-90" : ""}`}
+              style={{ transform: `translateX(-${indiceFoto * 100}%)` }}
+            >
+              {galeria.map((url, idx) => (
+                <img
+                  key={`${url}-${idx}`}
+                  src={url}
+                  alt={`${titulo} — foto ${idx + 1} de ${galeria.length}`}
+                  decoding="async"
+                  loading={idx === 0 ? "eager" : "lazy"}
+                  className="h-full w-full shrink-0 object-cover"
+                />
+              ))}
+            </div>
+
+            {galeria.length > 1 && (
+              <>
+                {/* Indicador táctil "1/4" */}
+                <span className="absolute right-5 top-5 z-10 rounded-chip bg-black/60 px-2.5 py-1 text-[12px] font-bold text-white backdrop-blur">
+                  {indiceFoto + 1}/{galeria.length}
+                </span>
+
+                {/* Dots */}
+                <div className="absolute bottom-[52px] left-1/2 z-[6] flex -translate-x-1/2 gap-1.5">
+                  {galeria.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setIndiceFoto(idx)}
+                      aria-label={`Ver foto ${idx + 1}`}
+                      className={`h-1.5 rounded-full transition-all ${
+                        idx === indiceFoto ? "w-4 bg-white" : "w-1.5 bg-white/50"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#c8a97a] to-[#a07850] text-8xl">
             {emoji}
@@ -208,6 +277,26 @@ const Producto = () => {
         ════════════════════════════════════════════════════ */}
       <main className="relative -mt-6 px-4">
         <div className="rounded-t-[32px] bg-card p-5 shadow-soft">
+
+          {/* Miniaturas clicables debajo de la imagen principal */}
+          {galeria.length > 1 && (
+            <div className="-mt-1 mb-4 flex gap-2 overflow-x-auto pb-1">
+              {galeria.map((url, idx) => (
+                <button
+                  key={`thumb-${url}-${idx}`}
+                  type="button"
+                  onClick={() => setIndiceFoto(idx)}
+                  aria-label={`Foto ${idx + 1}`}
+                  aria-current={idx === indiceFoto}
+                  className={`h-14 w-14 shrink-0 overflow-hidden rounded-xl border-2 transition-colors ${
+                    idx === indiceFoto ? "border-primary" : "border-transparent opacity-70"
+                  }`}
+                >
+                  <img src={url} alt="" decoding="async" loading="lazy" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Título + Precio */}
           <div className="flex items-start justify-between gap-2.5">
