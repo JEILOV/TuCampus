@@ -48,7 +48,12 @@ const NOMBRE_UNIVERSIDAD = {
   utp: "Universidad Tecnológica del Perú",
 };
 
-const SITE_URL = "https://tucampus.net.pe";
+// 🌐 Debe coincidir exactamente con el canonical de index.html
+// (https://www.tucampus.net.pe/) y con el destino del redirect 308
+// en vercel.json — así ningún link generado acá (urlProducto, url
+// en el <meta http-equiv="refresh">, og:url, etc.) pasa por el salto
+// extra del redirect del dominio viejo.
+const SITE_URL = "https://www.tucampus.net.pe";
 const IMAGEN_POR_DEFECTO = `${SITE_URL}/assets/icon-512.png`;
 
 // ── Inicialización perezosa de firebase-admin (una sola vez por
@@ -170,8 +175,18 @@ export default async function handler(req, res) {
 
     const titulo = producto.titulo || "Producto en TuCampus";
     const precio = typeof producto.precio === "number" ? producto.precio.toFixed(2) : producto.precio;
+
+    // 🏫 Sede dinámica: prioriza un campo de texto libre en el producto
+    // (`sede` o `universidad`, por si en el futuro se permite una sede
+    // fuera del catálogo fijo) por encima del lookup vía `universidadId`
+    // en NOMBRE_UNIVERSIDAD. Si no hay ninguno de los dos, cae al nombre
+    // de la sede original de TuCampus en vez del genérico "TuCampus" —
+    // así el preview de WhatsApp siempre nombra una universidad real.
     const nombreUniversidad =
-      NOMBRE_UNIVERSIDAD[producto.universidadId] || "TuCampus";
+      producto.sede
+      || producto.universidad
+      || NOMBRE_UNIVERSIDAD[producto.universidadId]
+      || "Universidad Nacional de Piura";
 
     const imagen =
       (Array.isArray(producto.imagenes) && producto.imagenes.length > 0

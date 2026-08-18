@@ -1,4 +1,17 @@
 {
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "unp-market-react.vercel.app"
+        }
+      ],
+      "destination": "https://www.tucampus.net.pe/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/producto",

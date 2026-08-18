@@ -13,18 +13,20 @@
     <title>TuCampus</title>
 
     <!-- 🌐 SEO / OpenGraph — dominio propio oficial.
-         No existían estas etiquetas antes; se agregan apuntando a
-         tucampus.net.pe para que compartidos (WhatsApp, redes, etc.)
-         y buscadores resuelvan siempre al dominio real, no a un
-         preview de Vercel. -->
-    <link rel="canonical" href="https://tucampus.net.pe/" />
+         Se usa el subdominio www (https://www.tucampus.net.pe/) como
+         canónico: es el destino final al que vercel.json redirige de
+         forma permanente (308) todo el tráfico del dominio viejo
+         (unp-market-react.vercel.app). Mantener este canonical alineado
+         con ese destino evita que buscadores indexen una URL que luego
+         termina redirigiendo a otra. -->
+    <link rel="canonical" href="https://www.tucampus.net.pe/" />
     <meta name="description" content="TuCampus — el marketplace de tu universidad. Compra y vende entre estudiantes de tu campus." />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="TuCampus" />
     <meta property="og:title" content="TuCampus" />
     <meta property="og:description" content="El marketplace de tu universidad. Compra y vende entre estudiantes de tu campus." />
-    <meta property="og:url" content="https://tucampus.net.pe/" />
+    <meta property="og:url" content="https://www.tucampus.net.pe/" />
 
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="TuCampus" />
