@@ -11,12 +11,15 @@
 //         de aquí. Cambiar la calidad = cambiar 1 constante.
 // ============================================================
 
-import { logError } from "./errorHandler";
+// (logError ya no se usa en este archivo — la subida de imagen ahora
+// delega el manejo de errores al catch de quien llame a subirImagenImgBB.)
 
 const MAX_DIMENSION = 1080;
 const CALIDAD_JPEG  = 0.70;
 const CALIDAD_WEBP  = 0.75; // WebP mantiene mejor calidad visual a menor peso que JPEG en un % similar
-const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
+// 🔒 La API key de ImgBB ya NO vive en el cliente (antes:
+// VITE_IMGBB_API_KEY, visible en el bundle para cualquiera). Ahora
+// vive solo en el servidor como IMGBB_API_KEY — ver api/upload-image.js.
 
 // 🔧 Optimización de rendimiento: feature-detection de soporte WebP en
 // canvas.toBlob(). Se resuelve UNA sola vez (no en cada compresión) y
@@ -83,36 +86,54 @@ export const comprimirImagen = (file) =>
   });
 
 /**
- * Sube un Blob/File a ImgBB y devuelve la URL pública.
+ * Convierte un Blob/File a base64 puro (sin el prefijo
+ * "data:image/xxx;base64,") — es lo que espera api/upload-image.js.
+ * @param {Blob} blob
+ * @returns {Promise<string>}
+ */
+const blobABase64 = (blob) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("No se pudo leer la imagen comprimida"));
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      // dataUrl luce como "data:image/webp;base64,AAAA..." — solo
+      // nos interesa lo que sigue después de la coma.
+      const base64 = String(dataUrl).split(",")[1] || "";
+      resolve(base64);
+    };
+    reader.readAsDataURL(blob);
+  });
+
+/**
+ * Sube un Blob/File a ImgBB (vía api/upload-image.js, NUNCA directo
+ * desde el navegador) y devuelve la URL pública.
  * Devuelve "" si no hay archivo.
  *
- * 🔧 Auditoría UI/UX: reescrito con XMLHttpRequest (en vez de fetch) porque
- * fetch no expone eventos de progreso de subida. Esto permite mostrar una
- * barra de progreso real en Publicar.jsx / EditarProducto.jsx en vez de
- * un simple texto "Subiendo..." sin feedback numérico.
+ * 🔧 Por qué pasa por nuestro propio endpoint y no llama a ImgBB
+ * directo: ImgBB no garantiza headers CORS consistentes en dominios
+ * de producción (funciona en localhost, falla con "blocked by CORS
+ * policy" en www.tucampus.net.pe). Nuestro servidor le habla a ImgBB
+ * server-to-server, donde CORS no aplica. Ver api/upload-image.js.
+ *
+ * Se sigue usando XMLHttpRequest (no fetch) para conservar el evento
+ * de progreso real de la barra de subida en Publicar.jsx/EditarProducto.jsx
+ * — ahora mide el progreso hacia NUESTRO endpoint, que es representativo
+ * igual porque el reenvío servidor→ImgBB es rápido en comparación.
  *
  * @param {Blob|File|null} file
  * @param {(porcentaje: number) => void} [onProgress]  Callback 0–100, opcional.
  * @returns {Promise<string>} URL pública de la imagen
  */
-export const subirImagenImgBB = (file, onProgress) => {
-  if (!file) return Promise.resolve("");
+export const subirImagenImgBB = async (file, onProgress) => {
+  if (!file) return "";
 
-  // 🔧 Si falta configurar la variable de entorno en el deploy,
-  // esto fallaría igual pero de forma críptica (401/400 de ImgBB sin
-  // contexto). Este guard deja un log claro para diagnosticar rápido
-  // un problema de configuración en vez de uno del usuario.
-  if (!IMGBB_API_KEY) {
-    logError("[imageUtils.subirImagenImgBB]", new Error("Falta VITE_IMGBB_API_KEY en el entorno."));
-    return Promise.reject(new Error("Falta configurar la clave de ImgBB."));
-  }
+  const imageBase64 = await blobABase64(file);
 
   return new Promise((resolve, reject) => {
-    const formData = new FormData();
-    formData.append("image", file);
-
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`);
+    xhr.open("POST", "/api/upload-image");
+    xhr.setRequestHeader("Content-Type", "application/json");
 
     if (onProgress) {
       xhr.upload.onprogress = (e) => {
@@ -124,19 +145,19 @@ export const subirImagenImgBB = (file, onProgress) => {
     xhr.onload = () => {
       try {
         const data = JSON.parse(xhr.responseText);
-        if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+        if (xhr.status >= 200 && xhr.status < 300 && data.url) {
           onProgress?.(100);
-          resolve(data.data.url);
+          resolve(data.url);
         } else {
-          reject(new Error("ImgBB rechazó la imagen"));
+          reject(new Error(data?.error || "No se pudo subir la imagen"));
         }
       } catch {
-        reject(new Error("Respuesta inválida de ImgBB"));
+        reject(new Error("Respuesta inválida del servidor de imágenes"));
       }
     };
 
     xhr.onerror = () => reject(new Error("Error de red al subir la imagen"));
-    xhr.send(formData);
+    xhr.send(JSON.stringify({ imageBase64 }));
   });
 };
 
@@ -155,7 +176,7 @@ export const subirImagenImgBB = (file, onProgress) => {
  *
  * @param {File[]} archivos                        Archivos originales (sin comprimir)
  * @param {(pct: number) => void} [onProgress]      Progreso global 0–100
- * @returns {Promise<string[]>}                     URLs públicas, mismo orden que `archivos`
+ * @returns {Promise<string[]>}                     URLs públicas, mismo orden que archivos
  */
 export const subirImagenes = async (archivos, onProgress) => {
   const lista  = (archivos || []).filter(Boolean);
@@ -185,7 +206,7 @@ export const subirImagenes = async (archivos, onProgress) => {
  * Ej: "galleta" → ["g", "ga", "gal", "gall", "galle", "gallet", "galleta"]
  *
  * 🔒 Cap en 30 resultados: las reglas de seguridad de Firestore exigen
- * `keywords.size() <= 30`. Sin este límite, un título con varias
+ * keywords.size() <= 30. Sin este límite, un título con varias
  * palabras largas genera más de 30 prefijos y Firestore rechaza el
  * create/update por completo, sin importar que el resto del payload
  * esté bien formado.
