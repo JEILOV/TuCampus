@@ -1,7 +1,7 @@
 // src/pages/Home.jsx
 import { useState, useEffect, useMemo, useRef }     from "react";
 import { useNavigate, useSearchParams }             from "react-router-dom";
-import { ChevronDown, MapPin, SearchX }             from "lucide-react";
+import { ChevronDown, MapPin, SearchX, Store }      from "lucide-react";
 import { useAuth }                                  from "../context/AuthContext";
 import { useCampus }                                from "../context/CampusContext";
 import { useProducts }                              from "../hooks/useProducts";
@@ -292,26 +292,49 @@ const Home = () => {
               ))}
             </div>
           ) : !cargando ? (
-            // ── Empty state: sin coincidencias con los filtros actuales ──
-            <div className="mt-10 flex flex-col items-center gap-3 px-6 text-center">
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-ink/5">
-                <SearchX size={28} className="text-ink/30" strokeWidth={2} />
-              </span>
-              <p className="text-[15px] font-extrabold text-ink">
-                No encontramos productos con esos filtros
-              </p>
-              <p className="text-[13px] font-semibold text-ink/50">
-                Probá con otra palabra clave o ajustá los filtros aplicados.
-              </p>
-              {hayFiltrosActivos && (
+            hayFiltrosActivos ? (
+              // ── Empty state: sin coincidencias con los filtros actuales ──
+              <div className="mt-10 flex flex-col items-center gap-3 px-6 text-center">
+                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-ink/5">
+                  <SearchX size={28} className="text-ink/30" strokeWidth={2} />
+                </span>
+                <p className="text-[15px] font-extrabold text-ink">
+                  No encontramos productos con esos filtros
+                </p>
+                <p className="text-[13px] font-semibold text-ink/50">
+                  Probá con otra palabra clave o ajustá los filtros aplicados.
+                </p>
                 <button
                   onClick={handleResetearFiltros}
                   className="mt-1 rounded-btn bg-primary px-5 py-2.5 text-[13.5px] font-extrabold text-white shadow-soft transition-transform active:scale-95"
                 >
                   Limpiar búsqueda y filtros
                 </button>
-              )}
-            </div>
+              </div>
+            ) : (
+              // ── Empty state MULTICAMPUS: la sede todavía no tiene
+              // ningún producto publicado (sin filtros de por medio) —
+              // distinto del caso de arriba: acá no hay nada que limpiar,
+              // hay que invitar a publicar el primer producto de la sede.
+              <div className="mt-10 flex flex-col items-center gap-3 px-6 text-center">
+                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-ink/5">
+                  <Store size={28} className="text-ink/30" strokeWidth={2} />
+                </span>
+                <p className="text-[15px] font-extrabold text-ink">
+                  Todavía no hay productos en{" "}
+                  {LISTA_UNIVERSIDADES.find((u) => u.id === universidadActiva)?.nombre || "esta sede"}
+                </p>
+                <p className="text-[13px] font-semibold text-ink/50">
+                  Sé el primero en vender algo a tus compañeros de campus.
+                </p>
+                <button
+                  onClick={() => navigate("/publicar")}
+                  className="mt-1 rounded-btn bg-primary px-5 py-2.5 text-[13.5px] font-extrabold text-white shadow-soft transition-transform active:scale-95"
+                >
+                  Publicar mi primer producto
+                </button>
+              </div>
+            )
           ) : null}
 
           {!todoCargado && <div ref={sentinelRef} className="h-2" />}

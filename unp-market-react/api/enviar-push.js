@@ -100,6 +100,12 @@ export default async function handler(req, res) {
   try {
     await admin.auth().verifyIdToken(idToken);
   } catch (err) {
+    // 🔧 Se loguea el motivo real del rechazo (token expirado, revocado,
+    // de otro proyecto de Firebase, reloj desincronizado, etc.) — sin
+    // esto, cualquier fallo de auth se ve idéntico desde afuera (401
+    // genérico) y no hay forma de diagnosticar cuál fue la causa real
+    // mirando los logs de Vercel.
+    console.error("[api/enviar-push] verifyIdToken falló:", err?.code || err?.message || err);
     return res.status(401).json({ error: "Token de sesión inválido o expirado." });
   }
 

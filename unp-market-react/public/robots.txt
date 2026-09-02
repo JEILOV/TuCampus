@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+# No indexar rutas privadas / sin valor de búsqueda para buscadores
+Disallow: /chat
+Disallow: /perfil
+Disallow: /publicar
+Disallow: /editar
+Disallow: /notificaciones
+Disallow: /admin/anuncios
+
+Sitemap: https://www.tucampus.net.pe/sitemap.xml
