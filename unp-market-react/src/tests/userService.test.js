@@ -1,5 +1,5 @@
 // src/tests/userService.test.js
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
 import {
   mockGetDoc, mockSetDoc, mockUpdateDoc, mockGetDocs,
@@ -88,15 +88,18 @@ describe("userService", () => {
   // ══════════════════════════════════════════════════════════
   describe("seguirVendedor", () => {
 
-    it("llama updateDoc con arrayUnion del miUid", async () => {
+    it("agrega miUid al array de seguidores existente", async () => {
+      // 🔧 La implementación actual ya no usa arrayUnion: lee el array
+      // `seguidores` actual con getDoc y reescribe la lista completa en
+      // updateDoc (ver userService.seguirVendedor).
+      mockGetDoc.mockResolvedValueOnce(makeSnap("vendedor-001", { seguidores: ["otro-uid"] }));
       mockUpdateDoc.mockResolvedValueOnce(undefined);
 
       await seguirVendedor("vendedor-001", "yo-uid");
 
       expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
-      const [_ref, datos] = mockUpdateDoc.mock.calls[0];
-      // arrayUnion está mockeado como { _type: "arrayUnion", args: ["yo-uid"] }
-      expect(datos.seguidores).toMatchObject({ _type: "arrayUnion", args: ["yo-uid"] });
+      const [, datos] = mockUpdateDoc.mock.calls[0];
+      expect(datos.seguidores).toEqual(["otro-uid", "yo-uid"]);
     });
 
     it("lanza Error traducido cuando Firestore falla", async () => {
@@ -113,13 +116,16 @@ describe("userService", () => {
   // ══════════════════════════════════════════════════════════
   describe("dejarDeSeguirVendedor", () => {
 
-    it("llama updateDoc con arrayRemove del miUid", async () => {
+    it("quita miUid del array de seguidores existente", async () => {
+      // 🔧 Igual que seguirVendedor: ya no usa arrayRemove — lee el array
+      // actual con getDoc y reescribe la lista filtrada en updateDoc.
+      mockGetDoc.mockResolvedValueOnce(makeSnap("vendedor-001", { seguidores: ["otro-uid", "yo-uid"] }));
       mockUpdateDoc.mockResolvedValueOnce(undefined);
 
       await dejarDeSeguirVendedor("vendedor-001", "yo-uid");
 
-      const [_ref, datos] = mockUpdateDoc.mock.calls[0];
-      expect(datos.seguidores).toMatchObject({ _type: "arrayRemove", args: ["yo-uid"] });
+      const [, datos] = mockUpdateDoc.mock.calls[0];
+      expect(datos.seguidores).toEqual(["otro-uid"]);
     });
 
     it("lanza Error traducido cuando Firestore falla", async () => {
@@ -216,7 +222,7 @@ describe("userService", () => {
       await sincronizarFavoritos("uid-001", ["prod-1", "prod-2", "prod-3"]);
 
       expect(mockSetDoc).toHaveBeenCalledTimes(1);
-      const [_ref, datos, opciones] = mockSetDoc.mock.calls[0];
+      const [, datos, opciones] = mockSetDoc.mock.calls[0];
       expect(datos).toEqual({ favoritos: ["prod-1", "prod-2", "prod-3"] });
       expect(opciones).toEqual({ merge: true }); // no sobreescribe otros campos
     });
@@ -226,7 +232,7 @@ describe("userService", () => {
 
       await sincronizarFavoritos("uid-001", []);
 
-      const [_ref, datos] = mockSetDoc.mock.calls[0];
+      const [, datos] = mockSetDoc.mock.calls[0];
       expect(datos).toEqual({ favoritos: [] });
     });
 

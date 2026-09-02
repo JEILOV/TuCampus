@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   mockGetDoc, mockUpdateDoc, mockDeleteDoc,
   mockWriteBatch, mockBatchSet, mockBatchUpdate, mockBatchCommit,
-  makeSnap, makeEmptySnap, fakeBatch,
+  makeSnap, makeEmptySnap,
   resetAllMocks,
 } from "./__mocks__/firebase";
 
@@ -94,16 +94,21 @@ describe("productService", () => {
 
       await crearProducto(inputBase);
 
-      const [_ref, datosGuardados] = mockBatchSet.mock.calls[0];
+      const [, datosGuardados] = mockBatchSet.mock.calls[0];
       expect(datosGuardados).toMatchObject({
         titulo:      "Anticuchos de pollo",
         precio:      8.50,             // parseFloat aplicado
-        categoria:   "salados",
+        // 🔧 "salados" es categoría legacy — normalizarCategoria() la
+        // migra a "comida" (ver MIGRACION_CATEGORIAS en productService.js).
+        categoria:   "comida",
         estado:      "disponible",     // siempre "disponible" al crear
         userUid:     "user-001",
         vendedorNombre: "Valery B.",   // del perfil, no de user.displayName
-        telefono:    "987654321",
+        // 🔒 telefono YA NO se copia al documento público del producto
+        // (ver comentario en productService.crearProducto) — no se afirma
+        // sobre ese campo acá.
       });
+      expect(datosGuardados.telefono).toBeUndefined();
     });
 
     it("incrementa totalPublicaciones si el usuario ya tiene documento", async () => {
@@ -113,7 +118,7 @@ describe("productService", () => {
 
       await crearProducto(inputBase);
 
-      const [_ref, datosActualizados] = mockBatchUpdate.mock.calls[0];
+      const [, datosActualizados] = mockBatchUpdate.mock.calls[0];
       expect(datosActualizados).toEqual({ totalPublicaciones: 6 });
     });
 
@@ -126,8 +131,15 @@ describe("productService", () => {
     });
 
     it("lanza Error traducido cuando Firestore falla", async () => {
+      // 🔧 El getDoc del contador de totalPublicaciones está envuelto en
+      // su propio try/catch interno (ver productService.crearProducto) —
+      // a propósito NUNCA tumba la creación del producto, así que
+      // rechazarlo ya no reproduce el escenario de "Firestore falla".
+      // El punto real donde un fallo de Firestore debe abortar
+      // crearProducto es batch.commit().
       const firestoreError = Object.assign(new Error("Forbidden"), { code: "permission-denied" });
-      mockGetDoc.mockRejectedValueOnce(firestoreError);
+      mockGetDoc.mockResolvedValueOnce(makeEmptySnap());
+      mockBatchCommit.mockRejectedValueOnce(firestoreError);
 
       await expect(crearProducto(inputBase)).rejects.toThrow("Error simulado (firestore)");
     });
@@ -136,7 +148,7 @@ describe("productService", () => {
       mockGetDoc.mockResolvedValueOnce(makeEmptySnap());
       await crearProducto({ ...inputBase, imagen: null });
 
-      const [_ref, datos] = mockBatchSet.mock.calls[0];
+      const [, datos] = mockBatchSet.mock.calls[0];
       expect(datos.imagen).toBe("");
     });
 
@@ -160,11 +172,13 @@ describe("productService", () => {
       await actualizarProducto("prod-456", inputBase);
 
       expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
-      const [_ref, datos] = mockUpdateDoc.mock.calls[0];
+      const [, datos] = mockUpdateDoc.mock.calls[0];
       expect(datos).toMatchObject({
         titulo:      "Galletas nuevas",
         precio:      12,
-        categoria:   "dulces",
+        // 🔧 "dulces" es categoría legacy — normalizarCategoria() la
+        // migra a "comida" (ver MIGRACION_CATEGORIAS en productService.js).
+        categoria:   "comida",
         descripcion: "Ahora con chispas",
         imagen:      "https://img.test/nueva.jpg",
       });
@@ -176,7 +190,7 @@ describe("productService", () => {
 
       await actualizarProducto("prod-456", { ...inputBase, imagen: "" });
 
-      const [_ref, datos] = mockUpdateDoc.mock.calls[0];
+      const [, datos] = mockUpdateDoc.mock.calls[0];
       expect(datos.imagen).toBe("https://img.test/vieja.jpg");
     });
 
@@ -221,7 +235,7 @@ describe("productService", () => {
 
       await cambiarEstadoProducto("prod-001", "agotado");
 
-      const [_ref, datos] = mockUpdateDoc.mock.calls[0];
+      const [, datos] = mockUpdateDoc.mock.calls[0];
       expect(datos).toEqual({ estado: "agotado" });
     });
 
@@ -230,7 +244,7 @@ describe("productService", () => {
 
       await cambiarEstadoProducto("prod-001", "disponible");
 
-      const [_ref, datos] = mockUpdateDoc.mock.calls[0];
+      const [, datos] = mockUpdateDoc.mock.calls[0];
       expect(datos).toEqual({ estado: "disponible" });
     });
 
