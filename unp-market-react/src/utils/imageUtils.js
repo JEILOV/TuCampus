@@ -68,140 +68,75 @@ const ESPERA_BASE_MS = 300; // backoff lineal: 300ms, 600ms entre intentos
 
 const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Carga un <img> desde una blob: URL. A diferencia de FileReader.readAsDataURL
-// (copia el archivo entero a memoria como base64 antes de decodificar) y de
-// createImageBitmap(file) directo sobre el File crudo (en Chrome/Android falla
-// con frecuencia cuando el File viene de un descriptor virtual de galería/nube
-// — Google Photos/Pinterest), URL.createObjectURL deja que el propio pipeline
-// de red/decodificación de imágenes del navegador maneje el archivo por
-// streaming. Es el camino documentado como más robusto para este caso puntual.
-//
-// img.onerror solo entrega un Event genérico (no un Error con detalle real),
-// así que el mensaje que arma este helper ya es lo más específico que el
-// navegador permite saber en este punto.
-const cargarImagenDesdeObjectUrl = (objectUrl) =>
-  new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload  = () => resolve(img);
-    img.onerror = () =>
-      reject(new Error("El navegador no pudo decodificar la imagen (formato no soportado o archivo corrupto/incompleto)"));
-    img.src = objectUrl;
-  });
-
-// 🔧 CAUSA RAÍZ del fallo que persistía incluso con fotos de cámara normales:
-// URL.createObjectURL(file) registra la blob: URL con el `type` que trae el
-// objeto File — y en Android ese `type` viene vacío o incorrecto con bastante
-// frecuencia (ciertos intents de cámara no setean MIME; archivos guardados
-// desde Pinterest/Google Photos igual). Con el type "en blanco", Chrome no
-// sabe qué decodificar y el <img> revienta en onerror aunque los bytes sean
-// un JPEG perfectamente válido — pasa lo mismo con foto de cámara o de
-// Pinterest porque el bug no depende del origen de la imagen, depende de
-// que el File llegue con metadata de tipo poco confiable.
-//
-// Fix: NO confiamos en file.type. Leemos los primeros bytes del archivo y
-// detectamos el formato real por firma binaria (magic number) — así el
-// Blob que se usa para el object URL siempre lleva el MIME correcto,
-// sin importar lo que haya declarado el sistema operativo o el picker.
-const detectarMimeReal = (bytes) => {
-  const b = new Uint8Array(bytes);
-  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
-  if (b.length >= 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "image/png";
-  if (b.length >= 4 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return "image/gif";
-  if (
-    b.length >= 12 &&
-    b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && // "RIFF"
-    b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50 // "WEBP"
-  ) return "image/webp";
-  if (b.length >= 2 && b[0] === 0x42 && b[1] === 0x4d) return "image/bmp";
-  return null; // firma no reconocida — se usa el fallback más abajo
-};
-
-// Rearma el archivo como un Blob con el MIME correcto (detectado por bytes,
-// no por metadata). Si por lo que sea no se puede ni leer la cabecera,
-// se sigue con el File original tal cual — no rompe el flujo por esto.
-const normalizarMimeArchivo = async (file) => {
-  try {
-    const cabecera = await file.slice(0, 12).arrayBuffer();
-    const mimeReal = detectarMimeReal(cabecera);
-    if (!mimeReal) return file; // firma desconocida: no forzamos un tipo a ciegas
-    if (mimeReal === file.type) return file; // ya venía correcto, no hace falta copiar bytes
-    return new Blob([file], { type: mimeReal });
-  } catch (err) {
-    console.warn("[imageUtils] No se pudo sniffear el MIME real del archivo, se usa el original:", err);
-    return file;
-  }
-};
-
 /**
- * Decodifica un File a una fuente dibujable en canvas (ImageBitmap o
- * HTMLImageElement, ambos exponen .width/.height y son válidos para
- * drawImage()), blindada contra fallos transitorios de lectura.
+ * Decodifica un File directamente a un ImageBitmap, sin pasar por
+ * `new Image()` en ningún punto del camino.
  *
- * Camino primario: URL.createObjectURL(file) + <img>. Se prefiere sobre
- * createImageBitmap(file) directo o FileReader.readAsDataURL porque ambos
- * exigen leer los bytes completos del File de una sola vez en JS — que es
- * justo donde Android revienta con archivos "stub" (recién sincronizados
- * desde Google Photos/Pinterest, aún bloqueados o incompletos en el storage
- * del sistema). Con una blob: URL, es el propio motor del navegador el que
- * hace streaming del archivo, con su manejo nativo de reintentos/bloqueos.
+ * 🔧 Por qué se eliminó `new Image()` + `URL.createObjectURL` por
+ * completo: en Android Chrome, cargar una blob: URL en una instancia
+ * de `<img>` que nunca se inserta en el DOM puede disparar `onerror`
+ * de forma intermitente — el navegador puede recolectar basura o
+ * perder la referencia al archivo temporal detrás de la blob URL
+ * antes de que la decodificación termine, sin que tenga relación real
+ * con si la imagen es válida o no. Ese era el origen del error que
+ * persistía incluso con capturas de pantalla comunes.
  *
- * Una vez que el <img> cargó bien, SI el navegador soporta createImageBitmap
- * se lo pasamos a ÉL (no al File crudo) para aprovechar la decodificación
- * acelerada — pero como fuente ya es un <img> válido, si esto fallara no es
- * crítico: seguimos usando el propio <img> para dibujar en canvas.
+ * Camino nuevo: `file.arrayBuffer()` copia los bytes completos del
+ * archivo a un ArrayBuffer real y estable en memoria de JS —ya no
+ * depende de ninguna referencia "viva" a un archivo temporal del
+ * sistema (galería, nube, blob URL)—, y `createImageBitmap()` decodifica
+ * DIRECTO desde esos bytes, sin `<img>` ni DOM de por medio. Además
+ * trae ventajas que ya teníamos antes: no depende del MIME/extensión
+ * declarados (decodifica por contenido real) y soporta WebP/AVIF.
  *
- * Reintenta hasta REINTENTOS_LECTURA veces con espera creciente — el
- * bloqueo del archivo suele ser cuestión de milisegundos mientras el
- * sistema termina de materializarlo.
+ * Reintenta hasta REINTENTOS_LECTURA veces con espera creciente — por
+ * si el fallo es un bloqueo transitorio (archivo aún sincronizándose)
+ * y no un problema real del archivo.
  *
- * Si se agotan los reintentos, propaga el ERROR NATIVO real
- * (`nombre: mensaje`) en vez de un mensaje genérico — así el toast en
- * producción dice exactamente qué está fallando en el celular del usuario.
+ * Si createImageBitmap propaga un error, es un DOMException real con
+ * `.name`/`.message` útiles (a diferencia de `img.onerror`, que solo
+ * daba un Event genérico) — se propaga tal cual al agotar reintentos.
  *
  * @param {File} file
- * @returns {Promise<ImageBitmap|HTMLImageElement>}
+ * @returns {Promise<ImageBitmap>}
  */
 const decodificarImagen = async (file) => {
+  if (typeof createImageBitmap !== "function") {
+    // Prácticamente todo navegador relevante hoy lo soporta (incluido
+    // Safari desde 2020). Si no existe, es más honesto decirlo que
+    // caer de nuevo a la ruta de <img> que causaba el bug original.
+    throw new Error(
+      "Este navegador no soporta la decodificación de imágenes necesaria. Actualiza tu navegador e intenta de nuevo.",
+    );
+  }
+
   let ultimoError;
 
-  // Se normaliza UNA sola vez fuera del loop — leer 12 bytes es barato,
-  // pero no hay razón para repetirlo en cada reintento.
-  const archivoConMimeReal = await normalizarMimeArchivo(file);
-
   for (let intento = 1; intento <= REINTENTOS_LECTURA; intento++) {
-    const objectUrl = URL.createObjectURL(archivoConMimeReal);
     try {
       // eslint-disable-next-line no-await-in-loop
-      const img = await cargarImagenDesdeObjectUrl(objectUrl);
-
-      if (typeof createImageBitmap === "function") {
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          return await createImageBitmap(img);
-        } catch {
-          // createImageBitmap falló sobre un <img> que YA cargó bien —
-          // no es el fallo que nos ocupa, seguimos con el <img> mismo.
-          return img;
-        }
-      }
-      return img;
+      const buffer = await file.arrayBuffer();
+      // Se reempaqueta como Blob nuevo (no createImageBitmap(file) directo)
+      // para no depender de que el File original siga siendo una referencia
+      // válida al momento de decodificar — buffer ya es una copia en memoria
+      // que no puede "perderse" ni bloquearse por el sistema de archivos.
+      const blob = new Blob([buffer], { type: file.type || "image/jpeg" });
+      // eslint-disable-next-line no-await-in-loop
+      return await createImageBitmap(blob);
     } catch (err) {
       ultimoError = err;
       // 🔧 Diagnóstico real (no a ciegas): si vuelve a fallar, esto queda
       // en la consola del celular con lo que SÍ sabemos del archivo —
-      // tipo original vs. detectado, tamaño, nombre — para poder pedirle
-      // al usuario ese log si el toast solo no alcanza para diagnosticar.
+      // tipo, tamaño, nombre, y el DOMException real con su .name/.message.
       console.warn(
         `[imageUtils] Intento ${intento}/${REINTENTOS_LECTURA} falló al decodificar "${file.name}" ` +
-          `(type original: "${file.type}", tamaño: ${file.size} bytes):`,
+          `(type: "${file.type}", tamaño: ${file.size} bytes):`,
         err,
       );
       if (intento < REINTENTOS_LECTURA) {
         // eslint-disable-next-line no-await-in-loop
         await esperar(ESPERA_BASE_MS * intento);
       }
-    } finally {
-      URL.revokeObjectURL(objectUrl);
     }
   }
 
@@ -229,9 +164,9 @@ const decodificarImagen = async (file) => {
  * @returns {Promise<Blob>}
  */
 export const comprimirImagen = async (file) => {
-  const source = await decodificarImagen(file);
+  const bitmap = await decodificarImagen(file);
 
-  let { width, height } = source; // ImageBitmap y HTMLImageElement exponen ambos .width/.height
+  let { width, height } = bitmap;
 
   if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
     if (width > height) {
@@ -246,12 +181,12 @@ export const comprimirImagen = async (file) => {
   const canvas  = document.createElement("canvas");
   canvas.width  = width;
   canvas.height = height;
-  canvas.getContext("2d").drawImage(source, 0, 0, width, height);
+  canvas.getContext("2d").drawImage(bitmap, 0, 0, width, height);
 
-  // Los ImageBitmap retienen memoria de decodificación hasta que se
-  // liberan explícitamente (a diferencia de <img>, que el GC recicla
-  // solo) — ya volcamos los píxeles al canvas, así que se puede cerrar.
-  if (typeof source.close === "function") source.close();
+  // El ImageBitmap retiene memoria de decodificación hasta que se
+  // libera explícitamente — ya volcamos los píxeles al canvas, así
+  // que se cierra apenas termina de usarse.
+  bitmap.close();
 
   const usarWebp = await soportaWebp();
   const formato   = usarWebp ? "image/webp" : "image/jpeg";
