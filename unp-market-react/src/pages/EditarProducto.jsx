@@ -247,7 +247,9 @@ const EditarProducto = () => {
         IMGBB_TIMEOUT:      "El servidor de imágenes tardó demasiado en responder. Intenta de nuevo.",
         IMGBB_REJECTED:     "El servidor de imágenes rechazó la foto. Probá con otra.",
       };
-      mostrarToast(MENSAJES_ERROR[err?.code] || "Error al guardar. Intenta de nuevo.", "error");
+      // 🔧 Fallback: err.message en vez de un string genérico — ver
+      // el mismo comentario en Publicar.jsx.
+      mostrarToast(MENSAJES_ERROR[err?.code] || err?.message || "Error al guardar. Intenta de nuevo.", "error");
       setBtnTexto("Guardar Cambios");
       setEnviando(false);
       enviandoRef.current = false;

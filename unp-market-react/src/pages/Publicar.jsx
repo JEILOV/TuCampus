@@ -232,7 +232,14 @@ const Publicar = () => {
         IMGBB_TIMEOUT:      "El servidor de imágenes tardó demasiado en responder. Intenta de nuevo.",
         IMGBB_REJECTED:     "El servidor de imágenes rechazó la foto. Probá con otra.",
       };
-      mostrarToast(MENSAJES_ERROR[err?.code] || "Error al publicar. Intenta de nuevo.", "error");
+      // 🔧 Fallback: err.message (NO un string genérico hardcodeado).
+      // Cualquier error que NO sea de subida de imagen — típicamente
+      // de productService.crearProducto — ya llega con un mensaje
+      // específico armado por traducirError() (ver errorHandler.js),
+      // ej. "No tienes permiso para realizar esta acción." en vez de
+      // un genérico "Error al publicar" que no dice nada del motivo
+      // real. Antes se descartaba ese mensaje sin usarlo.
+      mostrarToast(MENSAJES_ERROR[err?.code] || err?.message || "Error al publicar. Intenta de nuevo.", "error");
       setBtnTexto("Publicar Producto");
       setEnviando(false);
       enviandoRef.current = false;

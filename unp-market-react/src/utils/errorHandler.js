@@ -61,14 +61,23 @@ export const traducirError = (error, contexto = "default") => {
 };
 
 /**
- * Loguea el error en consola con contexto — solo en desarrollo.
- * En producción Vite elimina los console.error del bundle final.
+ * Loguea el error en consola con contexto.
+ *
+ * 🔧 Se loguea SIEMPRE, también en producción — no solo en DEV.
+ * Antes tenía un guard `if (import.meta.env.DEV)` bajo el supuesto de
+ * que "Vite elimina los console.error del bundle final en producción",
+ * pero eso es falso para este proyecto: no hay `drop_console` ni config
+ * de terser en vite.config.js, así que ese guard simplemente apagaba
+ * TODO logging en producción sin que nada lo reemplazara. Resultado:
+ * un error real de un usuario en el celular era invisible incluso
+ * conectando el teléfono por USB y abriendo chrome://inspect — la
+ * consola remota estaba vacía porque logError nunca llegaba a loguear
+ * nada fuera de DEV. Sin visibilidad en producción no hay forma de
+ * diagnosticar un bug que solo reproduce ahí.
  *
  * @param {string} origen  Ej: "[productService.crearProducto]"
  * @param {Error}  error
  */
 export const logError = (origen, error) => {
-  if (import.meta.env.DEV) {
-    console.error(origen, error);
-  }
+  console.error(origen, error);
 };

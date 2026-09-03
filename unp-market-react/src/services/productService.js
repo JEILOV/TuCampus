@@ -15,7 +15,7 @@ export const obtenerProductoPorId = async (productoId) => {
     return snap.exists() ? { id: snap.id, ...snap.data() } : null;
   } catch (err) {
     logError("[productService.obtenerProductoPorId]", err);
-    throw new Error(traducirError(err, "firestore"));
+    throw Object.assign(new Error(traducirError(err, "firestore")), { code: err?.code });
   }
 };
 
@@ -188,7 +188,14 @@ export const crearProducto = async ({ titulo, precio, categoria, condicion, desc
     return nuevoRef.id;
   } catch (err) {
     logError("[productService.crearProducto]", err);
-    throw new Error(traducirError(err, "firestore")); // mensaje limpio hacia el componente
+    // 🔧 Se preserva err.code (el código real de Firebase, ej.
+    // "permission-denied", "unavailable") en vez de lanzar un Error
+    // plano — sin esto, el componente que llama (Publicar.jsx) no
+    // tiene forma de distinguir ESTE fallo (Firestore) de un fallo de
+    // subida de imagen, y ambos terminaban mostrando el mismo mensaje
+    // genérico de fallback aunque `traducirError` ya arma acá mismo un
+    // mensaje específico y útil en err.message.
+    throw Object.assign(new Error(traducirError(err, "firestore")), { code: err?.code }); // preserva err.code original (ver comentario arriba de crearProducto)
   }
 };
 
@@ -241,7 +248,7 @@ export const actualizarProducto = async (productoId, { titulo, precio, categoria
     });
   } catch (err) {
     logError("[productService.actualizarProducto]", err);
-    throw new Error(traducirError(err, "firestore"));
+    throw Object.assign(new Error(traducirError(err, "firestore")), { code: err?.code });
   }
 };
 
@@ -250,7 +257,7 @@ export const eliminarProducto = async (productoId) => {
     await deleteDoc(doc(db, "productos", productoId));
   } catch (err) {
     logError("[productService.eliminarProducto]", err);
-    throw new Error(traducirError(err, "firestore"));
+    throw Object.assign(new Error(traducirError(err, "firestore")), { code: err?.code });
   }
 };
 
@@ -264,6 +271,6 @@ export const cambiarEstadoProducto = async (productoId, nuevoEstado) => {
     await updateDoc(doc(db, "productos", productoId), { estado: nuevoEstado });
   } catch (err) {
     logError("[productService.cambiarEstadoProducto]", err);
-    throw new Error(traducirError(err, "firestore"));
+    throw Object.assign(new Error(traducirError(err, "firestore")), { code: err?.code });
   }
 };
