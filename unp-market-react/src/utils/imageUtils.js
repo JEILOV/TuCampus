@@ -11,7 +11,8 @@
 //         de aquí. Cambiar la calidad = cambiar 1 constante.
 // ============================================================
 
-import { logError } from "./errorHandler";
+// (logError ya no se usa en este archivo — la subida de imagen ahora
+// delega el manejo de errores al catch de quien llame a subirImagenImgBB.)
 
 const MAX_DIMENSION = 1080;
 const CALIDAD_JPEG  = 0.70;
@@ -58,96 +59,12 @@ const soportaWebp = () => {
 const toBlobAsync = (canvas, formato, calidad) =>
   new Promise((resolve) => canvas.toBlob(resolve, formato, calidad));
 
-// ── Decodificación robusta de archivos de imagen ────────────────
-// 🔧 Por qué hace falta esto y no una sola FileReader+Image directa:
-// fotos guardadas desde apps como Pinterest o WhatsApp en Android
-// llegan con `file.type` vacío o inconsistente, y ADEMÁS es muy común
-// que un archivo "recién guardado" en la galería sea en realidad un
-// stub respaldado en la nube (Google Photos con backup + "liberar
-// espacio", OneDrive, etc.) — aparece en el picker pero el SO todavía
-// no bajó los bytes reales a disco. Leerlo de inmediato puede fallar
-// con NotReadableError/NotFoundError aunque la foto sea válida, sin
-// que tenga nada que ver con el formato. Por eso: dos vías de
-// decodificación distintas + reintentos cortos, en vez de una sola
-// lectura que revienta a la primera.
-const INTENTOS_LECTURA      = 3;
-const ESPERA_REINTENTO_MS   = 400;
-const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Decodifica el archivo a algo que canvas.drawImage() acepte
-// (ImageBitmap o HTMLImageElement) probando primero la vía más
-// robusta y cayendo a la clásica solo si hace falta.
-const decodificarImagen = async (file) => {
-  // Vía 1 — createImageBitmap: decodifica directo desde los BYTES del
-  // Blob (sniffea el formato real del archivo, no depende de
-  // file.type) y soporta WebP/AVIF nativamente en Chrome/Edge/Firefox
-  // — justo lo que falla con la vía clásica cuando el MIME viene
-  // confuso. Es la vía más resiliente disponible hoy, así que se
-  // intenta primero.
-  if (typeof createImageBitmap === "function") {
-    try {
-      const bitmap = await createImageBitmap(file);
-      return { source: bitmap, width: bitmap.width, height: bitmap.height, cerrar: () => bitmap.close() };
-    } catch (err) {
-      // No es fatal todavía — cae al fallback de abajo. Pasa, por
-      // ejemplo, en navegadores que no decodifican cierto formato vía
-      // createImageBitmap aunque sí puedan por <img> (algunos Safari).
-      logError("[imageUtils.decodificarImagen] createImageBitmap falló, probando fallback", err);
-    }
-  }
-
-  // Vía 2 (fallback universal) — FileReader → data URL → <img>. Menos
-  // resiliente a formatos raros que la Vía 1, pero funciona en
-  // cualquier navegador, incluso sin soporte de createImageBitmap.
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader   = new FileReader();
-    reader.onerror = () => reject(reader.error || new Error("No se pudo leer el archivo"));
-    reader.onload  = () => resolve(reader.result);
-    reader.readAsDataURL(file);
-  });
-
-  const img = await new Promise((resolve, reject) => {
-    const image   = new Image();
-    image.onerror = () => reject(new Error("No se pudo cargar la imagen"));
-    image.onload  = () => resolve(image);
-    image.src = dataUrl;
-  });
-
-  return { source: img, width: img.naturalWidth || img.width, height: img.naturalHeight || img.height, cerrar: () => {} };
-};
-
-// Reintenta decodificarImagen() con una espera corta entre intentos —
-// cubre el caso de un archivo que momentáneamente no es legible
-// (todavía sincronizándose desde la nube) y que sí funciona si se
-// reintenta un instante después, en vez de fallar a la primera.
-const decodificarConReintentos = async (file) => {
-  let ultimoError;
-  for (let intento = 1; intento <= INTENTOS_LECTURA; intento++) {
-    try {
-      return await decodificarImagen(file);
-    } catch (err) {
-      ultimoError = err;
-      logError(`[imageUtils.decodificarConReintentos] intento ${intento}/${INTENTOS_LECTURA} falló`, err);
-      if (intento < INTENTOS_LECTURA) await esperar(ESPERA_REINTENTO_MS);
-    }
-  }
-  // Se agotaron los intentos — se relanza el último error tal cual
-  // (preserva su .name original, ej. NotReadableError, útil para
-  // diagnosticar en los logs de producción ahora que logError sí
-  // loguea ahí — ver errorHandler.js).
-  throw ultimoError;
-};
-
 /**
  * Comprime una imagen usando Canvas.
  * Redimensiona a MAX_DIMENSION px en el lado más largo, mantiene el
  * ratio, y exporta en el formato más liviano disponible: WebP si el
  * navegador lo soporta (~25-35% más liviano que JPEG a calidad
  * visual equivalente), o JPEG al 70% como fallback universal.
- *
- * La lectura/decodificación del archivo de origen es resiliente a
- * MIME types confusos y a archivos momentáneamente no legibles — ver
- * decodificarConReintentos() arriba.
  *
  * Si el resultado sigue superando TAMANO_MAXIMO_BYTES (fotos con
  * mucho detalle/ruido que no bajan de peso solo con la calidad base),
@@ -159,38 +76,41 @@ const decodificarConReintentos = async (file) => {
  * @param {File} file
  * @returns {Promise<Blob>}
  */
-export const comprimirImagen = async (file) => {
-  const { source, width: anchoOriginal, height: altoOriginal, cerrar } = await decodificarConReintentos(file);
+export const comprimirImagen = (file) =>
+  new Promise((resolve, reject) => {
+    const reader   = new FileReader();
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+    reader.onload  = (e) => {
+      const img    = new Image();
+      img.onerror  = () => reject(new Error("No se pudo cargar la imagen"));
+      img.onload   = async () => {
+        let { width, height } = img;
 
-  let width  = anchoOriginal;
-  let height = altoOriginal;
+        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIMENSION) / width);
+            width  = MAX_DIMENSION;
+          } else {
+            width  = Math.round((width  * MAX_DIMENSION) / height);
+            height = MAX_DIMENSION;
+          }
+        }
 
-  if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-    if (width > height) {
-      height = Math.round((height * MAX_DIMENSION) / width);
-      width  = MAX_DIMENSION;
-    } else {
-      width  = Math.round((width  * MAX_DIMENSION) / height);
-      height = MAX_DIMENSION;
-    }
-  }
+        const canvas  = document.createElement("canvas");
+        canvas.width  = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
 
-  const canvas  = document.createElement("canvas");
-  canvas.width  = width;
-  canvas.height = height;
-  canvas.getContext("2d").drawImage(source, 0, 0, width, height);
-  cerrar(); // libera el ImageBitmap si esa fue la vía usada — no-op si fue <img>
+        const usarWebp = await soportaWebp();
+        const formato   = usarWebp ? "image/webp" : "image/jpeg";
+        const calidad   = usarWebp ? CALIDAD_WEBP : CALIDAD_JPEG;
 
-  const usarWebp = await soportaWebp();
-  const formato   = usarWebp ? "image/webp" : "image/jpeg";
-  const calidad   = usarWebp ? CALIDAD_WEBP : CALIDAD_JPEG;
+        let blob = await toBlobAsync(canvas, formato, calidad);
 
-  let blob = await toBlobAsync(canvas, formato, calidad);
-
-  // 🔧 Recompresión defensiva: la foto sigue pesando más de lo
-  // esperado a la calidad base — probamos calidades más bajas
-  // sobre el mismo canvas hasta entrar bajo el techo, o hasta
-  // agotar los intentos (nos quedamos con la última pasada aunque
+        // 🔧 Recompresión defensiva: la foto sigue pesando más de lo
+        // esperado a la calidad base — probamos calidades más bajas
+        // sobre el mismo canvas hasta entrar bajo el techo, o hasta
+        // agotar los intentos (nos quedamos con la última pasada aunque
         // no haya bajado del todo — nunca es peor que el original).
         for (const calidadMenor of PASADAS_RECOMPRESION) {
           if (!blob || blob.size <= TAMANO_MAXIMO_BYTES) break;
