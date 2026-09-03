@@ -68,20 +68,24 @@ const ESPERA_BASE_MS = 300; // backoff lineal: 300ms, 600ms entre intentos
 
 const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Fallback clásico: FileReader → data URL → <img>. Se mantiene tal
-// cual estaba antes (era el único camino), ahora como pieza reutilizable
-// que decodificarImagen() reintenta igual que a createImageBitmap.
-const leerConFileReader = (file) =>
+// Carga un <img> desde una blob: URL. A diferencia de FileReader.readAsDataURL
+// (copia el archivo entero a memoria como base64 antes de decodificar) y de
+// createImageBitmap(file) directo sobre el File crudo (en Chrome/Android falla
+// con frecuencia cuando el File viene de un descriptor virtual de galería/nube
+// — Google Photos/Pinterest), URL.createObjectURL deja que el propio pipeline
+// de red/decodificación de imágenes del navegador maneje el archivo por
+// streaming. Es el camino documentado como más robusto para este caso puntual.
+//
+// img.onerror solo entrega un Event genérico (no un Error con detalle real),
+// así que el mensaje que arma este helper ya es lo más específico que el
+// navegador permite saber en este punto.
+const cargarImagenDesdeObjectUrl = (objectUrl) =>
   new Promise((resolve, reject) => {
-    const reader   = new FileReader();
-    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
-    reader.onload  = (e) => {
-      const img   = new Image();
-      img.onerror = () => reject(new Error("No se pudo cargar la imagen"));
-      img.onload  = () => resolve(img);
-      img.src     = e.target.result;
-    };
-    reader.readAsDataURL(file);
+    const img = new Image();
+    img.onload  = () => resolve(img);
+    img.onerror = () =>
+      reject(new Error("El navegador no pudo decodificar la imagen (formato no soportado o archivo corrupto/incompleto)"));
+    img.src = objectUrl;
   });
 
 /**
@@ -89,57 +93,65 @@ const leerConFileReader = (file) =>
  * HTMLImageElement, ambos exponen .width/.height y son válidos para
  * drawImage()), blindada contra fallos transitorios de lectura.
  *
- * Camino primario: createImageBitmap(file) decodifica directo desde
- * los bytes crudos del archivo — no pasa por FileReader.readAsDataURL
- * ni por el <img> del DOM, que es justo donde Android revienta con
- * archivos "stub" (recién sincronizados desde Google Photos/Pinterest,
- * aún bloqueados o incompletos en el storage del sistema). Además no
- * depende del MIME type/extensión declarados y soporta WebP/AVIF.
+ * Camino primario: URL.createObjectURL(file) + <img>. Se prefiere sobre
+ * createImageBitmap(file) directo o FileReader.readAsDataURL porque ambos
+ * exigen leer los bytes completos del File de una sola vez en JS — que es
+ * justo donde Android revienta con archivos "stub" (recién sincronizados
+ * desde Google Photos/Pinterest, aún bloqueados o incompletos en el storage
+ * del sistema). Con una blob: URL, es el propio motor del navegador el que
+ * hace streaming del archivo, con su manejo nativo de reintentos/bloqueos.
  *
- * Cada camino reintenta hasta REINTENTOS_LECTURA veces con una espera
- * creciente entre intentos — el bloqueo suele ser cuestión de
- * milisegundos mientras el sistema termina de materializar el archivo.
+ * Una vez que el <img> cargó bien, SI el navegador soporta createImageBitmap
+ * se lo pasamos a ÉL (no al File crudo) para aprovechar la decodificación
+ * acelerada — pero como fuente ya es un <img> válido, si esto fallara no es
+ * crítico: seguimos usando el propio <img> para dibujar en canvas.
  *
- * Fallback: si createImageBitmap no existe (Safari viejo) o agota sus
- * reintentos, se cae a FileReader + Image (el único camino que existía
- * antes), también con reintentos propios por si el fallo no era
- * específico de createImageBitmap sino del archivo en sí.
+ * Reintenta hasta REINTENTOS_LECTURA veces con espera creciente — el
+ * bloqueo del archivo suele ser cuestión de milisegundos mientras el
+ * sistema termina de materializarlo.
+ *
+ * Si se agotan los reintentos, propaga el ERROR NATIVO real
+ * (`nombre: mensaje`) en vez de un mensaje genérico — así el toast en
+ * producción dice exactamente qué está fallando en el celular del usuario.
  *
  * @param {File} file
  * @returns {Promise<ImageBitmap|HTMLImageElement>}
  */
 const decodificarImagen = async (file) => {
-  if (typeof createImageBitmap === "function") {
-    for (let intento = 1; intento <= REINTENTOS_LECTURA; intento++) {
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        return await createImageBitmap(file);
-      } catch {
-        if (intento < REINTENTOS_LECTURA) {
-          // eslint-disable-next-line no-await-in-loop
-          await esperar(ESPERA_BASE_MS * intento);
-        }
-        // último intento agotado → cae al fallback de abajo, no al reject
-      }
-    }
-  }
-
   let ultimoError;
+
   for (let intento = 1; intento <= REINTENTOS_LECTURA; intento++) {
+    const objectUrl = URL.createObjectURL(file);
     try {
       // eslint-disable-next-line no-await-in-loop
-      return await leerConFileReader(file);
+      const img = await cargarImagenDesdeObjectUrl(objectUrl);
+
+      if (typeof createImageBitmap === "function") {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          return await createImageBitmap(img);
+        } catch {
+          // createImageBitmap falló sobre un <img> que YA cargó bien —
+          // no es el fallo que nos ocupa, seguimos con el <img> mismo.
+          return img;
+        }
+      }
+      return img;
     } catch (err) {
       ultimoError = err;
       if (intento < REINTENTOS_LECTURA) {
         // eslint-disable-next-line no-await-in-loop
         await esperar(ESPERA_BASE_MS * intento);
       }
+    } finally {
+      URL.revokeObjectURL(objectUrl);
     }
   }
-  // Agotados ambos caminos y todos los reintentos: el archivo
-  // realmente no se puede leer (no es un bloqueo transitorio).
-  throw ultimoError || new Error("No se pudo leer el archivo");
+
+  const detalle = ultimoError
+    ? `${ultimoError.name || "Error"}: ${ultimoError.message || ultimoError}`
+    : "causa desconocida";
+  throw new Error(`No se pudo leer el archivo (${detalle})`);
 };
 
 /**
