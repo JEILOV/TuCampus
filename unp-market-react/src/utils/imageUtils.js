@@ -21,6 +21,22 @@ const CALIDAD_WEBP  = 0.75; // WebP mantiene mejor calidad visual a menor peso q
 // VITE_IMGBB_API_KEY, visible en el bundle para cualquiera). Ahora
 // vive solo en el servidor como IMGBB_API_KEY — ver api/upload-image.js.
 
+// 🔧 Techo duro de tamaño (bytes), además del control por dimensión y
+// calidad de arriba. Por qué hace falta un techo aparte: dimensión +
+// calidad fijas no garantizan un tamaño final acotado — una foto con
+// mucho detalle (textura, ruido, muchos colores) puede seguir pesando
+// varios MB incluso a 1080px/70%. Sin este techo, esas fotos puntuales
+// son justamente las que arriesgan pegarle al límite de payload de
+// Vercel (4.5MB) y, más importante en la práctica, tardan más en subir
+// por una red móvil lenta — aumentando el riesgo de pegarle al timeout
+// de 10s del plan Hobby. 900KB deja margen de sobra bajo ambos límites.
+const TAMANO_MAXIMO_BYTES = 900 * 1024;
+// Pasadas extra de recompresión si la primera sigue pesando de más —
+// cada pasada baja la calidad; ambas reusan el MISMO canvas ya
+// dibujado (canvas.toBlob de nuevo), así que son baratas: no hay que
+// re-decodificar ni re-dibujar la imagen original.
+const PASADAS_RECOMPRESION = [0.5, 0.35];
+
 // 🔧 Optimización de rendimiento: feature-detection de soporte WebP en
 // canvas.toBlob(). Se resuelve UNA sola vez (no en cada compresión) y
 // se cachea en este módulo — es una operación async barata pero no hay
@@ -38,12 +54,24 @@ const soportaWebp = () => {
   return soportaWebpPromise;
 };
 
+// Versión promisificada de canvas.toBlob — evita repetir el mismo
+// patrón callback en cada pasada de recompresión.
+const toBlobAsync = (canvas, formato, calidad) =>
+  new Promise((resolve) => canvas.toBlob(resolve, formato, calidad));
+
 /**
  * Comprime una imagen usando Canvas.
  * Redimensiona a MAX_DIMENSION px en el lado más largo, mantiene el
  * ratio, y exporta en el formato más liviano disponible: WebP si el
  * navegador lo soporta (~25-35% más liviano que JPEG a calidad
  * visual equivalente), o JPEG al 70% como fallback universal.
+ *
+ * Si el resultado sigue superando TAMANO_MAXIMO_BYTES (fotos con
+ * mucho detalle/ruido que no bajan de peso solo con la calidad base),
+ * reintenta con las calidades de PASADAS_RECOMPRESION sobre el MISMO
+ * canvas ya dibujado — sin volver a decodificar ni redibujar la
+ * imagen original, así que cada pasada extra es barata incluso en
+ * un celular de gama baja.
  *
  * @param {File} file
  * @returns {Promise<Blob>}
@@ -77,8 +105,20 @@ export const comprimirImagen = (file) =>
         const formato   = usarWebp ? "image/webp" : "image/jpeg";
         const calidad   = usarWebp ? CALIDAD_WEBP : CALIDAD_JPEG;
 
+        let blob = await toBlobAsync(canvas, formato, calidad);
+
+        // 🔧 Recompresión defensiva: la foto sigue pesando más de lo
+        // esperado a la calidad base — probamos calidades más bajas
+        // sobre el mismo canvas hasta entrar bajo el techo, o hasta
+        // agotar los intentos (nos quedamos con la última pasada aunque
+        // no haya bajado del todo — nunca es peor que el original).
+        for (const calidadMenor of PASADAS_RECOMPRESION) {
+          if (!blob || blob.size <= TAMANO_MAXIMO_BYTES) break;
+          blob = await toBlobAsync(canvas, formato, calidadMenor);
+        }
+
         // fallback al archivo original si canvas.toBlob devuelve null
-        canvas.toBlob((blob) => resolve(blob ?? file), formato, calidad);
+        resolve(blob ?? file);
       };
       img.src = e.target.result;
     };
@@ -135,6 +175,15 @@ export const subirImagenImgBB = async (file, onProgress) => {
     xhr.open("POST", "/api/upload-image");
     xhr.setRequestHeader("Content-Type", "application/json");
 
+    // 🔧 Techo de tiempo del lado del cliente. Por qué hace falta además
+    // del timeout que ya pusimos en el servidor (ver api/upload-image.js):
+    // ese timeout protege lo que pasa DENTRO de la función serverless,
+    // pero si la red móvil del usuario es tan lenta que el request ni
+    // siquiera termina de LLEGAR a Vercel, el cliente se queda esperando
+    // indefinidamente sin este límite. 20s da margen sobre el límite de
+    // 10s de Vercel (Hobby) + tiempo de subida real en una red lenta.
+    xhr.timeout = 20000;
+
     if (onProgress) {
       xhr.upload.onprogress = (e) => {
         if (!e.lengthComputable) return;
@@ -143,20 +192,39 @@ export const subirImagenImgBB = async (file, onProgress) => {
     }
 
     xhr.onload = () => {
+      // 🔧 413/502/504 pueden venir directo de la plataforma de Vercel
+      // (payload demasiado grande, o la función excedió su tiempo
+      // máximo) — en esos casos NO hay body JSON que parsear (es una
+      // página de error de la plataforma), así que se resuelven por
+      // status ANTES de intentar JSON.parse, con un `code` explícito
+      // que el llamador puede usar para mostrar un mensaje específico.
+      if (xhr.status === 413) {
+        reject(Object.assign(new Error("La imagen es demasiado pesada para subir."), { code: "PAYLOAD_TOO_LARGE" }));
+        return;
+      }
+      if (xhr.status === 502 || xhr.status === 504) {
+        reject(Object.assign(new Error("La subida tardó demasiado. Intenta de nuevo."), { code: "UPLOAD_TIMEOUT" }));
+        return;
+      }
+
       try {
         const data = JSON.parse(xhr.responseText);
         if (xhr.status >= 200 && xhr.status < 300 && data.url) {
           onProgress?.(100);
           resolve(data.url);
         } else {
-          reject(new Error(data?.error || "No se pudo subir la imagen"));
+          // Nuestro propio servidor puede devolver un `code` (p. ej.
+          // IMGBB_TIMEOUT) — se propaga tal cual si viene.
+          reject(Object.assign(new Error(data?.error || "No se pudo subir la imagen"), { code: data?.code || "SERVER_ERROR" }));
         }
       } catch {
-        reject(new Error("Respuesta inválida del servidor de imágenes"));
+        reject(Object.assign(new Error("Respuesta inválida del servidor de imágenes"), { code: "SERVER_ERROR" }));
       }
     };
 
-    xhr.onerror = () => reject(new Error("Error de red al subir la imagen"));
+    xhr.onerror   = () => reject(Object.assign(new Error("Error de red al subir la imagen"), { code: "NETWORK_ERROR" }));
+    xhr.ontimeout = () => reject(Object.assign(new Error("La subida tardó demasiado. Verifica tu conexión."), { code: "UPLOAD_TIMEOUT" }));
+
     xhr.send(JSON.stringify({ imageBase64 }));
   });
 };

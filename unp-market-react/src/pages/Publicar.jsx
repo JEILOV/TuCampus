@@ -173,6 +173,11 @@ const Publicar = () => {
     setProgreso(0);
     try {
       setBtnTexto(previews.length > 1 ? "Subiendo fotos..." : "Subiendo imagen...");
+      // 🔧 Si subirImagenes() rechaza, el `await` de abajo corta la
+      // ejecución acá mismo — crearProducto() (y por lo tanto la
+      // escritura en Firestore) NUNCA se llega a invocar. No hace
+      // falta un flag ni un early-return extra: un solo try secuencial
+      // ya garantiza que no se cree un producto sin sus fotos.
       const imagenesFinal = await subirImagenes(
         previews.map((p) => p.file),
         (pct) => setProgreso(pct),
@@ -215,7 +220,19 @@ const Publicar = () => {
       navigate("/", { state: { toastPublicar: true } });
     } catch (err) {
       console.error("[Publicar] Error:", err);
-      mostrarToast("Error al publicar. Intenta de nuevo.", "error");
+      // 🔧 err.code viene de subirImagenImgBB() (imageUtils.js) cuando
+      // el fallo es de la subida de imagen — nos deja distinguir un
+      // 413/504/timeout de mobile de un error genérico de Firestore,
+      // en vez de mostrar siempre el mismo "Error al publicar" sin
+      // pista de qué pasó.
+      const MENSAJES_ERROR = {
+        PAYLOAD_TOO_LARGE: "La foto es demasiado pesada para subir. Probá con otra foto o mejorá tu conexión.",
+        UPLOAD_TIMEOUT:     "La subida tardó demasiado — tu conexión puede estar lenta. Intenta de nuevo.",
+        NETWORK_ERROR:      "Se perdió la conexión al subir la imagen. Verifica tu señal e intenta de nuevo.",
+        IMGBB_TIMEOUT:      "El servidor de imágenes tardó demasiado en responder. Intenta de nuevo.",
+        IMGBB_REJECTED:     "El servidor de imágenes rechazó la foto. Probá con otra.",
+      };
+      mostrarToast(MENSAJES_ERROR[err?.code] || "Error al publicar. Intenta de nuevo.", "error");
       setBtnTexto("Publicar Producto");
       setEnviando(false);
       enviandoRef.current = false;

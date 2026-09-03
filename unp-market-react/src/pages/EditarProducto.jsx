@@ -236,7 +236,18 @@ const EditarProducto = () => {
       navigate("/perfil", { state: { toastEditar: true } });
     } catch (err) {
       console.error("[EditarProducto] Error:", err);
-      mostrarToast("Error al guardar. Intenta de nuevo.", "error");
+      // 🔧 Mismo criterio que Publicar.jsx: err.code viene de
+      // subirImagenImgBB() (imageUtils.js) cuando el fallo es de la
+      // subida de imagen — permite distinguir un 413/504/timeout de
+      // mobile de un error genérico de Firestore.
+      const MENSAJES_ERROR = {
+        PAYLOAD_TOO_LARGE: "La foto es demasiado pesada para subir. Probá con otra foto o mejorá tu conexión.",
+        UPLOAD_TIMEOUT:     "La subida tardó demasiado — tu conexión puede estar lenta. Intenta de nuevo.",
+        NETWORK_ERROR:      "Se perdió la conexión al subir la imagen. Verifica tu señal e intenta de nuevo.",
+        IMGBB_TIMEOUT:      "El servidor de imágenes tardó demasiado en responder. Intenta de nuevo.",
+        IMGBB_REJECTED:     "El servidor de imágenes rechazó la foto. Probá con otra.",
+      };
+      mostrarToast(MENSAJES_ERROR[err?.code] || "Error al guardar. Intenta de nuevo.", "error");
       setBtnTexto("Guardar Cambios");
       setEnviando(false);
       enviandoRef.current = false;

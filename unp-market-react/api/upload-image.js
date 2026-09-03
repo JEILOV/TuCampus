@@ -62,17 +62,35 @@ export default async function handler(req, res) {
     const form = new URLSearchParams();
     form.append("image", imageBase64);
 
-    const respuestaImgBB = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: form.toString(),
-    });
+    // 🔧 Timeout propio de 8s (< los 10s duros del plan Hobby). Por qué
+    // hace falta: si ImgBB responde lento (o no responde), sin esto la
+    // plataforma de Vercel mata la función entera a los 10s con un 504
+    // SIN body — el cliente recibe una página de error, no el JSON de
+    // este catch, y ve un mensaje genérico sin poder distinguir qué pasó.
+    // Con este AbortSignal, SIEMPRE respondemos nosotros primero, con un
+    // 504 limpio y un `code` que el cliente puede usar para un mensaje
+    // específico (ver imageUtils.subirImagenImgBB).
+    let respuestaImgBB;
+    try {
+      respuestaImgBB = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form.toString(),
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch (fetchErr) {
+      if (fetchErr?.name === "TimeoutError" || fetchErr?.name === "AbortError") {
+        console.error("[api/upload-image] Timeout esperando respuesta de ImgBB (>8s).");
+        return res.status(504).json({ error: "ImgBB tardó demasiado en responder.", code: "IMGBB_TIMEOUT" });
+      }
+      throw fetchErr; // cualquier otro fallo de red cae al catch general de abajo
+    }
 
     const data = await respuestaImgBB.json().catch(() => null);
 
     if (!respuestaImgBB.ok || !data?.success) {
       console.error("[api/upload-image] ImgBB rechazó la imagen:", respuestaImgBB.status, data);
-      return res.status(502).json({ error: "ImgBB rechazó la imagen." });
+      return res.status(502).json({ error: "ImgBB rechazó la imagen.", code: "IMGBB_REJECTED" });
     }
 
     return res.status(200).json({ url: data.data.url });
