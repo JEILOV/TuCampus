@@ -61,8 +61,8 @@
 // ============================================================
 
 import {
-  doc, getDoc, setDoc, updateDoc,
-  collection, query, where, orderBy,
+  doc, getDoc, getDocs, setDoc, updateDoc,
+  collection, query, where, orderBy, limitToLast, endBefore,
   onSnapshot, writeBatch, serverTimestamp, increment,
   arrayUnion, arrayRemove,
 } from "firebase/firestore";
@@ -349,21 +349,41 @@ export const editarMensaje = async (chatId, mensajeId, miUid, nuevoTexto) => {
   }
 };
 
+// ── Paginación de mensajes ────────────────────────────────────
+// 🔧 Por qué hace falta un límite: antes `suscribirMensajes` traía TODA
+// la subcolección de golpe con un solo onSnapshot — en una conversación
+// larga (cientos de mensajes) eso significa una lectura de Firestore por
+// cada mensaje histórico en CADA carga de la página, más un listener que
+// recalcula el array completo ante cualquier cambio. `MENSAJES_LIMITE_INICIAL`
+// acota la ventana en vivo a los últimos N mensajes; los más viejos se
+// traen bajo demanda con `cargarMensajesAnteriores` (una sola lectura,
+// sin listener) cuando el usuario los pide explícitamente.
+export const MENSAJES_LIMITE_INICIAL = 40;
+
 // ── Suscribirse a los mensajes de un chat (tiempo real) ──────
 /**
- * Escucha en tiempo real los mensajes de una sala, ordenados
- * cronológicamente. Devuelve la función de limpieza (unsubscribe).
+ * Escucha en tiempo real los ÚLTIMOS `limite` mensajes de una sala,
+ * ordenados cronológicamente (asc). Devuelve la función de limpieza
+ * (unsubscribe).
+ *
+ * Esto es la "ventana en vivo": siempre refleja los mensajes más
+ * recientes tal como llegan. El historial más antiguo que esta ventana
+ * NO se trae acá — para eso está `cargarMensajesAnteriores`, que hace
+ * una lectura puntual (sin listener) y el componente que llama es quien
+ * combina ambos arrays en la UI (ver Chat.jsx).
  *
  * @param {string} chatId
  * @param {(mensajes: Array<Object>) => void} callback
+ * @param {number} [limite]  Cantidad de mensajes recientes a mantener en vivo.
  * @returns {() => void} unsubscribe
  */
-export const suscribirMensajes = (chatId, callback) => {
+export const suscribirMensajes = (chatId, callback, limite = MENSAJES_LIMITE_INICIAL) => {
   if (!chatId) return () => {};
 
   const q = query(
     collection(db, "chats", chatId, "mensajes"),
-    orderBy("fecha", "asc")
+    orderBy("fecha", "asc"),
+    limitToLast(limite)
   );
 
   const unsub = onSnapshot(q, (snap) => {
@@ -373,6 +393,43 @@ export const suscribirMensajes = (chatId, callback) => {
   });
 
   return unsub;
+};
+
+// ── Cargar una página de mensajes más antiguos ────────────────
+/**
+ * Trae (una sola vez, SIN listener) hasta `limite` mensajes anteriores
+ * a `fechaMasAntigua` — pensado para el botón/scroll "Cargar mensajes
+ * anteriores" de Chat.jsx. `fechaMasAntigua` es el campo `fecha`
+ * (Timestamp de Firestore) del mensaje más viejo que ya está cargado en
+ * pantalla (ya sea de la ventana en vivo o de una página anterior).
+ *
+ * Devuelve `hayMas: true` cuando la página vino completa (`limite`
+ * resultados) — señal de que probablemente queden más mensajes antes;
+ * `false` cuando vino incompleta, es decir que se llegó al principio
+ * de la conversación.
+ *
+ * @param {string} chatId
+ * @param {*} fechaMasAntigua       Timestamp de Firestore del mensaje más viejo ya cargado.
+ * @param {number} [limite]
+ * @returns {Promise<{mensajes: Array<Object>, hayMas: boolean}>}
+ */
+export const cargarMensajesAnteriores = async (chatId, fechaMasAntigua, limite = MENSAJES_LIMITE_INICIAL) => {
+  if (!chatId || !fechaMasAntigua) return { mensajes: [], hayMas: false };
+
+  try {
+    const q = query(
+      collection(db, "chats", chatId, "mensajes"),
+      orderBy("fecha", "asc"),
+      endBefore(fechaMasAntigua),
+      limitToLast(limite)
+    );
+    const snap = await getDocs(q);
+    const mensajes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    return { mensajes, hayMas: mensajes.length === limite };
+  } catch (err) {
+    logError("[chatService.cargarMensajesAnteriores]", err);
+    throw new Error(traducirError(err, "firestore"));
+  }
 };
 
 // ── Suscribirse a la lista de chats del usuario (tiempo real) ─

@@ -23,6 +23,8 @@ import { useAuth }                                   from "../context/AuthContex
 import {
   suscribirMisChats,
   suscribirMensajes,
+  cargarMensajesAnteriores,
+  MENSAJES_LIMITE_INICIAL,
   enviarMensaje,
   editarMensaje,
   marcarComoLeido,
@@ -554,9 +556,25 @@ const Chat = () => {
   // ── Modo conversación ────────────────────────────────────
   const [chatMeta, setChatMeta]         = useState(null);
   const [cargandoMeta, setCargandoMeta] = useState(true);
-  const [mensajes, setMensajes]         = useState([]);
+  const [mensajes, setMensajes]         = useState([]); // ventana en vivo (últimos N, ver suscribirMensajes)
   const [texto, setTexto]               = useState("");
   const [enviando, setEnviando]         = useState(false);
+
+  // ── Paginación de mensajes ────────────────────────────────
+  // `mensajesAntiguos`: páginas cargadas manualmente (más viejas que la
+  // ventana en vivo), SIN listener — nunca se actualizan solas, solo
+  // crecen hacia atrás cuando el usuario pide más historial.
+  const [mensajesAntiguos, setMensajesAntiguos] = useState([]);
+  const [cargandoAntiguos, setCargandoAntiguos] = useState(false);
+  const [hayMasAntiguos, setHayMasAntiguos]     = useState(false);
+  const esPrimeraVentana = useRef(true); // para decidir hayMasAntiguos solo en la 1ª carga del chat
+  const contenedorMensajesRef = useRef(null); // scroll de la lista, para no "saltar" al cargar historial
+
+  // Lista combinada que se renderiza: historial cargado manualmente +
+  // ventana en vivo. No hay overlap mientras haya más mensajes que
+  // MENSAJES_LIMITE_INICIAL, porque `cargarMensajesAnteriores` siempre
+  // pide `endBefore` el más viejo que ya se ve en pantalla.
+  const mensajesCombinados = [...mensajesAntiguos, ...mensajes];
   const [perfilOtroVivo, setPerfilOtroVivo] = useState(null); // nombre/avatar EN VIVO de /usuarios/{otroUid}
 
   // ── Fase 6: Chat Avanzado ─────────────────────────────────
@@ -609,12 +627,64 @@ const Chat = () => {
     return () => { cancelado = true; };
   }, [chatId]);
 
-  // Mensajes en tiempo real
+  // Mensajes en tiempo real (ventana de los últimos MENSAJES_LIMITE_INICIAL)
   useEffect(() => {
     if (!chatId) { setMensajes([]); return; }
-    const unsub = suscribirMensajes(chatId, setMensajes);
+
+    // Nuevo chat abierto → se limpia el historial paginado del chat anterior
+    // y se vuelve a evaluar desde cero si hay más mensajes viejos por cargar.
+    setMensajesAntiguos([]);
+    setHayMasAntiguos(false);
+    esPrimeraVentana.current = true;
+
+    const unsub = suscribirMensajes(chatId, (nuevos) => {
+      setMensajes(nuevos);
+      // Solo en la primera entrega de este chat: si la ventana en vivo ya
+      // viene "llena" (= al límite), es probable que existan mensajes más
+      // viejos todavía sin cargar → se habilita el botón de historial.
+      if (esPrimeraVentana.current) {
+        setHayMasAntiguos(nuevos.length >= MENSAJES_LIMITE_INICIAL);
+        esPrimeraVentana.current = false;
+      }
+    });
     return () => unsub();
   }, [chatId]);
+
+  // Cargar una página más de mensajes antiguos, preservando la posición
+  // de scroll (si no, al insertar contenido arriba el navegador "salta"
+  // porque scrollTop es un valor absoluto en píxeles, no relativo al
+  // contenido visible).
+  const handleCargarMensajesAnteriores = useCallback(async () => {
+    if (cargandoAntiguos || !hayMasAntiguos) return;
+    const masViejoActual = mensajesAntiguos[0] || mensajes[0];
+    if (!masViejoActual?.fecha) return;
+
+    const contenedor = contenedorMensajesRef.current;
+    const alturaPrevia = contenedor?.scrollHeight ?? 0;
+    const scrollPrevio = contenedor?.scrollTop ?? 0;
+
+    setCargandoAntiguos(true);
+    try {
+      const { mensajes: anteriores, hayMas } = await cargarMensajesAnteriores(
+        chatId,
+        masViejoActual.fecha,
+        MENSAJES_LIMITE_INICIAL
+      );
+      setMensajesAntiguos((prev) => [...anteriores, ...prev]);
+      setHayMasAntiguos(hayMas);
+
+      // Restaurar la posición de scroll DESPUÉS de que React pinte los
+      // mensajes nuevos arriba, para que la vista no se mueva.
+      requestAnimationFrame(() => {
+        if (!contenedor) return;
+        contenedor.scrollTop = contenedor.scrollHeight - alturaPrevia + scrollPrevio;
+      });
+    } catch (err) {
+      mostrarToast(err.message || "No se pudieron cargar mensajes anteriores", "error");
+    } finally {
+      setCargandoAntiguos(false);
+    }
+  }, [chatId, cargandoAntiguos, hayMasAntiguos, mensajesAntiguos, mensajes, mostrarToast]);
 
   // Fase 6: ¿el otro usuario me bloqueó? — se consulta su perfil PÚBLICO
   // (bloqueados vive en /usuarios/{uid}, no en una subcolección privada).
@@ -1107,16 +1177,45 @@ const Chat = () => {
       ) : (
         <>
           {/* Lista de mensajes: ÚNICO elemento con scroll interno (flex:1 + min-height:0) */}
-          <div style={{
-            flex: 1, overflowY: "auto", minHeight: 0, WebkitOverflowScrolling: "touch",
-            display: "flex", flexDirection: "column", padding: "14px 0",
-          }}>
-            {mensajes.length === 0 ? (
+          <div
+            ref={contenedorMensajesRef}
+            onScroll={(e) => {
+              // Disparador al llegar arriba del todo: mismo gesto que el
+              // botón, pero automático (estilo "scroll infinito hacia atrás").
+              if (e.currentTarget.scrollTop <= 40 && hayMasAntiguos && !cargandoAntiguos) {
+                handleCargarMensajesAnteriores();
+              }
+            }}
+            style={{
+              flex: 1, overflowY: "auto", minHeight: 0, WebkitOverflowScrolling: "touch",
+              display: "flex", flexDirection: "column", padding: "14px 0",
+            }}
+          >
+            {hayMasAntiguos && (
+              <div style={{ display: "flex", justifyContent: "center", padding: "4px 0 14px" }}>
+                <button
+                  type="button"
+                  onClick={handleCargarMensajesAnteriores}
+                  disabled={cargandoAntiguos}
+                  style={{
+                    background: "var(--bg-crema)", border: "none", borderRadius: "20px",
+                    padding: "8px 16px", fontSize: "0.78rem", fontWeight: 700,
+                    color: "var(--azul-oscuro)", fontFamily: "'Nunito', sans-serif",
+                    cursor: cargandoAntiguos ? "default" : "pointer",
+                    opacity: cargandoAntiguos ? 0.7 : 1,
+                  }}
+                >
+                  {cargandoAntiguos ? "Cargando..." : "Cargar mensajes anteriores"}
+                </button>
+              </div>
+            )}
+
+            {mensajesCombinados.length === 0 ? (
               <div style={{ textAlign: "center", color: "#a0a5b9", fontWeight: 600, fontSize: "0.85rem", marginTop: "40px" }}>
                 Todavía no hay mensajes. ¡Escribí el primero! 👋
               </div>
             ) : (
-              mensajes.map((m) => (
+              mensajesCombinados.map((m) => (
                 <Burbuja
                   key={m.id}
                   mensaje={m}
