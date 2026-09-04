@@ -26,6 +26,7 @@ import {
   enviarMensaje,
   editarMensaje,
   marcarComoLeido,
+  marcarMensajesComoLeidos,
   ocultarChat,
 }                                       from "../services/chatService";
 import {
@@ -290,6 +291,32 @@ const UMBRAL_SWIPE_RESPONDER = 46;
 const MAX_ARRASTRE_SWIPE     = 72;
 const DURACION_LONG_PRESS_MS = 480;
 
+// 🆕 Doble check estilo WhatsApp — solo se renderiza en mensajes propios
+// (esMio). Un solo trazo (color heredado, `currentColor`) cuando
+// `leido` es false o undefined (mensajes de antes de esta migración
+// también caen acá, y es el comportamiento correcto: no se puede
+// afirmar que se leyeron). Doble trazo azul cuando `leido === true`.
+const ChecksLeido = ({ leido }) => (
+  <svg
+    width="14" height="10" viewBox="0 0 16 11" fill="none"
+    style={{ flexShrink: 0 }}
+    aria-label={leido ? "Leído" : "Enviado"}
+  >
+    <path
+      d="M1 5.5L4.5 9L10.5 1.5"
+      stroke={leido ? "#34B7F1" : "currentColor"}
+      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+    />
+    {leido && (
+      <path
+        d="M5.5 5.5L9 9L15 1.5"
+        stroke="#34B7F1"
+        strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+      />
+    )}
+  </svg>
+);
+
 const Burbuja = ({ mensaje, esMio, onResponder, onMenuContextual }) => {
   const esImagen = mensaje.tipo === "imagen" && mensaje.imagen;
   const cita     = mensaje.respondiendoA;
@@ -485,8 +512,10 @@ const Burbuja = ({ mensaje, esMio, onResponder, onMenuContextual }) => {
           opacity: esImagen ? 1 : (esMio ? 0.75 : 0.5), textAlign: "right",
           color: esImagen ? "#a0a5b9" : "inherit",
           padding: esImagen ? "0 2px" : 0,
+          display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "3px",
         }}>
-          {mensaje.editado && "Editado · "}{formatearHora(mensaje.fecha)}
+          <span>{mensaje.editado && "Editado · "}{formatearHora(mensaje.fecha)}</span>
+          {esMio && <ChecksLeido leido={mensaje.leido === true} />}
         </div>
       </div>
 
@@ -629,6 +658,14 @@ const Chat = () => {
   useEffect(() => {
     if (!chatId || !user?.uid || mensajes.length === 0) return;
     marcarComoLeido(chatId, user.uid);
+    // 🆕 Doble check: además del contador de la lista (arriba), marca
+    // en un solo writeBatch los mensajes RECIBIDOS que sigan en
+    // `leido: false`. `mensajes` no está en las deps a propósito —
+    // mismo criterio que ya usaba este efecto (mensajes.length): evita
+    // reencolar la función en cada referencia nueva del array del
+    // listener; la función igual lee el `mensajes` más reciente por
+    // closure, y es no-op (sin writes) si no hay nada pendiente.
+    marcarMensajesComoLeidos(chatId, mensajes, user.uid);
   }, [chatId, user?.uid, mensajes.length]);
 
   // Auto-scroll al último mensaje: se dispara al cambiar la lista de mensajes

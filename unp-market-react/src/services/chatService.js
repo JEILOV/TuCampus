@@ -209,6 +209,7 @@ export const obtenerOCrearChat = async (uidComprador, uidVendedor, productoInfo 
       ultimoMensaje:      "",
       ultimoMensajeFecha: serverTimestamp(),
       ultimoMensajeDeUid: null,
+      ultimoMensajeLeido: null, // aún no hay mensajes — null en vez de bool para distinguir "sin mensajes" de "no leído"
 
       noLeidoPor: { [uidComprador]: 0, [uidVendedor]: 0 },
       creadoEn:   serverTimestamp(),
@@ -267,6 +268,10 @@ export const enviarMensaje = async (chatId, deUid, contenido, tipo = "texto", re
       texto:  tipo === "texto"  ? limpio : "",
       imagen: tipo === "imagen" ? limpio : "",   // URL pública de ImgBB
       fecha:  serverTimestamp(),
+      // 🆕 Doble check: false al enviar, se pone true en un solo
+      // writeBatch (ver marcarMensajesComoLeidos) cuando el destinatario
+      // tiene la conversación abierta — nunca un updateDoc por mensaje.
+      leido:  false,
       // Cita opcional (Fase 7 — Responder mensaje). `null` y no `undefined`
       // porque Firestore rechaza `undefined` en un `set()`; así el campo
       // siempre existe en el doc, vacío cuando no se respondió a nada.
@@ -281,6 +286,12 @@ export const enviarMensaje = async (chatId, deUid, contenido, tipo = "texto", re
       ultimoMensaje:      previewLista,
       ultimoMensajeFecha: serverTimestamp(),
       ultimoMensajeDeUid: deUid,
+      // 🆕 Campo HERMANO de `ultimoMensaje` (no anidado) — `ultimoMensaje`
+      // sigue siendo un string plano porque Chat.jsx ya lo consume así en
+      // dos puntos (preview de la lista y buscador, `chat.ultimoMensaje`
+      // como texto directo). false al enviar: el mensaje recién creado
+      // todavía no lo vio el destinatario.
+      ultimoMensajeLeido: false,
       [`noLeidoPor.${deUid}`]: 0, // quien envía ve su propio mensaje como leído
       // Fase 6: cualquier actividad nueva "revive" el chat para quien lo
       // hubiera ocultado — tanto para el que envía como para el que recibe.
@@ -531,6 +542,61 @@ export const marcarComoLeido = async (chatId, miUid) => {
     });
   } catch (err) {
     logError("[chatService.marcarComoLeido]", err);
+    // No relanzamos: es best-effort, no debe bloquear la lectura de mensajes.
+  }
+};
+
+// ── Marcar mensajes individuales como leídos (doble check) ────
+/**
+ * Marca `leido: true` en los mensajes RECIBIDOS (no propios) que todavía
+ * están en `leido: false`, en un solo `writeBatch` — nunca un `updateDoc`
+ * por mensaje, para no inflar la cuota de escrituras al abrir una
+ * conversación con varios mensajes pendientes de golpe.
+ *
+ * No-op total (sin lecturas ni escrituras a Firestore) si no hay nada
+ * pendiente — pensado para llamarse en cada snapshot nuevo de
+ * `suscribirMensajes` sin costo cuando ya todo está leído.
+ *
+ * Si el ÚLTIMO mensaje de la lista (mensajes[mensajes.length - 1], ya
+ * que `suscribirMensajes` los entrega ordenados por fecha ascendente)
+ * es uno de los que se está marcando, el mismo batch pone además
+ * `ultimoMensajeLeido: true` en el doc padre del chat — así la lista de
+ * chats puede mostrar el check azul junto al último mensaje propio sin
+ * tener que abrir la subcolección de esa conversación.
+ *
+ * Best-effort, igual que `marcarComoLeido`: un fallo acá no debe
+ * interrumpir la lectura de la conversación.
+ *
+ * @param {string} chatId
+ * @param {Array<{id: string, deUid: string, leido?: boolean}>} mensajes
+ *   Lista actual de mensajes del chat (ordenada asc), tal cual la
+ *   entrega `suscribirMensajes`.
+ * @param {string} miUid
+ * @returns {Promise<void>}
+ */
+export const marcarMensajesComoLeidos = async (chatId, mensajes, miUid) => {
+  if (!chatId || !miUid || !Array.isArray(mensajes) || mensajes.length === 0) return;
+
+  const pendientes = mensajes.filter((m) => m.deUid !== miUid && m.leido === false);
+  if (pendientes.length === 0) return; // ya está todo leído — cero writes
+
+  try {
+    const batch = writeBatch(db);
+    pendientes.forEach((m) => {
+      batch.update(doc(db, "chats", chatId, "mensajes", m.id), { leido: true });
+    });
+
+    // El último mensaje de la conversación es el que se refleja en la
+    // lista de chats (junto a "Tú: ...") — solo si es uno de los que
+    // se acaba de marcar, actualizamos el flag a nivel del chat.
+    const ultimoMensaje = mensajes[mensajes.length - 1];
+    if (pendientes.some((m) => m.id === ultimoMensaje.id)) {
+      batch.update(doc(db, "chats", chatId), { ultimoMensajeLeido: true });
+    }
+
+    await batch.commit();
+  } catch (err) {
+    logError("[chatService.marcarMensajesComoLeidos]", err);
     // No relanzamos: es best-effort, no debe bloquear la lectura de mensajes.
   }
 };
