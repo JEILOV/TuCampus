@@ -314,6 +314,47 @@ export const subirImagenImgBB = async (file, onProgress) => {
 };
 
 /**
+ * Sube hasta N Blobs YA COMPRIMIDOS, en secuencia (mismo motivo que
+ * `subirImagenes`: ImgBB gratuito es sensible a ráfagas concurrentes).
+ *
+ * 🔧 Diferencia clave con `subirImagenes`: esta función NO llama a
+ * `comprimirImagen` — asume que cada Blob ya pasó por ahí en el
+ * momento de la SELECCIÓN del archivo (ver Publicar.jsx/EditarProducto.jsx),
+ * no en el submit. Por qué importa: en Android, el descriptor de
+ * lectura de un `File` temporal (el que entrega el selector de fotos)
+ * puede ser revocado por el sistema apenas el picker se cierra. Si el
+ * usuario tarda unos minutos llenando el formulario y recién en el
+ * submit se intenta leer ese `File` (que es lo que hace
+ * `comprimirImagen` internamente vía `createImageBitmap`/`arrayBuffer`),
+ * la lectura falla con `NotReadableError` — un `Blob` ya materializado
+ * en memoria, en cambio, no depende de ningún descriptor del SO y se
+ * puede subir sin problema aunque hayan pasado varios minutos.
+ *
+ * @param {Blob[]} blobs                            Blobs ya comprimidos (mismo orden de salida)
+ * @param {(pct: number) => void} [onProgress]      Progreso global 0–100
+ * @returns {Promise<string[]>}                     URLs públicas, mismo orden que `blobs`
+ */
+export const subirBlobsComprimidos = async (blobs, onProgress) => {
+  const lista  = (blobs || []).filter(Boolean);
+  const total  = lista.length;
+  const urls   = [];
+
+  if (total === 0) return urls;
+
+  for (let i = 0; i < total; i++) {
+    // eslint-disable-next-line no-await-in-loop
+    const url = await subirImagenImgBB(lista[i], (pctArchivoActual) => {
+      const pctGlobal = Math.round(((i + pctArchivoActual / 100) / total) * 100);
+      onProgress?.(pctGlobal);
+    });
+    urls.push(url);
+  }
+
+  onProgress?.(100);
+  return urls;
+};
+
+/**
  * Comprime y sube hasta N imágenes, EN SECUENCIA (no en paralelo).
  *
  * 🔧 Por qué secuencial y no Promise.all: ImgBB (plan gratuito) es
@@ -325,6 +366,13 @@ export const subirImagenImgBB = async (file, onProgress) => {
  *
  * Si una imagen falla, la función corta ahí mismo (no sube parcial en
  * silencio) — el componente que llama decide cómo informar el error.
+ *
+ * ⚠️ Recibe `File`s CRUDOS y los comprime recién acá, en el momento de
+ * subir. Por eso NO es apta para el flujo submit-tardío de
+ * Publicar.jsx/EditarProducto.jsx (ver `NotReadableError` explicado en
+ * `subirBlobsComprimidos` arriba) — se mantiene solo por si algún
+ * flujo sube Y comprime en el mismo instante (selección → submit
+ * inmediato, sin campos de formulario de por medio).
  *
  * @param {File[]} archivos                        Archivos originales (sin comprimir)
  * @param {(pct: number) => void} [onProgress]      Progreso global 0–100

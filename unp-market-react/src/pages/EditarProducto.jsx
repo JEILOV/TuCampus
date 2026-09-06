@@ -5,7 +5,7 @@ import { doc, getDoc }                  from "firebase/firestore";
 import { ChevronLeft, Camera, Send, X, Plus } from "lucide-react";
 import { db }                           from "../services/firebase";
 import { useAuth }                      from "../context/AuthContext";
-import { subirImagenes }                from "../utils/imageUtils";
+import { comprimirImagen, subirBlobsComprimidos } from "../utils/imageUtils";
 import { actualizarProducto, normalizarCategoria, normalizarCondicion } from "../services/productService";
 import Spinner                          from "../components/Spinner";
 import Toast, { useToast }              from "../components/Toast";
@@ -46,12 +46,17 @@ const EditarProducto = () => {
   // 🖼️ Hasta MAX_FOTOS "slots", en el orden en que se muestran/envían.
   // kind: "existing" (ya en Firestore, `url` es la URL pública real,
   // no hay que volver a subirla) | "new" (recién elegida en este
-  // dispositivo, `url` es un object URL de preview y `file` es lo que
-  // hay que comprimir + subir al guardar).
+  // dispositivo: `url` es un object URL de preview del blob YA
+  // comprimido, y `blob` es ese mismo Blob comprimido, listo para
+  // subir — ver handleFileChange para el motivo de comprimir acá y no
+  // en el submit).
   const [fotos,          setFotos]          = useState([]);
   const [btnTexto,       setBtnTexto]       = useState("Guardar Cambios");
   const [enviando,       setEnviando]       = useState(false);
   const [cargando,       setCargando]       = useState(true);
+  // 🔧 true mientras se comprimen las fotos recién elegidas, ver
+  // Publicar.jsx (mismo patrón).
+  const [procesandoImagenes, setProcesandoImagenes] = useState(false);
   
   // ✅ Nuevo manejo de Toasts centralizado
   const [toast, setToast] = useState(null);
@@ -136,7 +141,7 @@ const EditarProducto = () => {
 
   const MAX_IMAGEN_MB = 5;
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const filesSeleccionados = Array.from(e.target.files || []);
     e.target.value = "";
 
@@ -148,7 +153,7 @@ const EditarProducto = () => {
       return;
     }
 
-    const nuevas = [];
+    const candidatos = [];
     const descartadosPorLimite = filesSeleccionados.length > espacioDisponible;
 
     for (const file of filesSeleccionados.slice(0, espacioDisponible)) {
@@ -160,12 +165,43 @@ const EditarProducto = () => {
         mostrarToast(`"${file.name}" supera ${MAX_IMAGEN_MB}MB. Elige una más liviana.`, "error");
         continue;
       }
-      nuevas.push({
-        id:   `new-${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
-        kind: "new",
-        file,
-        url:  URL.createObjectURL(file),
-      });
+      candidatos.push(file);
+    }
+
+    if (candidatos.length === 0) return;
+
+    // 🔧 CRÍTICO (bug de Android) — mismo motivo exacto que
+    // Publicar.jsx: el `File` que entrega el selector puede quedar con
+    // su descriptor de lectura revocado por el sistema apenas se
+    // cierra el picker. Si se guarda el `File` crudo en el estado y
+    // recién se lee/comprime al hacer clic en "Guardar Cambios"
+    // —minutos después— la lectura falla con:
+    //   NotReadableError: The requested file could not be read...
+    // Por eso se comprime ACÁ, en el mismo gesto de selección, y se
+    // guarda en el estado el `Blob` ya comprimido (vive en memoria,
+    // no depende de ningún descriptor de archivo del SO). El submit
+    // solo sube esos Blobs con subirBlobsComprimidos(), sin volver a
+    // tocar el `File` original.
+    setProcesandoImagenes(true);
+    const nuevas = [];
+    try {
+      for (const file of candidatos) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const blob = await comprimirImagen(file);
+          nuevas.push({
+            id:   `new-${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
+            kind: "new",
+            blob,
+            url:  URL.createObjectURL(blob), // preview del BLOB comprimido, no del file original
+          });
+        } catch (err) {
+          console.error("[EditarProducto] Error al procesar imagen:", err);
+          mostrarToast(`No se pudo procesar "${file.name}". Probá con otra foto.`, "error");
+        }
+      }
+    } finally {
+      setProcesandoImagenes(false);
     }
 
     if (nuevas.length > 0) setFotos((prev) => [...prev, ...nuevas]);
@@ -215,7 +251,10 @@ const EditarProducto = () => {
       let urlsNuevas = [];
       if (fotosNuevas.length > 0) {
         setBtnTexto(fotosNuevas.length > 1 ? "Subiendo fotos..." : "Subiendo imagen...");
-        urlsNuevas = await subirImagenes(fotosNuevas.map((f) => f.file));
+        // 🔧 Los Blobs de `fotosNuevas` ya están comprimidos desde la
+        // selección (ver handleFileChange) — acá solo se suben, sin
+        // volver a tocar `File`s ni descriptores del SO ya caducados.
+        urlsNuevas = await subirBlobsComprimidos(fotosNuevas.map((f) => f.blob));
       }
 
       // 🔧 Reconstruye el array final RESPETANDO el orden visual actual
@@ -293,18 +332,25 @@ const EditarProducto = () => {
           <div className="mb-5">
             <div className="flex items-baseline justify-between">
               <label className={labelClass}>Fotos del producto</label>
-              <span className="text-[11px] font-semibold text-ink/40">{fotos.length}/{MAX_FOTOS}</span>
+              <span className="text-[11px] font-semibold text-ink/40">
+                {procesandoImagenes ? "Procesando..." : `${fotos.length}/${MAX_FOTOS}`}
+              </span>
             </div>
 
             {fotos.length === 0 ? (
               <div
-                onClick={() => fileInputRef.current?.click()}
-                className="mt-2 cursor-pointer rounded-2xl border-2 border-dashed border-ink/15 bg-background p-5 text-center transition-colors"
+                onClick={() => !procesandoImagenes && fileInputRef.current?.click()}
+                aria-disabled={procesandoImagenes}
+                className={`mt-2 rounded-2xl border-2 border-dashed border-ink/15 bg-background p-5 text-center transition-colors ${
+                  procesandoImagenes ? "cursor-wait opacity-60" : "cursor-pointer"
+                }`}
               >
                 <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Camera size={26} />
                 </span>
-                <p className="mt-2 text-[14.5px] font-extrabold text-ink">Toca para abrir la cámara o galería</p>
+                <p className="mt-2 text-[14.5px] font-extrabold text-ink">
+                  {procesandoImagenes ? "Procesando foto..." : "Toca para abrir la cámara o galería"}
+                </p>
                 <p className="mt-1 text-[12px] font-semibold text-ink/40">
                   Hasta {MAX_FOTOS} fotos · JPG, PNG · Máx. 5MB c/u
                 </p>
@@ -334,8 +380,9 @@ const EditarProducto = () => {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
+                    disabled={procesandoImagenes}
                     aria-label="Agregar foto"
-                    className="flex aspect-square items-center justify-center rounded-2xl border-2 border-dashed border-ink/15 bg-background text-ink/30 transition-colors hover:border-primary/40 hover:text-primary"
+                    className="flex aspect-square items-center justify-center rounded-2xl border-2 border-dashed border-ink/15 bg-background text-ink/30 transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-wait disabled:opacity-60"
                   >
                     <Plus size={22} />
                   </button>
@@ -349,6 +396,7 @@ const EditarProducto = () => {
               multiple
               ref={fileInputRef}
               onChange={handleFileChange}
+              disabled={procesandoImagenes}
               className="hidden"
             />
           </div>
@@ -426,7 +474,7 @@ const EditarProducto = () => {
           {/* CTA */}
           <button
             type="submit"
-            disabled={enviando}
+            disabled={enviando || procesandoImagenes}
             className="flex w-full items-center justify-center gap-2 rounded-btn bg-primary py-4 text-[15px] font-extrabold text-white shadow-soft transition-all duration-200 ease-out active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
           >
             <Send size={18} />

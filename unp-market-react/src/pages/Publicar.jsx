@@ -5,7 +5,7 @@ import { doc, getDoc, collection, writeBatch, serverTimestamp } from "firebase/f
 import { ChevronLeft, Camera, Lightbulb, Send, X, Plus } from "lucide-react";
 import { db }                                   from "../services/firebase";
 import { useAuth }                              from "../context/AuthContext";
-import { subirImagenes }                        from "../utils/imageUtils";
+import { comprimirImagen, subirBlobsComprimidos } from "../utils/imageUtils";
 import { obtenerContactoPrivado }               from "../services/userService";
 import { crearProducto }                        from "../services/productService";
 import Toast, { useToast }                      from "../components/Toast"; // ✅ Nuevo import
@@ -44,13 +44,20 @@ const Publicar = () => {
   // 🏷️ Default "usado": es el caso más común en un marketplace estudiantil.
   const [condicion,   setCondicion]   = useState("usado");
   const [descripcion, setDescripcion] = useState("");
-  // 🖼️ Hasta MAX_FOTOS archivos. `previews` guarda { id, file, url }
-  // por foto: `url` es un object URL (URL.createObjectURL) que se debe
-  // revocar al quitar la foto o desmontar, para no filtrar memoria.
+  // 🖼️ Hasta MAX_FOTOS fotos. `previews` guarda { id, blob, url } por
+  // foto: `blob` es el resultado YA COMPRIMIDO de comprimirImagen()
+  // (NO el `File` crudo del selector — ver handleFileChange para el
+  // motivo), y `url` es un object URL de ESE blob para la vista previa
+  // (se debe revocar al quitar la foto o desmontar, para no filtrar
+  // memoria).
   const [previews,    setPreviews]    = useState([]);
   const [btnTexto,    setBtnTexto]    = useState("Publicar Producto");
   const [enviando,    setEnviando]    = useState(false);
   const [progreso,    setProgreso]    = useState(0); // 🔧 feedback real de subida (0–100)
+  // 🔧 true mientras se comprimen las fotos recién elegidas (ver
+  // handleFileChange). Sirve para deshabilitar el selector mientras
+  // tanto y no encolar compresiones superpuestas.
+  const [procesandoImagenes, setProcesandoImagenes] = useState(false);
   
   // ✅ Nuevo manejo de Toasts centralizado
   const [toast, setToast] = useState(null);
@@ -73,7 +80,7 @@ const Publicar = () => {
 
   const MAX_IMAGEN_MB = 5;
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const filesSeleccionados = Array.from(e.target.files || []);
     e.target.value = ""; // permite volver a elegir el mismo archivo más adelante
 
@@ -85,8 +92,8 @@ const Publicar = () => {
       return;
     }
 
-    const nuevos = [];
-    let descartadosPorLimite = filesSeleccionados.length > espacioDisponible;
+    const candidatos = [];
+    const descartadosPorLimite = filesSeleccionados.length > espacioDisponible;
 
     for (const file of filesSeleccionados.slice(0, espacioDisponible)) {
       // 🔧 Validar ANTES de aceptar el archivo: sin esto, un archivo
@@ -101,11 +108,53 @@ const Publicar = () => {
         mostrarToast(`"${file.name}" supera ${MAX_IMAGEN_MB}MB. Elige una más liviana.`, "error");
         continue;
       }
-      nuevos.push({
-        id:   `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
-        file,
-        url:  URL.createObjectURL(file),
-      });
+      candidatos.push(file);
+    }
+
+    if (candidatos.length === 0) return;
+
+    // 🔧 CRÍTICO (bug de Android): se comprime AHORA, en el mismo
+    // gesto en que el usuario elige la foto — NO se espera al submit.
+    //
+    // Por qué: el `File` que entrega el selector de Android apunta a
+    // un descriptor de lectura temporal (algo tipo
+    // /data/.../cache/...). Ese descriptor puede ser revocado por el
+    // sistema apenas se cierra el picker de fotos. Si el `File` crudo
+    // se guarda en el estado y recién se lee/comprime al hacer clic en
+    // "Publicar" —minutos después, mientras el usuario llenaba título,
+    // precio, etc.— la lectura (`file.arrayBuffer()`, que usa
+    // comprimirImagen() por dentro) revienta con:
+    //   NotReadableError: The requested file could not be read...
+    //
+    // La solución: leer y comprimir el archivo ACÁ, apenas se
+    // selecciona, y guardar en el estado el `Blob` YA comprimido (que
+    // vive en memoria, sin depender de ningún descriptor de archivo
+    // del sistema operativo). El submit, más abajo, solo sube esos
+    // Blobs con subirBlobsComprimidos() — nunca vuelve a tocar el
+    // `File` original.
+    setProcesandoImagenes(true);
+    const nuevos = [];
+    try {
+      for (const file of candidatos) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const blob = await comprimirImagen(file);
+          nuevos.push({
+            id:   `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
+            blob,
+            url:  URL.createObjectURL(blob), // preview del BLOB comprimido, no del file original
+          });
+        } catch (err) {
+          // Si comprimirImagen() falla acá (archivo corrupto, etc.) se
+          // descarta esa foto puntual y se avisa — no se guarda ningún
+          // File crudo "por las dudas" que después vuelva a fallar en
+          // el submit.
+          console.error("[Publicar] Error al procesar imagen:", err);
+          mostrarToast(`No se pudo procesar "${file.name}". Probá con otra foto.`, "error");
+        }
+      }
+    } finally {
+      setProcesandoImagenes(false);
     }
 
     if (nuevos.length > 0) {
@@ -173,13 +222,17 @@ const Publicar = () => {
     setProgreso(0);
     try {
       setBtnTexto(previews.length > 1 ? "Subiendo fotos..." : "Subiendo imagen...");
-      // 🔧 Si subirImagenes() rechaza, el `await` de abajo corta la
-      // ejecución acá mismo — crearProducto() (y por lo tanto la
+      // 🔧 Los Blobs en `previews` ya están comprimidos desde el
+      // momento en que se seleccionaron (ver handleFileChange) — acá
+      // solo se suben, sin tocar `File`s ni descriptores del sistema
+      // operativo que ya pudieron caducar.
+      // Si subirBlobsComprimidos() rechaza, el `await` de abajo corta
+      // la ejecución acá mismo — crearProducto() (y por lo tanto la
       // escritura en Firestore) NUNCA se llega a invocar. No hace
       // falta un flag ni un early-return extra: un solo try secuencial
       // ya garantiza que no se cree un producto sin sus fotos.
-      const imagenesFinal = await subirImagenes(
-        previews.map((p) => p.file),
+      const imagenesFinal = await subirBlobsComprimidos(
+        previews.map((p) => p.blob),
         (pct) => setProgreso(pct),
       );
 
@@ -280,18 +333,25 @@ const Publicar = () => {
           <div className="mb-5">
             <div className="flex items-baseline justify-between">
               <label className={labelClass}>Fotos del producto</label>
-              <span className="text-[11px] font-semibold text-ink/40">{previews.length}/{MAX_FOTOS}</span>
+              <span className="text-[11px] font-semibold text-ink/40">
+                {procesandoImagenes ? "Procesando..." : `${previews.length}/${MAX_FOTOS}`}
+              </span>
             </div>
 
             {previews.length === 0 ? (
               <div
-                onClick={() => fileInputRef.current?.click()}
-                className="mt-2 cursor-pointer rounded-2xl border-2 border-dashed border-ink/15 bg-background p-5 text-center transition-colors"
+                onClick={() => !procesandoImagenes && fileInputRef.current?.click()}
+                aria-disabled={procesandoImagenes}
+                className={`mt-2 rounded-2xl border-2 border-dashed border-ink/15 bg-background p-5 text-center transition-colors ${
+                  procesandoImagenes ? "cursor-wait opacity-60" : "cursor-pointer"
+                }`}
               >
                 <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Camera size={26} />
                 </span>
-                <p className="mt-2 text-[14.5px] font-extrabold text-ink">Toca para abrir la cámara o galería</p>
+                <p className="mt-2 text-[14.5px] font-extrabold text-ink">
+                  {procesandoImagenes ? "Procesando foto..." : "Toca para abrir la cámara o galería"}
+                </p>
                 <p className="mt-1 text-[12px] font-semibold text-ink/40">
                   Hasta {MAX_FOTOS} fotos · JPG, PNG · Máx. 5MB c/u
                 </p>
@@ -321,8 +381,9 @@ const Publicar = () => {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
+                    disabled={procesandoImagenes}
                     aria-label="Agregar foto"
-                    className="flex aspect-square items-center justify-center rounded-2xl border-2 border-dashed border-ink/15 bg-background text-ink/30 transition-colors hover:border-primary/40 hover:text-primary"
+                    className="flex aspect-square items-center justify-center rounded-2xl border-2 border-dashed border-ink/15 bg-background text-ink/30 transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-wait disabled:opacity-60"
                   >
                     <Plus size={22} />
                   </button>
@@ -336,6 +397,7 @@ const Publicar = () => {
               multiple
               ref={fileInputRef}
               onChange={handleFileChange}
+              disabled={procesandoImagenes}
               className="hidden"
             />
           </div>
@@ -426,7 +488,7 @@ const Publicar = () => {
           {/* CTA */}
           <button
             type="submit"
-            disabled={enviando}
+            disabled={enviando || procesandoImagenes}
             className="flex w-full items-center justify-center gap-2 rounded-btn bg-primary py-4 text-[15px] font-extrabold text-white shadow-soft transition-all duration-200 ease-out active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
           >
             <Send size={18} />
