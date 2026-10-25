@@ -75,14 +75,10 @@ describe("productService", () => {
       perfil:      perfilFake,
     };
 
-    it("usa writeBatch: llama a batch.set + batch.update + batch.commit", async () => {
-      // El usuario YA tiene documento en Firestore (perfil existente)
-      mockGetDoc.mockResolvedValueOnce(
-        makeSnap("user-001", { totalPublicaciones: 3 })
-      );
-
+    it("usa writeBatch: llama a batch.set + batch.update + batch.commit sin getDoc previo", async () => {
       await crearProducto(inputBase);
 
+      expect(mockGetDoc).not.toHaveBeenCalled();
       expect(mockWriteBatch).toHaveBeenCalledTimes(1);
       expect(mockBatchSet).toHaveBeenCalledTimes(1);
       expect(mockBatchUpdate).toHaveBeenCalledTimes(1);
@@ -90,8 +86,6 @@ describe("productService", () => {
     });
 
     it("el documento del producto incluye los campos obligatorios", async () => {
-      mockGetDoc.mockResolvedValueOnce(makeEmptySnap()); // usuario sin doc previo
-
       await crearProducto(inputBase);
 
       const [, datosGuardados] = mockBatchSet.mock.calls[0];
@@ -104,48 +98,29 @@ describe("productService", () => {
         estado:      "disponible",     // siempre "disponible" al crear
         userUid:     "user-001",
         vendedorNombre: "Valery B.",   // del perfil, no de user.displayName
-        // 🔒 telefono YA NO se copia al documento público del producto
-        // (ver comentario en productService.crearProducto) — no se afirma
-        // sobre ese campo acá.
       });
       expect(datosGuardados.telefono).toBeUndefined();
     });
 
-    it("incrementa totalPublicaciones si el usuario ya tiene documento", async () => {
-      mockGetDoc.mockResolvedValueOnce(
-        makeSnap("user-001", { totalPublicaciones: 5 })
-      );
-
+    it("incrementa totalPublicaciones atómicamente con increment(1) sin leer el usuario antes", async () => {
       await crearProducto(inputBase);
 
-      const [, datosActualizados] = mockBatchUpdate.mock.calls[0];
-      expect(datosActualizados).toEqual({ totalPublicaciones: 6 });
-    });
-
-    it("NO llama batch.update si el usuario no tiene documento en Firestore", async () => {
-      mockGetDoc.mockResolvedValueOnce(makeEmptySnap());
-
-      await crearProducto(inputBase);
-
-      expect(mockBatchUpdate).not.toHaveBeenCalled();
+      expect(mockGetDoc).not.toHaveBeenCalled();
+      const [userRef, datosActualizados] = mockBatchUpdate.mock.calls[0];
+      expect(userRef).toEqual({ _col: "usuarios", _id: "user-001" });
+      expect(datosActualizados).toEqual({
+        totalPublicaciones: { _type: "increment", n: 1 },
+      });
     });
 
     it("lanza Error traducido cuando Firestore falla", async () => {
-      // 🔧 El getDoc del contador de totalPublicaciones está envuelto en
-      // su propio try/catch interno (ver productService.crearProducto) —
-      // a propósito NUNCA tumba la creación del producto, así que
-      // rechazarlo ya no reproduce el escenario de "Firestore falla".
-      // El punto real donde un fallo de Firestore debe abortar
-      // crearProducto es batch.commit().
       const firestoreError = Object.assign(new Error("Forbidden"), { code: "permission-denied" });
-      mockGetDoc.mockResolvedValueOnce(makeEmptySnap());
       mockBatchCommit.mockRejectedValueOnce(firestoreError);
 
       await expect(crearProducto(inputBase)).rejects.toThrow("Error simulado (firestore)");
     });
 
     it("usa imagen vacía si no se pasa imagen", async () => {
-      mockGetDoc.mockResolvedValueOnce(makeEmptySnap());
       await crearProducto({ ...inputBase, imagen: null });
 
       const [, datos] = mockBatchSet.mock.calls[0];
@@ -166,7 +141,7 @@ describe("productService", () => {
       imagenOriginal: "https://img.test/vieja.jpg",
     };
 
-    it("llama updateDoc con los campos correctos", async () => {
+    it("llama updateDoc con los campos correctos y no toca imagenes si se omitió", async () => {
       mockUpdateDoc.mockResolvedValueOnce(undefined);
 
       await actualizarProducto("prod-456", inputBase);
@@ -182,16 +157,44 @@ describe("productService", () => {
         descripcion: "Ahora con chispas",
         imagen:      "https://img.test/nueva.jpg",
       });
+      expect("imagenes" in datos).toBe(false);
       expect(datos.fechaEdicion).toBeDefined();
     });
 
-    it("usa imagenOriginal si no se pasa imagen nueva", async () => {
+    it("al editar pasando de ['a', 'b'] a [] escribe imagenes: [] e imagen: '' (H06)", async () => {
+      mockUpdateDoc.mockResolvedValueOnce(undefined);
+
+      await actualizarProducto("prod-456", {
+        ...inputBase,
+        imagenes: [],
+      });
+
+      const [, datos] = mockUpdateDoc.mock.calls[0];
+      expect(datos.imagenes).toEqual([]);
+      expect(datos.imagen).toBe("");
+    });
+
+    it("al editar con una foto nueva en imagenes escribe imagenes: [url] e imagen: url", async () => {
+      mockUpdateDoc.mockResolvedValueOnce(undefined);
+
+      await actualizarProducto("prod-456", {
+        ...inputBase,
+        imagenes: ["https://img.test/foto-unica.jpg"],
+      });
+
+      const [, datos] = mockUpdateDoc.mock.calls[0];
+      expect(datos.imagenes).toEqual(["https://img.test/foto-unica.jpg"]);
+      expect(datos.imagen).toBe("https://img.test/foto-unica.jpg");
+    });
+
+    it("usa imagenOriginal si no se pasa imagen nueva y imagenes se omite", async () => {
       mockUpdateDoc.mockResolvedValueOnce(undefined);
 
       await actualizarProducto("prod-456", { ...inputBase, imagen: "" });
 
       const [, datos] = mockUpdateDoc.mock.calls[0];
       expect(datos.imagen).toBe("https://img.test/vieja.jpg");
+      expect("imagenes" in datos).toBe(false);
     });
 
     it("lanza Error traducido cuando Firestore falla", async () => {

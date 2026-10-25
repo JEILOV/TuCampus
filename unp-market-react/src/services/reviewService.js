@@ -61,6 +61,41 @@ const resumirComentario = (comentario, maxLen = 60) => {
 // ── Helper: ID determinística de reseña ──────────────────────
 const idResena = (autorUid, vendedorUid) => `${autorUid}_${vendedorUid}`;
 
+/**
+ * Función pura (H03): calcula el nuevo agregado de reputación usando la suma
+ * entera acumulada (`sumaPrev`) en lugar del promedio redondeado.
+ *
+ * @param {Object} params
+ * @param {number} params.sumaPrev
+ * @param {number} params.totalPrev
+ * @param {boolean} params.esNueva
+ * @param {number} [params.estrellasPrevias=0]
+ * @param {number} params.puntaje
+ * @returns {{ sumaEstrellas: number, totalResenas: number, calificacionPromedio: number }}
+ */
+export const calcularAgregadoResena = ({
+  sumaPrev = 0,
+  totalPrev = 0,
+  esNueva,
+  estrellasPrevias = 0,
+  puntaje,
+}) => {
+  const totalResenas = esNueva ? totalPrev + 1 : totalPrev;
+  const sumaEstrellas = esNueva
+    ? Math.round(sumaPrev + puntaje)
+    : Math.round(sumaPrev - (estrellasPrevias || 0) + puntaje);
+
+  const calificacionPromedio = totalResenas > 0
+    ? Math.round((sumaEstrellas / totalResenas) * 10) / 10
+    : 0;
+
+  return {
+    sumaEstrellas,
+    totalResenas,
+    calificacionPromedio,
+  };
+};
+
 // ── ¿Ya dejé una reseña a este vendedor? ──────────────────────
 /**
  * @param {string} vendedorUid
@@ -188,27 +223,28 @@ export const guardarOActualizarResena = async ({
         tx.get(vendedorRef),
       ]);
 
-      const esNueva = !resenaSnap.exists();
+      const esNueva        = !resenaSnap.exists();
       const vendedorData   = vendedorSnap.exists() ? vendedorSnap.data() : {};
       const totalActual    = vendedorData.totalResenas || 0;
       const promedioActual = vendedorData.calificacionPromedio || 0;
-      const sumaActual     = promedioActual * totalActual;
+      // Fallback para documentos legados previos a H03; el script de migración
+      // scripts/recalcularReputacion.mjs corrige los datos previos en Firestore.
+      const sumaPrev = typeof vendedorData.sumaEstrellas === "number"
+        ? vendedorData.sumaEstrellas
+        : Math.round(promedioActual * totalActual);
 
-      let nuevoTotal;
-      let nuevaSuma;
-
-      if (esNueva) {
-        nuevoTotal = totalActual + 1;
-        nuevaSuma  = sumaActual + puntaje;
-      } else {
-        const estrellasAnteriores = resenaSnap.data().estrellas || 0;
-        nuevoTotal = totalActual; // una edición no suma una reseña nueva
-        nuevaSuma  = sumaActual - estrellasAnteriores + puntaje; // aplica solo la diferencia
-      }
-
-      const nuevoPromedio = nuevoTotal > 0
-        ? Math.round((nuevaSuma / nuevoTotal) * 10) / 10 // 1 decimal
-        : 0;
+      const estrellasAnteriores = esNueva ? 0 : (resenaSnap.data().estrellas || 0);
+      const {
+        sumaEstrellas,
+        totalResenas: nuevoTotal,
+        calificacionPromedio: nuevoPromedio,
+      } = calcularAgregadoResena({
+        sumaPrev,
+        totalPrev: totalActual,
+        esNueva,
+        estrellasPrevias: estrellasAnteriores,
+        puntaje,
+      });
 
       if (esNueva) {
         tx.set(resenaRef, {
@@ -232,6 +268,7 @@ export const guardarOActualizarResena = async ({
       }
 
       tx.set(vendedorRef, {
+        sumaEstrellas,
         totalResenas:         nuevoTotal,
         calificacionPromedio: nuevoPromedio,
       }, { merge: true });

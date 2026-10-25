@@ -1,20 +1,23 @@
 // src/tests/userService.test.js
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 import {
   mockGetDoc, mockSetDoc, mockUpdateDoc, mockGetDocs,
+  mockWriteBatch, mockBatchSet, mockBatchUpdate, mockBatchCommit,
   makeSnap, makeEmptySnap, makeQuerySnap,
   resetAllMocks,
 } from "./__mocks__/firebase";
 
 import {
   obtenerPerfilVendedor,
+  guardarContactoPrivado,
   obtenerProductosPorVendedor,
   seguirVendedor,
   dejarDeSeguirVendedor,
   obtenerOCrearPerfilUsuario,
   sincronizarFavoritos,
 } from "../services/userService";
+import { propagarPerfilAProductos } from "../pages/Perfil";
 
 // ─────────────────────────────────────────────────────────────
 describe("userService", () => {
@@ -86,25 +89,40 @@ describe("userService", () => {
   });
 
   // ══════════════════════════════════════════════════════════
-  describe("seguirVendedor", () => {
+  describe("seguirVendedor (H04)", () => {
 
-    it("agrega miUid al array de seguidores existente", async () => {
-      // 🔧 La implementación actual ya no usa arrayUnion: lee el array
-      // `seguidores` actual con getDoc y reescribe la lista completa en
-      // updateDoc (ver userService.seguirVendedor).
-      mockGetDoc.mockResolvedValueOnce(makeSnap("vendedor-001", { seguidores: ["otro-uid"] }));
+    it("llama a updateDoc con arrayUnion(miUid) sin hacer getDoc previo", async () => {
       mockUpdateDoc.mockResolvedValueOnce(undefined);
 
       await seguirVendedor("vendedor-001", "yo-uid");
 
+      expect(mockGetDoc).not.toHaveBeenCalled();
       expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
-      const [, datos] = mockUpdateDoc.mock.calls[0];
-      expect(datos.seguidores).toEqual(["otro-uid", "yo-uid"]);
+      const [ref, datos] = mockUpdateDoc.mock.calls[0];
+      expect(ref).toEqual({ _col: "usuarios", _id: "vendedor-001" });
+      expect(datos).toEqual({
+        seguidores: { _type: "arrayUnion", args: ["yo-uid"] },
+      });
     });
 
-    it("lanza Error traducido cuando Firestore falla", async () => {
+    it("si recibe permission-denied pero el usuario ya figura en seguidores, retorna sin error", async () => {
       mockUpdateDoc.mockRejectedValueOnce(
         Object.assign(new Error("Denied"), { code: "permission-denied" })
+      );
+      mockGetDoc.mockResolvedValueOnce(
+        makeSnap("vendedor-001", { seguidores: ["otro-uid", "yo-uid"] })
+      );
+
+      await expect(seguirVendedor("vendedor-001", "yo-uid")).resolves.toBeUndefined();
+      expect(mockGetDoc).toHaveBeenCalledTimes(1);
+    });
+
+    it("si recibe permission-denied y el usuario NO figura en seguidores, relanza el error", async () => {
+      mockUpdateDoc.mockRejectedValueOnce(
+        Object.assign(new Error("Denied"), { code: "permission-denied" })
+      );
+      mockGetDoc.mockResolvedValueOnce(
+        makeSnap("vendedor-001", { seguidores: ["otro-uid"] })
       );
 
       await expect(seguirVendedor("vendedor-001", "yo-uid"))
@@ -114,27 +132,179 @@ describe("userService", () => {
   });
 
   // ══════════════════════════════════════════════════════════
-  describe("dejarDeSeguirVendedor", () => {
+  describe("dejarDeSeguirVendedor (H04)", () => {
 
-    it("quita miUid del array de seguidores existente", async () => {
-      // 🔧 Igual que seguirVendedor: ya no usa arrayRemove — lee el array
-      // actual con getDoc y reescribe la lista filtrada en updateDoc.
-      mockGetDoc.mockResolvedValueOnce(makeSnap("vendedor-001", { seguidores: ["otro-uid", "yo-uid"] }));
+    it("llama a updateDoc con arrayRemove(miUid) sin hacer getDoc previo", async () => {
       mockUpdateDoc.mockResolvedValueOnce(undefined);
 
       await dejarDeSeguirVendedor("vendedor-001", "yo-uid");
 
-      const [, datos] = mockUpdateDoc.mock.calls[0];
-      expect(datos.seguidores).toEqual(["otro-uid"]);
+      expect(mockGetDoc).not.toHaveBeenCalled();
+      expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
+      const [ref, datos] = mockUpdateDoc.mock.calls[0];
+      expect(ref).toEqual({ _col: "usuarios", _id: "vendedor-001" });
+      expect(datos).toEqual({
+        seguidores: { _type: "arrayRemove", args: ["yo-uid"] },
+      });
     });
 
-    it("lanza Error traducido cuando Firestore falla", async () => {
+    it("si recibe permission-denied pero el usuario ya NO figura en seguidores, retorna sin error", async () => {
+      mockUpdateDoc.mockRejectedValueOnce(
+        Object.assign(new Error("Denied"), { code: "permission-denied" })
+      );
+      mockGetDoc.mockResolvedValueOnce(
+        makeSnap("vendedor-001", { seguidores: ["otro-uid"] })
+      );
+
+      await expect(dejarDeSeguirVendedor("vendedor-001", "yo-uid")).resolves.toBeUndefined();
+      expect(mockGetDoc).toHaveBeenCalledTimes(1);
+    });
+
+    it("si recibe permission-denied y el usuario aún figura en seguidores, relanza el error", async () => {
+      mockUpdateDoc.mockRejectedValueOnce(
+        Object.assign(new Error("Denied"), { code: "permission-denied" })
+      );
+      mockGetDoc.mockResolvedValueOnce(
+        makeSnap("vendedor-001", { seguidores: ["otro-uid", "yo-uid"] })
+      );
+
+      await expect(dejarDeSeguirVendedor("vendedor-001", "yo-uid"))
+        .rejects.toThrow("Error simulado (firestore)");
+    });
+
+    it("lanza Error traducido cuando Firestore falla con otro código", async () => {
       mockUpdateDoc.mockRejectedValueOnce(
         Object.assign(new Error("Unavailable"), { code: "unavailable" })
       );
 
       await expect(dejarDeSeguirVendedor("vendedor-001", "yo-uid"))
         .rejects.toThrow("Error simulado (firestore)");
+    });
+
+  });
+
+  // ══════════════════════════════════════════════════════════
+  describe("guardarContactoPrivado (H05 + H10)", () => {
+
+    it("usa un único writeBatch con batch.set en contacto privado y batch.update solo con campos permitidos + deleteField() en telefono", async () => {
+      const metodosPago = {
+        yape: { activo: true, numero: "999888777" },
+        plin: { activo: false, numero: "" },
+      };
+
+      await guardarContactoPrivado("uid-001", {
+        telefono: "999888777",
+        metodosPago,
+        nombre: "Valery",
+        bio: "",
+        acercaDe: "",
+        ubicacion: "",
+        avatar: "https://img.test/a.jpg",
+        portada: "",
+        aceptaYape: true,
+        aceptaPlin: false,
+      });
+
+      expect(mockWriteBatch).toHaveBeenCalledTimes(1);
+      expect(mockBatchSet).toHaveBeenCalledTimes(1);
+      expect(mockBatchUpdate).toHaveBeenCalledTimes(1);
+      expect(mockBatchCommit).toHaveBeenCalledTimes(1);
+
+      const [contactoRef, contactoDatos, contactoOpts] = mockBatchSet.mock.calls[0];
+      expect(contactoRef).toEqual({
+        _col: "usuarios",
+        _id: "uid-001",
+        _subpath: ["privado", "contacto"],
+      });
+      expect(contactoDatos).toEqual({ telefono: "999888777", metodosPago });
+      expect(contactoOpts).toEqual({ merge: true });
+
+      const [userRef, userDatos] = mockBatchUpdate.mock.calls[0];
+      expect(userRef).toEqual({ _col: "usuarios", _id: "uid-001" });
+      expect(Object.keys(userDatos).sort()).toEqual([
+        "aceptaPlin",
+        "aceptaYape",
+        "acercaDe",
+        "avatar",
+        "bio",
+        "nombre",
+        "portada",
+        "telefono",
+        "ubicacion",
+      ]);
+      expect(userDatos.telefono).toEqual({ _type: "deleteField" });
+    });
+
+    it("nunca envía reputación, seguidores, favoritos, bloqueados, fcmToken ni email y permite vaciar bio/acercaDe/ubicacion", async () => {
+      await guardarContactoPrivado("uid-001", {
+        telefono: "987654321",
+        metodosPago: { yape: { activo: false, numero: "" }, plin: { activo: false, numero: "" } },
+        nombre: "Valery",
+        bio: "",
+        acercaDe: "",
+        ubicacion: "",
+        avatar: "",
+        portada: "",
+        aceptaYape: false,
+        aceptaPlin: false,
+        // Campos prohibidos que jamás deben enviarse en el update de perfil:
+        calificacionPromedio: 5,
+        totalResenas: 99,
+        seguidores: ["otro"],
+        favoritos: ["p1"],
+        bloqueados: ["u2"],
+        fcmToken: "token-secreto",
+        email: "hacker@otro.com",
+      });
+
+      const [, userDatos] = mockBatchUpdate.mock.calls[0];
+      expect(userDatos.bio).toBe("");
+      expect(userDatos.acercaDe).toBe("");
+      expect(userDatos.ubicacion).toBe("");
+      expect(userDatos).not.toHaveProperty("calificacionPromedio");
+      expect(userDatos).not.toHaveProperty("totalResenas");
+      expect(userDatos).not.toHaveProperty("seguidores");
+      expect(userDatos).not.toHaveProperty("favoritos");
+      expect(userDatos).not.toHaveProperty("bloqueados");
+      expect(userDatos).not.toHaveProperty("fcmToken");
+      expect(userDatos).not.toHaveProperty("email");
+    });
+
+    it("un fallo parcial en la propagación a productos con Promise.allSettled NO lanza error general y advierte el conteo", async () => {
+      mockGetDocs.mockResolvedValueOnce(
+        makeQuerySnap([
+          { id: "prod-1", data: { titulo: "P1" } },
+          { id: "prod-2", data: { titulo: "P2" } },
+          { id: "prod-3", data: { titulo: "P3" } },
+        ])
+      );
+      mockUpdateDoc
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("Fallo en prod-2"))
+        .mockResolvedValueOnce(undefined);
+
+      const mostrarToast = vi.fn();
+      const setProductos = vi.fn();
+
+      const res = await propagarPerfilAProductos(
+        "uid-001",
+        {
+          avatarVendedor: "https://img/a.jpg",
+          vendedorNombre: "Valery",
+          vendedor: "Valery",
+          aceptaYape: true,
+          aceptaPlin: false,
+        },
+        mostrarToast,
+        setProductos
+      );
+
+      expect(res).toEqual({ total: 3, fallidos: 1 });
+      expect(mockUpdateDoc).toHaveBeenCalledTimes(3);
+      expect(mostrarToast).toHaveBeenCalledWith(
+        expect.stringContaining("1 publicación"),
+        "warning"
+      );
     });
 
   });

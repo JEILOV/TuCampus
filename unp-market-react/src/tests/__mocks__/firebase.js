@@ -16,6 +16,7 @@ import { vi } from "vitest";
 export const makeSnap = (id, data) => ({
   exists: () => true,
   id,
+  ref: { _id: id },
   data: () => data,
 });
 
@@ -23,6 +24,7 @@ export const makeSnap = (id, data) => ({
 export const makeEmptySnap = () => ({
   exists: () => false,
   id:     null,
+  ref:    null,
   data:   () => null,
 });
 
@@ -34,16 +36,20 @@ export const makeQuerySnap = (items) => ({
 });
 
 // ── Mock de funciones de Firestore ───────────────────────────
-export const mockGetDoc     = vi.fn();
-export const mockSetDoc     = vi.fn();
-export const mockUpdateDoc  = vi.fn();
-export const mockDeleteDoc  = vi.fn();
-export const mockAddDoc     = vi.fn();
-export const mockGetDocs    = vi.fn();
-export const mockWriteBatch = vi.fn();
-export const mockBatchSet   = vi.fn();
-export const mockBatchUpdate = vi.fn();
-export const mockBatchCommit = vi.fn();
+export const mockGetDoc         = vi.fn();
+export const mockSetDoc         = vi.fn();
+export const mockUpdateDoc      = vi.fn();
+export const mockDeleteDoc      = vi.fn();
+export const mockAddDoc         = vi.fn();
+export const mockGetDocs        = vi.fn();
+export const mockWriteBatch     = vi.fn();
+export const mockBatchSet       = vi.fn();
+export const mockBatchUpdate    = vi.fn();
+export const mockBatchCommit    = vi.fn();
+export const mockRunTransaction = vi.fn();
+export const mockTxGet          = vi.fn();
+export const mockTxSet          = vi.fn();
+export const mockTxUpdate       = vi.fn();
 
 // ── Objeto batch falso que devuelve writeBatch() ─────────────
 export const fakeBatch = {
@@ -51,6 +57,13 @@ export const fakeBatch = {
   update: mockBatchUpdate,
   delete: vi.fn(),
   commit: mockBatchCommit,
+};
+
+export const fakeTx = {
+  get:    mockTxGet,
+  set:    mockTxSet,
+  update: mockTxUpdate,
+  delete: vi.fn(),
 };
 
 // ── Configuración del mock de "firebase/firestore" ───────────
@@ -62,21 +75,27 @@ vi.mock("firebase/firestore", () => ({
   addDoc:          mockAddDoc,
   getDocs:         mockGetDocs,
   writeBatch:      mockWriteBatch,
+  runTransaction:  mockRunTransaction,
   serverTimestamp: () => ({ _type: "serverTimestamp" }),
   arrayUnion:      (...args) => ({ _type: "arrayUnion", args }),
   arrayRemove:     (...args) => ({ _type: "arrayRemove", args }),
+  increment:       (n)       => ({ _type: "increment", n }),
+  deleteField:     ()        => ({ _type: "deleteField" }),
   // Helpers de query — devuelven sus args para poder afirmar sobre ellos
-  doc:        (_db, col, id) => ({ _col: col, _id: id }),
+  doc:        (_db, col, id, ...rest) =>
+    rest.length > 0 ? { _col: col, _id: id, _subpath: rest } : { _col: col, _id: id },
   collection: (_db, col)     => ({ _col: col }),
   query:      (...args)      => ({ _query: args }),
   where:      (field, op, val)  => ({ field, op, val }),
   orderBy:    (field, dir)      => ({ field, dir }),
   limit:      (n)               => ({ limit: n }),
+  limitToLast:(n)               => ({ limitToLast: n }),
+  endBefore:  (snap)            => ({ endBefore: snap }),
   startAfter: (snap)            => ({ startAfter: snap }),
 }));
 
 // ── Mock del singleton db ─────────────────────────────────────
-vi.mock("../../services/firebase", () => ({ db: {} }));
+vi.mock("../../services/firebase", () => ({ db: {}, app: {}, auth: {} }));
 
 // ── Mock del errorHandler (lo testeamos aparte) ──────────────
 vi.mock("../../utils/errorHandler", () => ({
@@ -92,9 +111,11 @@ export const resetAllMocks = () => {
     mockGetDoc, mockSetDoc, mockUpdateDoc, mockDeleteDoc,
     mockAddDoc, mockGetDocs, mockWriteBatch,
     mockBatchSet, mockBatchUpdate, mockBatchCommit,
+    mockRunTransaction, mockTxGet, mockTxSet, mockTxUpdate,
   ].forEach((fn) => fn.mockReset());
 
   // Comportamiento por defecto: writeBatch devuelve el fakeBatch
   mockWriteBatch.mockReturnValue(fakeBatch);
   mockBatchCommit.mockResolvedValue(undefined);
+  mockRunTransaction.mockImplementation(async (_db, fn) => fn(fakeTx));
 };

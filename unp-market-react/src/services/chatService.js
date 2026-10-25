@@ -61,9 +61,9 @@
 // ============================================================
 
 import {
-  doc, getDoc, getDocs, setDoc, updateDoc,
+  doc, getDoc, getDocs, updateDoc,
   collection, query, where, orderBy, limitToLast, endBefore,
-  onSnapshot, writeBatch, serverTimestamp, increment,
+  onSnapshot, writeBatch, runTransaction, serverTimestamp, increment,
   arrayUnion, arrayRemove,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -152,8 +152,7 @@ export const obtenerOCrearChat = async (uidComprador, uidVendedor, productoInfo 
   const chatRef = doc(db, "chats", chatId);
 
   try {
-    const [snap, infoComprador, infoVendedor] = await Promise.all([
-      getDoc(chatRef),
+    const [infoComprador, infoVendedor] = await Promise.all([
       obtenerInfoPerfilReal(uidComprador, productoInfo.compradorNombre, productoInfo.compradorAvatar),
       obtenerInfoPerfilReal(uidVendedor, productoInfo.vendedorNombre, productoInfo.vendedorAvatar),
     ]);
@@ -186,37 +185,46 @@ export const obtenerOCrearChat = async (uidComprador, uidVendedor, productoInfo 
         }
       : {};
 
-    if (snap.exists()) {
-      const actualizacion = { participantesInfo, ...camposProducto };
-      // Se espera esta escritura (a diferencia del refresco de perfil,
-      // que es fire-and-forget) porque Chat.jsx navega inmediatamente
-      // después y lee el doc — si no se espera, puede mostrar el
-      // producto de referencia viejo por una fracción de segundo.
-      await updateDoc(chatRef, actualizacion).catch((err) => {
-        logError("[chatService.obtenerOCrearChat] refresco de contexto", err);
+    const actualizacion = { participantesInfo, ...camposProducto };
+    let datosExistentes = null;
+
+    try {
+      return await runTransaction(db, async (tx) => {
+        const snap = await tx.get(chatRef);
+
+        if (snap.exists()) {
+          datosExistentes = snap.data();
+          tx.update(chatRef, actualizacion);
+          return { id: chatId, ...datosExistentes, ...actualizacion };
+        }
+
+        const nuevoChat = {
+          participantes: [uidComprador, uidVendedor].sort(),
+          participantesInfo,
+          productoId:         productoReferencia?.id        || null,
+          productoTitulo:     productoReferencia?.titulo     || null,
+          productoImagen:     productoReferencia?.imagenUrl  || null,
+          productoReferencia: productoReferencia || null,
+
+          ultimoMensaje:      "",
+          ultimoMensajeFecha: serverTimestamp(),
+          ultimoMensajeDeUid: null,
+          ultimoMensajeLeido: null, // aún no hay mensajes — null en vez de bool para distinguir "sin mensajes" de "no leído"
+
+          noLeidoPor: { [uidComprador]: 0, [uidVendedor]: 0 },
+          creadoEn:   serverTimestamp(),
+        };
+
+        tx.set(chatRef, nuevoChat);
+        return { id: chatId, ...nuevoChat };
       });
-      return { id: chatId, ...snap.data(), ...actualizacion };
+    } catch (txErr) {
+      if (datosExistentes) {
+        logError("[chatService.obtenerOCrearChat] refresco de contexto", txErr);
+        return { id: chatId, ...datosExistentes };
+      }
+      throw txErr;
     }
-
-    const nuevoChat = {
-      participantes: [uidComprador, uidVendedor].sort(),
-      participantesInfo,
-      productoId:         productoReferencia?.id        || null,
-      productoTitulo:     productoReferencia?.titulo     || null,
-      productoImagen:     productoReferencia?.imagenUrl  || null,
-      productoReferencia: productoReferencia || null,
-
-      ultimoMensaje:      "",
-      ultimoMensajeFecha: serverTimestamp(),
-      ultimoMensajeDeUid: null,
-      ultimoMensajeLeido: null, // aún no hay mensajes — null en vez de bool para distinguir "sin mensajes" de "no leído"
-
-      noLeidoPor: { [uidComprador]: 0, [uidVendedor]: 0 },
-      creadoEn:   serverTimestamp(),
-    };
-
-    await setDoc(chatRef, nuevoChat);
-    return { id: chatId, ...nuevoChat };
   } catch (err) {
     logError("[chatService.obtenerOCrearChat]", err);
     throw new Error(traducirError(err, "firestore"));

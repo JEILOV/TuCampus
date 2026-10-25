@@ -28,3 +28,10 @@ ui-debug.log
 firebase-debug.log
 .firebase/
 coverage/
+backup-reputacion-*.json
+
+*serviceAccount*.json
+*-firebase-adminsdk-*.json
+
+*serviceAccount*.json
+*-firebase-adminsdk-*.json

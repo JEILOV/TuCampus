@@ -1,7 +1,7 @@
 // src/services/productService.js
 import {
   doc, getDoc, updateDoc, deleteDoc,
-  collection, serverTimestamp, writeBatch,
+  collection, serverTimestamp, writeBatch, increment,
 } from "firebase/firestore";
 import { db }              from "./firebase";
 import { generarPrefijos } from "../utils/imageUtils";
@@ -72,7 +72,7 @@ export const normalizarCondicion = (condicion) =>
 // la firma vieja) y siempre devuelve una lista limpia y acotada a 4.
 const MAX_FOTOS_PRODUCTO = 4;
 const normalizarImagenes = (imagenes, imagenSuelta) => {
-  const fuente = Array.isArray(imagenes) && imagenes.length > 0 ? imagenes : [imagenSuelta];
+  const fuente = Array.isArray(imagenes) ? imagenes : [imagenSuelta];
   return fuente
     .map((url) => (typeof url === "string" ? url.trim() : ""))
     .filter(Boolean)
@@ -156,21 +156,11 @@ export const crearProducto = async ({ titulo, precio, categoria, condicion, desc
       keywords:       prefijos,
     });
 
-    // 🔧 El contador totalPublicaciones es un "nice to have", no un
-    // requisito de la publicación. Si esta lectura falla (hipo de red,
-    // etc.) NO debe tumbar la creación del producto en sí — solo se
-    // omite el incremento y se registra para diagnóstico.
-    try {
-      const userRef = doc(db, "usuarios", user.uid);
-      const snap    = await getDoc(userRef);
-      if (snap.exists()) {
-        batch.update(userRef, {
-          totalPublicaciones: (snap.data().totalPublicaciones || 0) + 1,
-        });
-      }
-    } catch (counterErr) {
-      logError("[productService.crearProducto] contador opcional", counterErr);
-    }
+    // 🔒 H04: Incremento atómico del contador histórico sin getDoc previo
+    const userRef = doc(db, "usuarios", user.uid);
+    batch.update(userRef, {
+      totalPublicaciones: increment(1),
+    });
 
     await batch.commit();
 
@@ -240,9 +230,9 @@ export const actualizarProducto = async (productoId, { titulo, precio, categoria
       condicion:    condicionValida,
       descripcion:  descripcionLimpia,
       imagen:       imagenPortada,
-      // Ver nota en crearProducto: se guarda el array completo cuando
-      // hay al menos 1 foto, para que Producto.jsx tenga el carrusel.
-      ...(imagenesLimpias.length > 0 ? { imagenes: imagenesLimpias } : {}),
+      // H06: si `imagenes` vino como array (aunque sea []), se escribe
+      // siempre; si fue omitido, no se toca el campo existente.
+      ...(Array.isArray(imagenes) ? { imagenes: imagenesLimpias } : {}),
       keywords:     prefijos,
       fechaEdicion: serverTimestamp(),
     });

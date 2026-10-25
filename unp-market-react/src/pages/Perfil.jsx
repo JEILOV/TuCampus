@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef }              from "react";
 import { useNavigate, useLocation }                 from "react-router-dom";
 import {
-  doc, setDoc, getDocs,
+  doc, getDocs,
   collection, query, where,
   updateDoc, deleteDoc,
 } from "firebase/firestore";
@@ -26,6 +26,40 @@ import { useToast, ToastContainer }    from "../components/Toast";
 // Placeholders — reemplazar por los archivos finales de cada logo.
 const YAPE_PLACEHOLDER = "/assets/yape-placeholder.png";
 const PLIN_PLACEHOLDER = "/assets/plin-placeholder.png";
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const propagarPerfilAProductos = async (uid, datosProducto, mostrarToast, setProductos) => {
+  try {
+    const q    = query(collection(db, "productos"), where("userUid", "==", uid));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      // 🔒 Solo se sincronizan datos públicos (nombre, avatar, insignias
+      // de método de pago). El teléfono nunca se copia a "productos".
+      const resultados = await Promise.allSettled(
+        snap.docs.map((d) => updateDoc(doc(db, "productos", d.id), datosProducto))
+      );
+      const fallidos = resultados.filter((r) => r.status === "rejected").length;
+      if (setProductos) {
+        setProductos((prev) => prev.map((p) => ({ ...p, ...datosProducto })));
+      }
+      if (mostrarToast) {
+        if (fallidos > 0) {
+          mostrarToast(
+            `⚠️ No se pudieron sincronizar ${fallidos} publicación${fallidos !== 1 ? "es" : ""}`,
+            "warning"
+          );
+        } else {
+          mostrarToast(`✓ Perfil actualizado en ${snap.size} publicación${snap.size !== 1 ? "es" : ""}`);
+        }
+      }
+      return { total: snap.size, fallidos };
+    }
+    return { total: 0, fallidos: 0 };
+  } catch (syncErr) {
+    console.warn("[Perfil] Error al sincronizar productos:", syncErr);
+    return { total: 0, fallidos: 0 };
+  }
+};
 
 // ──────────────────────────────────────────────────────────────
 //  SUB-COMPONENTE: Tarjeta de producto en modo perfil
@@ -240,66 +274,48 @@ const Perfil = () => {
     }
 
     const telefonoFinal = mTelefono.trim();
+    const nombreFinal   = mNombre.trim() || perfilPrev.nombre || "";
 
-    // 🔒 El número NUNCA se escribe en el doc público /usuarios/{uid}.
-    // Se guarda aparte en la subcolección privada de contacto, junto
-    // con los métodos de pago (por ahora, mismo número para Yape/Plin).
+    const datosEditables = {
+      nombre:     nombreFinal,
+      bio:        mBio,
+      acercaDe:   mAcerca,
+      ubicacion:  mUbicacion,
+      avatar:     avatarFinal,
+      portada:    portadaFinal,
+      aceptaYape: mAceptaYape,
+      aceptaPlin: mAceptaPlin,
+    };
+
+    // 🔒 H05 + H10: contacto privado + campos editables del perfil público
+    // en un único writeBatch (con telefono: deleteField() en /usuarios/{uid}).
+    // Nunca se envían reputación, seguidores, favoritos, bloqueados, fcmToken ni email.
     await guardarContactoPrivado(user.uid, {
       telefono: telefonoFinal,
       metodosPago: {
         yape: { activo: mAceptaYape, numero: mAceptaYape ? telefonoFinal : "" },
         plin: { activo: mAceptaPlin, numero: mAceptaPlin ? telefonoFinal : "" },
       },
+      ...datosEditables,
     });
 
-    const nuevoPerfil = {
-      ...perfilPrev,
-      uid:        user.uid,
-      nombre:     mNombre    || perfilPrev.nombre    || "",
-      bio:        mBio       || perfilPrev.bio       || "",
-      acercaDe:   mAcerca    || perfilPrev.acercaDe  || "",
-      ubicacion:  mUbicacion || perfilPrev.ubicacion || "",
-      avatar:     avatarFinal,
-      portada:    portadaFinal,
-      aceptaYape: mAceptaYape,
-      aceptaPlin: mAceptaPlin,
-    };
-    delete nuevoPerfil.telefono; // por si un perfil viejo aún lo traía
-
-    await setDoc(doc(db, "usuarios", user.uid), nuevoPerfil, { merge: true });
-    actualizarPerfil(nuevoPerfil);
+    actualizarPerfil(datosEditables);
 
     setModalOpen(false);
     mostrarToast("¡Perfil guardado correctamente!");
 
-    try {
-      const q    = query(collection(db, "productos"), where("userUid", "==", user.uid));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        // 🔒 Solo se sincronizan datos públicos (nombre, avatar, insignias
-        // de método de pago). El teléfono nunca se copia a "productos".
-        await Promise.all(snap.docs.map((d) =>
-          updateDoc(doc(db, "productos", d.id), {
-            avatarVendedor: avatarFinal,
-            vendedorNombre: nuevoPerfil.nombre || "",
-            vendedor:       nuevoPerfil.nombre || "",
-            aceptaYape:     mAceptaYape,
-            aceptaPlin:     mAceptaPlin,
-          })
-        ));
-        setProductos((prev) => prev.map((p) => ({
-          ...p,
-          avatarVendedor: avatarFinal,
-          vendedorNombre: nuevoPerfil.nombre || "",
-          vendedor:       nuevoPerfil.nombre || "",
-          aceptaYape:     mAceptaYape,
-          aceptaPlin:     mAceptaPlin,
-        })));
-        mostrarToast(`✓ Perfil actualizado en ${snap.size} publicación${snap.size !== 1 ? "es" : ""}`);
-      }
-    } catch (syncErr) {
-      console.warn("[Perfil] Error al sincronizar productos:", syncErr);
-    }
+    await propagarPerfilAProductos(
+      user.uid,
+      {
+        avatarVendedor: avatarFinal,
+        vendedorNombre: datosEditables.nombre || "",
+        vendedor:       datosEditables.nombre || "",
+        aceptaYape:     mAceptaYape,
+        aceptaPlin:     mAceptaPlin,
+      },
+      mostrarToast,
+      setProductos
+    );
   };
 
   const handleGuardar = async () => {

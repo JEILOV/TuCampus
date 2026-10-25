@@ -2,6 +2,7 @@ import {
   doc, getDoc, setDoc,
   collection, query, where, getDocs,
   updateDoc, arrayUnion, arrayRemove,
+  writeBatch, deleteField,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
@@ -47,25 +48,49 @@ export const obtenerContactoPrivado = async (uid) => {
 };
 
 /**
- * 🔒 Guarda telefono + metodosPago en la subcolección privada del dueño,
- * y espeja SOLO los booleanos (aceptaYape/aceptaPlin) al doc público de
- * usuarios — nunca el número — para que las tarjetas puedan mostrar el
- * badge sin una lectura extra por tarjeta.
+ * 🔒 H05 + H10: Guarda telefono + metodosPago en la subcolección privada del dueño
+ * y actualiza SOLO los campos permitidos del perfil público en un único writeBatch,
+ * eliminando cualquier `telefono` legado del documento público con deleteField().
  * @param {string} uid
- * @param {{telefono: string, metodosPago: {yape:{activo:boolean,numero:string}, plin:{activo:boolean,numero:string}}}} datos
+ * @param {Object} datos
  */
-export const guardarContactoPrivado = async (uid, { telefono, metodosPago }) => {
+export const guardarContactoPrivado = async (
+  uid,
+  {
+    telefono,
+    metodosPago,
+    nombre = "",
+    bio = "",
+    acercaDe = "",
+    ubicacion = "",
+    avatar = "",
+    portada = "",
+    aceptaYape,
+    aceptaPlin,
+  }
+) => {
   try {
-    await setDoc(
+    const batch = writeBatch(db);
+
+    batch.set(
       doc(db, "usuarios", uid, "privado", "contacto"),
       { telefono: telefono || "", metodosPago },
       { merge: true }
     );
 
-    await updateDoc(doc(db, "usuarios", uid), {
-      aceptaYape: !!metodosPago?.yape?.activo,
-      aceptaPlin: !!metodosPago?.plin?.activo,
+    batch.update(doc(db, "usuarios", uid), {
+      nombre,
+      bio,
+      acercaDe,
+      ubicacion,
+      avatar,
+      portada,
+      aceptaYape: aceptaYape !== undefined ? Boolean(aceptaYape) : !!metodosPago?.yape?.activo,
+      aceptaPlin: aceptaPlin !== undefined ? Boolean(aceptaPlin) : !!metodosPago?.plin?.activo,
+      telefono: deleteField(),
     });
+
+    await batch.commit();
   } catch (err) {
     logError("[userService.guardarContactoPrivado]", err);
     throw new Error(traducirError(err, "firestore"));
@@ -85,40 +110,47 @@ export const obtenerProductosPorVendedor = async (uid) => {
 };
 
 /**
- * Agrega al usuario actual a la lista de seguidores de un vendedor.
+ * Agrega al usuario actual a la lista de seguidores de un vendedor (H04: atómico sin lectura previa).
  * @param {string} vendedorUid
  * @param {string} miUid
  */
 export const seguirVendedor = async (vendedorUid, miUid) => {
+  const ref = doc(db, "usuarios", vendedorUid);
   try {
-    const ref  = doc(db, "usuarios", vendedorUid);
-    const snap = await getDoc(ref);
-    const actuales = (snap.exists() && Array.isArray(snap.data().seguidores))
-      ? snap.data().seguidores
-      : [];
-
-    if (actuales.includes(miUid)) return; // ya lo sigue, nada que hacer
-
-    await updateDoc(ref, { seguidores: [...actuales, miUid] });
+    await updateDoc(ref, { seguidores: arrayUnion(miUid) });
   } catch (err) {
+    if (err?.code === "permission-denied") {
+      try {
+        const snap = await getDoc(ref);
+        const actuales = (snap.exists() && Array.isArray(snap.data().seguidores))
+          ? snap.data().seguidores
+          : [];
+        if (actuales.includes(miUid)) return;
+      } catch {
+        // Si la lectura de verificación falla, caemos al manejo de error original
+      }
+    }
     logError("[userService.seguirVendedor]", err);
     throw new Error(traducirError(err, "firestore"));
   }
 };
 
-
 export const dejarDeSeguirVendedor = async (vendedorUid, miUid) => {
+  const ref = doc(db, "usuarios", vendedorUid);
   try {
-    const ref  = doc(db, "usuarios", vendedorUid);
-    const snap = await getDoc(ref);
-    const actuales = (snap.exists() && Array.isArray(snap.data().seguidores))
-      ? snap.data().seguidores
-      : [];
-
-    if (!actuales.includes(miUid)) return; // ya no lo sigue, nada que hacer
-
-    await updateDoc(ref, { seguidores: actuales.filter((uid) => uid !== miUid) });
+    await updateDoc(ref, { seguidores: arrayRemove(miUid) });
   } catch (err) {
+    if (err?.code === "permission-denied") {
+      try {
+        const snap = await getDoc(ref);
+        const actuales = (snap.exists() && Array.isArray(snap.data().seguidores))
+          ? snap.data().seguidores
+          : [];
+        if (!actuales.includes(miUid)) return;
+      } catch {
+        // Si la lectura de verificación falla, caemos al manejo de error original
+      }
+    }
     logError("[userService.dejarDeSeguirVendedor]", err);
     throw new Error(traducirError(err, "firestore"));
   }
