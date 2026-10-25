@@ -88,6 +88,24 @@ const obtenerProductoRef = (chat) => {
   };
 };
 
+// 🔒 S08: Trunca texto a 200 caracteres (con "…" si se cortó) y autorNombre a 100
+// para cumplir con esRespondiendoAValido() en firestore.rules.
+// eslint-disable-next-line react-refresh/only-export-components
+export const construirRespondiendoA = (mensajeRespondiendo, miUid, otroNombre) => {
+  if (!mensajeRespondiendo) return null;
+  const textoCrudo = mensajeRespondiendo.texto || (mensajeRespondiendo.imagen ? "📷 Imagen" : "");
+  const texto = textoCrudo.length > 200 ? `${textoCrudo.slice(0, 199)}…` : textoCrudo;
+  const nombreCrudo = mensajeRespondiendo.deUid === miUid
+    ? "Tú"
+    : (otroNombre || "Estudiante UNP");
+  const autorNombre = nombreCrudo.slice(0, 100);
+  return {
+    id:          mensajeRespondiendo.id,
+    texto,
+    autorNombre,
+  };
+};
+
 // Formato de fecha para las tarjetas de la lista de chats (distinto del
 // formatearHora de arriba, que es para las burbujas dentro de una charla
 // abierta y solo necesita la hora). Acepta Timestamp de Firestore
@@ -772,10 +790,13 @@ const Chat = () => {
     if (!mensajeRespondiendo) return null;
     return {
       id:    mensajeRespondiendo.id,
-      texto: mensajeRespondiendo.texto || (mensajeRespondiendo.imagen ? "📷 Imagen" : ""),
+      texto: (() => {
+        const t = mensajeRespondiendo.texto || (mensajeRespondiendo.imagen ? "📷 Imagen" : "");
+        return t.length > 200 ? `${t.slice(0, 199)}…` : t;
+      })(),
       autorNombre: mensajeRespondiendo.deUid === user?.uid
         ? "Tú"
-        : (otroInfo.nombre || "Estudiante UNP"),
+        : (otroInfo.nombre || "Estudiante UNP").slice(0, 100),
     };
   }, [mensajeRespondiendo, user?.uid, otroInfo.nombre]);
 

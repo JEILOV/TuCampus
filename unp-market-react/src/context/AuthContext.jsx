@@ -73,6 +73,15 @@ export const AuthProvider = ({ children }) => {
         return; // ⛔ DETENEMOS LA EJECUCIÓN AQUÍ
       }
 
+      // 🔒 S04: No cargar perfil ni exponer user si el correo aún no está verificado
+      if (!firebaseUser.emailVerified) {
+        setUser(null);
+        setPerfil(null);
+        setFavoritos(new Set());
+        setCargando(false);
+        return;
+      }
+
       // ✅ Si pasa el bloqueo, continuamos con el flujo normal de la app
       try {
         // Recuperar favoritos que el usuario marcó como invitado

@@ -1,0 +1,300 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ──────────────────────────────────────────────────────────
+    //  FUNCIONES AUXILIARES
+    // ──────────────────────────────────────────────────────────
+
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+
+    // 🏫 Multicampus: whitelist de dominios institucionales soportados.
+    // ⚠️ Esta lista DEBE coincidir con src/config/universidades.js.
+    //
+    // 🔒 CAMBIO (S04): ahora exige email_verified == true. Los usuarios de
+    // Google ya vienen verificados; los de correo/contraseña obtienen el
+    // claim al iniciar sesión DESPUÉS de verificar (Login.jsx ya cierra la
+    // sesión de cuentas sin verificar, así que el flujo normal no cambia).
+    function esEstudianteValido() {
+      return estaAutenticado()
+          && request.auth.token.email_verified == true
+          && (
+            request.auth.token.email.matches('.*@alumnos\\.unp\\.edu\\.pe$')
+            || request.auth.token.email.matches('.*@ucvvirtual\\.edu\\.pe$')
+            || request.auth.token.email.matches('.*@utp\\.edu\\.pe$')
+          );
+    }
+
+    function esDuenio(uid) {
+      return estaAutenticado() && request.auth.uid == uid;
+    }
+
+    // 🔧 Gating de admin para /anuncios (debe coincidir con ADMIN_EMAILS en
+    // src/pages/PanelAdminAnuncios.jsx).
+    // 🔒 CAMBIO (S04): también exige email_verified.
+    function esAdmin() {
+      return estaAutenticado()
+          && request.auth.token.email_verified == true
+          && request.auth.token.email in ['0512023070@alumnos.unp.edu.pe'];
+    }
+
+    function esAnuncioValido() {
+      let d = request.resource.data;
+      return d.titulo     is string  && d.titulo.size() > 0 && d.titulo.size() <= 80
+          && d.subtitulo  is string  && d.subtitulo.size() <= 120
+          && d.colorFondo is string  && d.colorFondo.size() <= 20
+          && d.imagenUrl  is string  && d.imagenUrl.size() <= 500
+          && d.enlaceUrl  is string  && d.enlaceUrl.size() <= 500
+          && d.orden      is number
+          && d.activo     is bool
+          && d.universidadId is string && d.universidadId in ['global', 'unp', 'ucv', 'utp'];
+    }
+
+    function esProductoValido() {
+      let d = request.resource.data;
+      return d.titulo      is string  && d.titulo.size()  > 0 && d.titulo.size()  <= 200
+          && d.descripcion is string  && d.descripcion.size() <= 500
+          && d.precio      is number  && d.precio  > 0    && d.precio  <= 10000
+          && d.categoria   is string  && d.categoria in ['comida','tecnologia','ropa','materiales','servicios','otros']
+          && d.estado      is string  && d.estado   in ['disponible','agotado']
+          && d.keywords    is list    && d.keywords.size() <= 30
+          && d.universidadId is string && d.universidadId in ['unp','ucv','utp']
+          && d.userUid == request.auth.uid
+          && (!('condicion' in d) || d.condicion in ['nuevo', 'como_nuevo', 'usado']);
+    }
+
+    function noModificaDuenio() {
+      return !('userUid' in request.resource.data)
+          || request.resource.data.userUid == resource.data.userUid;
+    }
+
+    // 🔒 CAMBIO (S05): antes solo comprobaba el tamaño y que el UID estuviera
+    // en alguna de las dos listas, lo que permitía agregar/quitar a OTRO
+    // usuario aprovechando que uno ya figuraba en la lista.
+    // Ahora el UID solicitante debe ser EXACTAMENTE el elemento que aparece
+    // (agrega) o desaparece (quita), sin duplicados.
+    function cambioValidoDeSeguidores(uid) {
+      let antes   = ('seguidores' in resource.data) && resource.data.seguidores is list
+                      ? resource.data.seguidores : [];
+      let despues = ('seguidores' in request.resource.data) && request.resource.data.seguidores is list
+                      ? request.resource.data.seguidores : [];
+      let agrega  = despues.size() == antes.size() + 1
+                    && despues.hasAll(antes)
+                    && despues.hasAll([uid])
+                    && !antes.hasAny([uid]);
+      let quita   = antes.size() == despues.size() + 1
+                    && antes.hasAll(despues)
+                    && antes.hasAll([uid])
+                    && !despues.hasAny([uid]);
+      return agrega || quita;
+    }
+
+    // Reseña: valida forma, autor, no autocalificación e ID determinístico.
+    // 🔒 CAMBIO (S07 parcial): estrellas debe ser entero (el cliente ya usa
+    // Math.round en reviewService.js).
+    function esResenaValida(resenaId) {
+      let d = request.resource.data;
+      return d.vendedorUid is string && d.vendedorUid.size() > 0
+          && d.autorUid    == request.auth.uid
+          && d.autorUid    != d.vendedorUid
+          && d.estrellas   is int && d.estrellas >= 1 && d.estrellas <= 5
+          && d.comentario  is string && d.comentario.size() <= 300
+          && resenaId == d.autorUid + '_' + d.vendedorUid;
+    }
+
+    function noModificaAutorNiVendedor() {
+      return request.resource.data.autorUid    == resource.data.autorUid
+          && request.resource.data.vendedorUid == resource.data.vendedorUid;
+    }
+
+    function esRespondiendoAValido() {
+      let d = request.resource.data;
+      return !('respondiendoA' in d)
+          || d.respondiendoA == null
+          || (
+            d.respondiendoA is map
+            && d.respondiendoA.keys().hasOnly(['id', 'texto', 'autorNombre'])
+            && d.respondiendoA.id          is string && d.respondiendoA.id.size()          > 0   && d.respondiendoA.id.size()          <= 200
+            && d.respondiendoA.texto       is string && d.respondiendoA.texto.size()       <= 200
+            && d.respondiendoA.autorNombre is string && d.respondiendoA.autorNombre.size() > 0   && d.respondiendoA.autorNombre.size() <= 100
+          );
+    }
+
+    function esEdicionDeMensajeValida() {
+      let antes   = resource.data;
+      let despues = request.resource.data;
+      return antes.deUid == request.auth.uid
+          && antes.tipo  == 'texto'
+          && despues.diff(antes).affectedKeys().hasOnly(['texto', 'editado', 'fechaEdicion'])
+          && despues.texto   is string && despues.texto.size() > 0 && despues.texto.size() <= 1000
+          && despues.editado == true
+          && despues.fechaEdicion == request.time;
+    }
+
+    function esMarcadoDeLeidoValido() {
+      let antes   = resource.data;
+      let despues = request.resource.data;
+      return antes.deUid != request.auth.uid
+          && antes.leido  == false
+          && despues.leido == true
+          && despues.diff(antes).affectedKeys().hasOnly(['leido']);
+    }
+
+
+    // ──────────────────────────────────────────────────────────
+    //  COLECCIÓN: productos
+    // ──────────────────────────────────────────────────────────
+    match /productos/{productoId} {
+      allow read: if true;
+      allow create: if esEstudianteValido() && esProductoValido();
+      allow update: if (esDuenio(resource.data.userUid) && noModificaDuenio() && esProductoValido())
+                    // ⚠️ PENDIENTE (S02): esta vía permite a cualquier estudiante
+                    // cambiar la reputación copiada en el producto. Se cierra en la
+                    // Fase 4 (sumaEstrellas + getAfter, o dejar de copiar la reputación).
+                    || (
+                      esEstudianteValido() &&
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['calificacionVendedor', 'totalResenasVendedor'])
+                    );
+      allow delete: if esDuenio(resource.data.userUid);
+    }
+
+
+    // ──────────────────────────────────────────────────────────
+    //  COLECCIÓN: usuarios
+    // ──────────────────────────────────────────────────────────
+    match /usuarios/{userId} {
+      // ⚠️ PENDIENTE (S01): lectura pública del documento completo. Se cierra
+      // en la Fase 5 separando perfil público y datos privados.
+      allow read: if true;
+      allow create, delete: if esDuenio(userId) && esEstudianteValido();
+
+      // ⚠️ PENDIENTE (S02/S03): el dueño puede editar cualquier campo y la
+      // rama de reputación no valida valores. Fases 4 y 5.
+      allow update: if esDuenio(userId)
+                    || (
+                      esEstudianteValido() &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seguidores']) &&
+                      cambioValidoDeSeguidores(request.auth.uid)
+                    )
+                    || (
+                      esEstudianteValido() &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['calificacionPromedio', 'totalResenas', 'sumaEstrellas'])
+                      && (!('sumaEstrellas' in request.resource.data) || request.resource.data.sumaEstrellas is int)
+                    );
+
+      match /privado/contacto {
+        allow read: if esEstudianteValido();
+        allow write: if esDuenio(userId);
+      }
+    }
+
+
+    // ──────────────────────────────────────────────────────────
+    //  COLECCIÓN: notificaciones
+    // ──────────────────────────────────────────────────────────
+    match /notificaciones/{notifId} {
+      allow read: if esDuenio(resource.data.paraUid);
+      allow create: if esEstudianteValido()
+                    && request.resource.data.deUid == request.auth.uid
+                    && request.resource.data.paraUid is string
+                    && request.resource.data.paraUid.size() > 0;
+      allow update: if esDuenio(resource.data.paraUid)
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leido']);
+      allow delete: if esDuenio(resource.data.paraUid);
+    }
+
+
+    // ──────────────────────────────────────────────────────────
+    //  COLECCIÓN: chats
+    // ──────────────────────────────────────────────────────────
+    match /chats/{chatId} {
+      allow read: if estaAutenticado()
+                  && (resource == null || request.auth.uid in resource.data.participantes);
+
+      // 🔒 CAMBIO: el ID del chat debe ser EXACTAMENTE los dos UID de
+      // participantes unidos con "_" (mismo criterio que generarChatId en
+      // chatService.js: [uidA, uidB].sort().join("_")), y los dos
+      // participantes deben ser distintos. Evita crear chats con el ID de
+      // otros dos usuarios para bloquearles la conversación.
+      allow create: if esEstudianteValido()
+                    && request.resource.data.participantes is list
+                    && request.resource.data.participantes.size() == 2
+                    && request.auth.uid in request.resource.data.participantes
+                    && request.resource.data.participantes[0] != request.resource.data.participantes[1]
+                    && chatId == request.resource.data.participantes[0] + '_' + request.resource.data.participantes[1];
+
+      // 🔒 CAMBIO (S04): update ahora exige estudiante verificado, igual que create.
+      // ⚠️ PENDIENTE (S06): aún permite cambiar cualquier campo salvo participantes.
+      allow update: if esEstudianteValido()
+                    && request.auth.uid in resource.data.participantes
+                    && request.resource.data.participantes == resource.data.participantes;
+
+      match /mensajes/{mensajeId} {
+        allow read: if estaAutenticado()
+                    && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantes;
+
+        allow create: if esEstudianteValido()
+                      && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantes
+                      && request.resource.data.deUid == request.auth.uid
+                      && esRespondiendoAValido()
+                      && (
+                        (
+                          (!('tipo' in request.resource.data) || request.resource.data.tipo == 'texto')
+                          && request.resource.data.texto is string
+                          && request.resource.data.texto.size() > 0
+                          && request.resource.data.texto.size() <= 1000
+                        )
+                        ||
+                        (
+                          request.resource.data.tipo == 'imagen'
+                          && request.resource.data.imagen is string
+                          && request.resource.data.imagen.size() > 0
+                        )
+                      );
+
+        allow update: if esEstudianteValido() && (
+          esEdicionDeMensajeValida()
+          || (
+            request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantes
+            && esMarcadoDeLeidoValido()
+          )
+        );
+        allow delete: if false;
+      }
+    }
+
+
+    // ──────────────────────────────────────────────────────────
+    //  COLECCIÓN: resenas
+    // ──────────────────────────────────────────────────────────
+    match /resenas/{resenaId} {
+      allow read: if true;
+      allow create: if esEstudianteValido() && esResenaValida(resenaId);
+      allow update: if esDuenio(resource.data.autorUid)
+                    && esResenaValida(resenaId)
+                    && noModificaAutorNiVendedor();
+      allow delete: if false;
+    }
+
+
+    // ──────────────────────────────────────────────────────────
+    //  COLECCIÓN: anuncios
+    // ──────────────────────────────────────────────────────────
+    match /anuncios/{anuncioId} {
+      allow read: if true;
+      allow create, update: if esAdmin() && esAnuncioValido();
+      allow delete: if esAdmin();
+    }
+
+
+    // ──────────────────────────────────────────────────────────
+    //  CATCH-ALL
+    // ──────────────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

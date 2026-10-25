@@ -204,6 +204,9 @@ const Login = () => {
         setFormPassword("");
       } else {
         const cred = await signInWithEmailAndPassword(auth, emailLimpio, formPassword);
+        if (typeof cred.user.reload === "function") {
+          await cred.user.reload();
+        }
 
         if (!cred.user.emailVerified) {
           await signOut(auth);
@@ -211,6 +214,8 @@ const Login = () => {
           setEnviando(false);
           return;
         }
+
+        await (auth.currentUser || cred.user).getIdToken?.(true);
 
         // ✅ A partir de aquí: el onAuthStateChanged del AuthContext se dispara,
         //    carga el perfil de Firestore, fusiona favoritos y pone cargando=false.
