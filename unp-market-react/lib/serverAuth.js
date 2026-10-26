@@ -62,11 +62,29 @@ export const autenticarEstudiante = async (req) => {
     };
   }
 
+  let appAdmin;
+  try {
+    appAdmin = obtenerAdmin();
+  } catch (adminErr) {
+    console.error(
+      "[serverAuth] Error al inicializar firebase-admin (revisar variables de entorno):",
+      adminErr?.code || adminErr?.message
+    );
+    return {
+      ok: false,
+      status: 401,
+      error: "Tu sesión expiró o no es válida. Vuelve a iniciar sesión.",
+    };
+  }
+
   let decoded;
   try {
-    const appAdmin = obtenerAdmin();
     decoded = await appAdmin.auth().verifyIdToken(idToken);
-  } catch {
+  } catch (err) {
+    console.error(
+      "[serverAuth] verifyIdToken falló:",
+      err?.code || err?.message
+    );
     return {
       ok: false,
       status: 401,

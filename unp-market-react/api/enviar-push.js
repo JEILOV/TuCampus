@@ -24,6 +24,10 @@ const VENTANA_MENSAJE_MS = 2 * 60 * 1000;  // 2 minutos
 const VENTANA_RESENA_MS  = 2 * 60 * 1000;  // 2 minutos
 const VENTANA_PRODUCTO_MS = 5 * 60 * 1000; // 5 minutos
 
+// Tope por usuario para notificaciones masivas de tipo "producto" (3 por hora)
+export const VENTANA_LIMITE_PRODUCTO_MS = 60 * 60 * 1000;
+export const MAX_PUSH_PRODUCTO_POR_HORA = 3;
+
 // Campos del contrato viejo que ya no se aceptan desde el cliente
 const CAMPOS_CONTRATO_VIEJO = [
   "tokens",
@@ -77,6 +81,44 @@ const esErrorYaExiste = (err) =>
   err?.code === 6 ||
   err?.code === "already-exists" ||
   /already exists/i.test(err?.message || "");
+
+/**
+ * Verifica e incrementa el tope horario de pushes de producto en limitesApi/pushProducto_${uid}.
+ * Si Firestore falla, registra el error y deja pasar (fail open).
+ */
+const verificarLimitePushProducto = async (db, uid) => {
+  try {
+    const ref = db.collection("limitesApi").doc(`pushProducto_${uid}`);
+    const ahora = Date.now();
+
+    const permitido = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const datos = snap.exists ? snap.data() : null;
+      const inicio = typeof datos?.inicio === "number" ? datos.inicio : 0;
+      const conteo = typeof datos?.conteo === "number" ? datos.conteo : 0;
+
+      if (!snap.exists || ahora - inicio > VENTANA_LIMITE_PRODUCTO_MS) {
+        tx.set(ref, { inicio: ahora, conteo: 1 });
+        return true;
+      }
+
+      if (conteo >= MAX_PUSH_PRODUCTO_POR_HORA) {
+        return false;
+      }
+
+      tx.set(ref, { inicio, conteo: conteo + 1 });
+      return true;
+    });
+
+    return permitido;
+  } catch (err) {
+    console.error(
+      "[api/enviar-push] Error al verificar límite de push de producto (fail open):",
+      err
+    );
+    return true;
+  }
+};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -206,7 +248,9 @@ export default async function handler(req, res) {
         msgData.tipo === "imagen"
           ? "📷 Imagen"
           : String(msgData.texto || "").slice(0, 100);
-      urlDestino = sanitizarRutaRelativa(`/chat?id=${chatId}`);
+      urlDestino = sanitizarRutaRelativa(
+        `/chat?id=${encodeURIComponent(chatId)}`
+      );
       iconUrl = avatarRemitente;
       claveDedup = `m_${chatId}_${mensajeId}`;
     }
@@ -256,7 +300,9 @@ export default async function handler(req, res) {
       const estrellas = Number(resenaData.estrellas) || 5;
       titulo = "⭐ Nueva calificación";
       cuerpo = `${nombreRemitente} te calificó con ${estrellas} ⭐`;
-      urlDestino = sanitizarRutaRelativa(`/vendedor?uid=${vendedorUid}`);
+      urlDestino = sanitizarRutaRelativa(
+        `/vendedor?uid=${encodeURIComponent(vendedorUid)}`
+      );
       iconUrl = avatarRemitente;
       claveDedup = `r_${uid}_${vendedorUid}_${obtenerClaveHoraActual()}`;
     }
@@ -309,7 +355,9 @@ export default async function handler(req, res) {
 
       titulo = "🛍️ Nuevo producto en tu campus";
       cuerpo = String(prodData.titulo || "").slice(0, 100);
-      urlDestino = sanitizarRutaRelativa(`/producto?id=${productoId}`);
+      urlDestino = sanitizarRutaRelativa(
+        `/producto?id=${encodeURIComponent(productoId)}`
+      );
       imageUrl = sanitizarHttpsUrl(primeraFoto);
       claveDedup = `p_${productoId}`;
     }
@@ -358,6 +406,14 @@ export default async function handler(req, res) {
         return res.status(200).json({ duplicado: true });
       }
       throw dedupErr;
+    }
+
+    // f.2) Tope por usuario para tipo "producto" (máximo 3 por hora en limitesApi/pushProducto_${uid})
+    if (tipo === "producto") {
+      const dentroDelLimite = await verificarLimitePushProducto(db, uid);
+      if (!dentroDelLimite) {
+        return res.status(200).json({ limitado: true });
+      }
     }
 
     // g) Construcción del payload data-only con rutas relativas e imágenes https://
