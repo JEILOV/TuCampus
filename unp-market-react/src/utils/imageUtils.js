@@ -14,6 +14,8 @@
 // (logError ya no se usa en este archivo — la subida de imagen ahora
 // delega el manejo de errores al catch de quien llame a subirImagenImgBB.)
 
+import { auth } from "../services/firebase";
+
 const MAX_DIMENSION = 1080;
 const CALIDAD_JPEG  = 0.70;
 const CALIDAD_WEBP  = 0.75; // WebP mantiene mejor calidad visual a menor peso que JPEG en un % similar
@@ -230,6 +232,94 @@ const blobABase64 = (blob) =>
   });
 
 /**
+ * Construye los headers para la subida autenticada hacia /api/upload-image.
+ * Extraído como función pura para facilitar pruebas unitarias.
+ */
+export const construirHeadersSubida = (token) => {
+  if (!token || typeof token !== "string" || !token.trim()) {
+    throw Object.assign(new Error("Inicia sesión para subir imágenes"), {
+      code: "AUTH_REQUIRED",
+    });
+  }
+  return {
+    "Content-Type": "application/json",
+    Authorization: "Bearer " + token.trim(),
+  };
+};
+
+/**
+ * Traduce una respuesta no exitosa (status + body texto) de /api/upload-image
+ * en un Error con `code` específico (distinguiendo 401/403 de timeout/413).
+ */
+export const mapearErrorSubida = (status, responseText) => {
+  if (status === 413) {
+    let data = null;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      // respuesta HTML de plataforma (sin JSON)
+    }
+    return Object.assign(
+      new Error(data?.error || "La imagen es demasiado pesada para subir."),
+      { code: data?.code || "PAYLOAD_TOO_LARGE" }
+    );
+  }
+  if (status === 502 || status === 504) {
+    return Object.assign(
+      new Error("La subida tardó demasiado. Intenta de nuevo."),
+      { code: "UPLOAD_TIMEOUT" }
+    );
+  }
+
+  let data = null;
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    // Si no es JSON válido, resolvemos abajo según el status HTTP
+  }
+
+  if (status === 401) {
+    return Object.assign(
+      new Error(
+        data?.error ||
+          "Tu sesión expiró. Vuelve a iniciar sesión para subir imágenes."
+      ),
+      { code: data?.code || "AUTH_REQUIRED" }
+    );
+  }
+  if (status === 403) {
+    return Object.assign(
+      new Error(
+        data?.error ||
+          "No tienes permiso para subir imágenes. Verifica tu correo institucional."
+      ),
+      { code: data?.code || "FORBIDDEN" }
+    );
+  }
+  if (status === 429) {
+    return Object.assign(
+      new Error(
+        data?.error ||
+          "Has subido demasiadas imágenes por ahora. Intenta más tarde."
+      ),
+      { code: data?.code || "RATE_LIMITED" }
+    );
+  }
+
+  if (data) {
+    return Object.assign(
+      new Error(data.error || "No se pudo subir la imagen"),
+      { code: data.code || "SERVER_ERROR" }
+    );
+  }
+
+  return Object.assign(
+    new Error("Respuesta inválida del servidor de imágenes"),
+    { code: "SERVER_ERROR" }
+  );
+};
+
+/**
  * Sube un Blob/File a ImgBB (vía api/upload-image.js, NUNCA directo
  * desde el navegador) y devuelve la URL pública.
  * Devuelve "" si no hay archivo.
@@ -252,12 +342,20 @@ const blobABase64 = (blob) =>
 export const subirImagenImgBB = async (file, onProgress) => {
   if (!file) return "";
 
+  if (!auth.currentUser) {
+    throw new Error("Inicia sesión para subir imágenes");
+  }
+
+  const token = await auth.currentUser.getIdToken();
+  const headers = construirHeadersSubida(token);
   const imageBase64 = await blobABase64(file);
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/upload-image");
-    xhr.setRequestHeader("Content-Type", "application/json");
+    Object.entries(headers).forEach(([clave, valor]) => {
+      xhr.setRequestHeader(clave, valor);
+    });
 
     // 🔧 Techo de tiempo del lado del cliente. Por qué hace falta además
     // del timeout que ya pusimos en el servidor (ver api/upload-image.js):
@@ -282,28 +380,19 @@ export const subirImagenImgBB = async (file, onProgress) => {
       // página de error de la plataforma), así que se resuelven por
       // status ANTES de intentar JSON.parse, con un `code` explícito
       // que el llamador puede usar para mostrar un mensaje específico.
-      if (xhr.status === 413) {
-        reject(Object.assign(new Error("La imagen es demasiado pesada para subir."), { code: "PAYLOAD_TOO_LARGE" }));
-        return;
-      }
-      if (xhr.status === 502 || xhr.status === 504) {
-        reject(Object.assign(new Error("La subida tardó demasiado. Intenta de nuevo."), { code: "UPLOAD_TIMEOUT" }));
-        return;
-      }
-
-      try {
-        const data = JSON.parse(xhr.responseText);
-        if (xhr.status >= 200 && xhr.status < 300 && data.url) {
-          onProgress?.(100);
-          resolve(data.url);
-        } else {
-          // Nuestro propio servidor puede devolver un `code` (p. ej.
-          // IMGBB_TIMEOUT) — se propaga tal cual si viene.
-          reject(Object.assign(new Error(data?.error || "No se pudo subir la imagen"), { code: data?.code || "SERVER_ERROR" }));
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data?.url) {
+            onProgress?.(100);
+            resolve(data.url);
+            return;
+          }
+        } catch {
+          // Cae a mapearErrorSubida abajo
         }
-      } catch {
-        reject(Object.assign(new Error("Respuesta inválida del servidor de imágenes"), { code: "SERVER_ERROR" }));
       }
+      reject(mapearErrorSubida(xhr.status, xhr.responseText));
     };
 
     xhr.onerror   = () => reject(Object.assign(new Error("Error de red al subir la imagen"), { code: "NETWORK_ERROR" }));
