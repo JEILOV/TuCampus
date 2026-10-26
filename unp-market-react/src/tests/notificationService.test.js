@@ -3,14 +3,29 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 import {
   mockAddDoc,
+  mockGetDoc,
+  mockGetDocs,
   resetAllMocks,
 } from "./__mocks__/firebase";
+
+const { mockSolicitarPush } = vi.hoisted(() => ({
+  mockSolicitarPush: vi.fn(),
+}));
+
+vi.mock("../services/pushService", () => ({
+  solicitarPush: mockSolicitarPush,
+}));
 
 // logError está mockeado en __mocks__/firebase.js —
 // lo importamos aquí para afirmar sobre sus llamadas.
 import { logError } from "../utils/errorHandler";
 
-import { crearNotificacion } from "../services/notificationService";
+import {
+  crearNotificacion,
+  notificarNuevoMensaje,
+  notificarNuevaResena,
+  notificarNuevoProductoEnSede,
+} from "../services/notificationService";
 
 // ─────────────────────────────────────────────────────────────
 // src/tests/notificationService.test.js
@@ -171,6 +186,48 @@ describe("notificationService", () => {
       expect(logError).not.toHaveBeenCalled();
     });
 
+  });
+
+  // ══════════════════════════════════════════════════════════
+  describe("orquestación push en servidor (FASE 4 - TAREA 4)", () => {
+    it("notificarNuevoMensaje delega a solicitarPush sin leer usuarios en el cliente", async () => {
+      await notificarNuevoMensaje({ chatId: "chat-1", mensajeId: "msg-99" });
+
+      expect(mockSolicitarPush).toHaveBeenCalledWith({
+        tipo: "mensaje",
+        chatId: "chat-1",
+        mensajeId: "msg-99",
+      });
+      expect(mockGetDoc).not.toHaveBeenCalled();
+    });
+
+    it("notificarNuevaResena delega a solicitarPush sin leer usuarios en el cliente", async () => {
+      await notificarNuevaResena({ vendedorUid: "uid-vendedor-1" });
+
+      expect(mockSolicitarPush).toHaveBeenCalledWith({
+        tipo: "resena",
+        vendedorUid: "uid-vendedor-1",
+      });
+      expect(mockGetDoc).not.toHaveBeenCalled();
+    });
+
+    it("notificarNuevoProductoEnSede delega a solicitarPush sin consultar usuarios en el cliente", async () => {
+      await notificarNuevoProductoEnSede({ productoId: "prod-777" });
+
+      expect(mockSolicitarPush).toHaveBeenCalledWith({
+        tipo: "producto",
+        productoId: "prod-777",
+      });
+      expect(mockGetDocs).not.toHaveBeenCalled();
+    });
+
+    it("no invoca solicitarPush si faltan las referencias obligatorias", async () => {
+      await notificarNuevoMensaje({ chatId: "chat-1" });
+      await notificarNuevaResena({});
+      await notificarNuevoProductoEnSede({});
+
+      expect(mockSolicitarPush).not.toHaveBeenCalled();
+    });
   });
 
 });

@@ -168,11 +168,7 @@ export const crearProducto = async ({ titulo, precio, categoria, condicion, desc
     // best-effort, fire-and-forget: si falla, el producto ya quedó
     // publicado igual). No se espera su resultado.
     notificarNuevoProductoEnSede({
-      universidadId: perfil?.universidadId || null,
-      titulo:        tituloLimpio,
-      productoId:    nuevoRef.id,
-      imagen:        imagenPortada || undefined,
-      excluirUid:    user.uid, // el vendedor no se autonotifica
+      productoId: nuevoRef.id,
     });
 
     return nuevoRef.id;

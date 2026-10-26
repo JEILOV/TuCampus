@@ -1,9 +1,9 @@
 // src/services/notificationService.js
-import { addDoc, arrayUnion, collection, doc, getDoc, getDocs, limit, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { addDoc, arrayUnion, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { getMessaging, getToken, isSupported, onMessage }                  from "firebase/messaging";
 import { app, db }                                                         from "./firebase";
 import { logError }                                                        from "../utils/errorHandler";
-import { enviarPush }                                                      from "./pushService";
+import { solicitarPush }                                                   from "./pushService";
 
 /**
  * Crea una notificación para otro usuario en Firestore.
@@ -188,50 +188,14 @@ export const escucharNotificacionesPrimerPlano = async (callback) => {
 
 
 // ────────────────────────────────────────────────────────────
-//  ORQUESTACIÓN DE PUSH POR EVENTO DE NEGOCIO
+//  ORQUESTACIÓN DE PUSH POR EVENTO DE NEGOCIO (FASE 4)
 // ────────────────────────────────────────────────────────────
-//  Estas funciones conectan un evento real de la app (mensaje de
-//  chat, reseña nueva, producto publicado) con el envío efectivo
-//  de la notificación push: resuelven qué token(s) FCM son el
-//  destino y arman el título/cuerpo/enlace, delegando el envío en
-//  sí a pushService.enviarPush (que a su vez llama a
-//  /api/enviar-push, ver ese archivo).
-//
-//  Todas son fire-safe: nunca lanzan. Se llaman "en paralelo" al
-//  flujo principal (sin await, o con await pero sin que su fallo
-//  aborte nada) desde chatService/Chat.jsx, reviewService.js y
-//  productService.js — un push que no llega nunca debe impedir que
-//  el mensaje/reseña/producto se guarde en Firestore.
+//  El cliente ya NO lee tokens FCM de otros usuarios ni construye
+//  el título/cuerpo del push. Solo envía la referencia del evento
+//  recién guardado a pushService.solicitarPush, y el servidor
+//  (api/enviar-push.js) valida el documento en Firestore y decide
+//  los destinatarios y el contenido.
 // ────────────────────────────────────────────────────────────
-
-const truncarTexto = (texto, max = 100) => {
-  const limpio = (texto || "").trim();
-  if (!limpio) return "";
-  return limpio.length > max ? `${limpio.slice(0, max - 1)}…` : limpio;
-};
-
-/**
- * Notifica por push a un usuario a partir de su UID — lee sus
- * fcmToken guardados en /usuarios/{uid} (ver
- * solicitarPermisoNotificaciones más arriba) y les envía el push.
- * Helper interno compartido por las 3 funciones de abajo.
- *
- * @param {string} uid
- * @param {{titulo: string, cuerpo: string, url?: string, avatar?: string, imagen?: string}} mensaje
- */
-const notificarPorUid = async (uid, { titulo, cuerpo, url, avatar, imagen }) => {
-  if (!uid) return;
-  const snap = await getDoc(doc(db, "usuarios", uid));
-  const tokensCrudos = snap.exists() ? snap.data().fcmToken : null;
-  const tokens = Array.isArray(tokensCrudos)
-    ? tokensCrudos.filter((t) => typeof t === "string" && t.trim().length > 0)
-    : [];
-
-  console.log(`[notificationService.notificarPorUid] uid=${uid} tokens encontrados=${tokens.length}`);
-
-  if (tokens.length === 0) return;
-  await enviarPush({ tokens, titulo, cuerpo, url, avatar, imagen });
-};
 
 /**
  * Push al destinatario de un mensaje de chat nuevo.
@@ -239,27 +203,13 @@ const notificarPorUid = async (uid, { titulo, cuerpo, url, avatar, imagen }) => 
  * mensaje en Firestore — nunca antes ni en la misma transacción.
  *
  * @param {Object} params
- * @param {string} params.paraUid   UID de quien recibe el mensaje
- * @param {string} params.deNombre  Nombre de quien lo envía
- * @param {string} [params.deAvatar] Foto de perfil de quien envía — se
- *   muestra como el `icon` (círculo chico) de la notificación, mismo
- *   criterio que WhatsApp: la foto de quien te escribe, no la tuya.
- *   NUNCA se manda como `imagen` (esa es solo para fotos de producto).
- * @param {string} params.mensaje   Texto del mensaje (o "📷 Imagen")
  * @param {string} params.chatId
+ * @param {string} params.mensajeId
  */
-export const notificarNuevoMensaje = async ({ paraUid, deNombre, deAvatar, mensaje, chatId }) => {
-  if (!paraUid || !chatId) return;
+export const notificarNuevoMensaje = async ({ chatId, mensajeId } = {}) => {
+  if (!chatId || !mensajeId) return;
   try {
-    await notificarPorUid(paraUid, {
-      titulo: `💬 ${deNombre || "Nuevo mensaje"}`,
-      cuerpo: truncarTexto(mensaje) || "Tienes un mensaje nuevo.",
-      url:    `/chat?id=${chatId}`,
-      // 🔧 `avatar` (icon chico), NUNCA `imagen` (image expandida) —
-      // así el avatar del remitente sale como el círculo al costado
-      // del mensaje, no como una foto gigante ocupando la notificación.
-      avatar: deAvatar || undefined,
-    });
+    await solicitarPush({ tipo: "mensaje", chatId, mensajeId });
   } catch (err) {
     logError("[notificationService.notificarNuevoMensaje]", err);
   }
@@ -268,93 +218,32 @@ export const notificarNuevoMensaje = async ({ paraUid, deNombre, deAvatar, mensa
 /**
  * Push al vendedor cuando recibe una reseña/calificación nueva.
  * Se llama DESPUÉS de que reviewService.guardarOActualizarResena
- * confirmó el runTransaction — igual que con los mensajes, el push
- * es un efecto secundario post-escritura, nunca parte de ella.
+ * confirmó el runTransaction.
  *
  * @param {Object} params
  * @param {string} params.vendedorUid  UID de quien recibe la calificación
- * @param {string} params.autorNombre  Nombre de quien calificó
- * @param {string} [params.autorAvatar] Foto de perfil de quien calificó —
- *   mismo campo que reviewService ya guarda como `deAvatar` en la
- *   notificación in-app; acá se reusa como `icon` (círculo chico),
- *   nunca como `imagen` expandida.
- * @param {number} params.estrellas    1 a 5
  */
-export const notificarNuevaResena = async ({ vendedorUid, autorNombre, autorAvatar, estrellas }) => {
+export const notificarNuevaResena = async ({ vendedorUid } = {}) => {
   if (!vendedorUid) return;
   try {
-    await notificarPorUid(vendedorUid, {
-      titulo: "⭐ Nueva calificación",
-      cuerpo: `${autorNombre || "Un estudiante"} te calificó con ${estrellas} ⭐`,
-      url:    `/vendedor?uid=${vendedorUid}`,
-      // 🔧 `avatar` (icon chico) — mismo criterio que notificarNuevoMensaje.
-      avatar: autorAvatar || undefined,
-    });
+    await solicitarPush({ tipo: "resena", vendedorUid });
   } catch (err) {
     logError("[notificationService.notificarNuevaResena]", err);
   }
 };
-
-// Límite propio (no de FCM) para cuánto se lee de /usuarios al
-// notificar por sede — cuida las lecturas de Firestore en el plan
-// Spark. sendEachForMulticast igual acepta como mucho 500 tokens
-// por llamada, así que tampoco tendría sentido pedir más de golpe.
-const MAX_USUARIOS_POR_SEDE = 300;
 
 /**
  * Push a los estudiantes de una sede cuando se publica un producto
  * nuevo. Se llama DESPUÉS de que productService.crearProducto ya
  * confirmó el writeBatch.
  *
- * 🔧 Costo/alcance conocido: lee hasta MAX_USUARIOS_POR_SEDE
- * documentos de /usuarios por cada producto publicado (para juntar
- * sus fcmToken) — aceptable para el volumen de un marketplace de
- * campus, pero si la base de usuarios por sede crece mucho valdría
- * la pena segmentar más (ej. por categoría de interés) en vez de
- * avisarle a toda la sede de cada publicación.
- *
  * @param {Object} params
- * @param {string} params.universidadId
- * @param {string} params.titulo        Título del producto publicado
  * @param {string} params.productoId
- * @param {string} [params.imagen]      Foto del producto (`producto.imagen`,
- *   o su alias `producto.imagenes?.[0]` si en algún momento se pasa a
- *   soportar galería) — se muestra como vista previa grande del push.
- * @param {string} [params.excluirUid]  UID del vendedor — no se autonotifica
  */
-export const notificarNuevoProductoEnSede = async ({ universidadId, titulo, productoId, imagen, excluirUid }) => {
-  if (!universidadId) return;
+export const notificarNuevoProductoEnSede = async ({ productoId } = {}) => {
+  if (!productoId) return;
   try {
-    const q = query(
-      collection(db, "usuarios"),
-      where("universidadId", "==", universidadId),
-      limit(MAX_USUARIOS_POR_SEDE),
-    );
-    const snap = await getDocs(q);
-
-    const tokens = [];
-    snap.docs.forEach((d) => {
-      if (d.id === excluirUid) return;
-      const t = d.data().fcmToken;
-      if (!Array.isArray(t)) return;
-      t.forEach((token) => {
-        if (typeof token === "string" && token.trim().length > 0) tokens.push(token);
-      });
-    });
-
-    console.log(
-      `[notificationService.notificarNuevoProductoEnSede] universidadId=${universidadId} usuarios encontrados=${snap.size} tokens encontrados=${tokens.length}`
-    );
-
-    if (tokens.length === 0) return;
-
-    await enviarPush({
-      tokens,
-      titulo: "🛍️ Nuevo producto en tu campus",
-      cuerpo: truncarTexto(titulo) || "Hay una publicación nueva en tu campus.",
-      url:    productoId ? `/producto?id=${productoId}` : "/",
-      imagen: imagen || undefined,
-    });
+    await solicitarPush({ tipo: "producto", productoId });
   } catch (err) {
     logError("[notificationService.notificarNuevoProductoEnSede]", err);
   }

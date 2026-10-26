@@ -818,14 +818,11 @@ const Chat = () => {
       // tiempo real — duplicarlo en /notificaciones solo llenaba esa
       // pestaña de spam por cada mensaje del chat.
       await enviarMensaje(chatId, user.uid, limpio, "texto", respondiendoA).then((resultado) => {
-        if (resultado?.otroUid) {
+        if (resultado?.id) {
           // 🔔 Push al destinatario — fire-and-forget, nunca bloquea el envío.
           notificarNuevoMensaje({
-            paraUid:  resultado.otroUid,
-            deNombre: perfil?.nombre || user.displayName || "Alguien",
-            deAvatar: perfil?.avatar || user.photoURL || undefined,
-            mensaje:  limpio,
             chatId,
+            mensajeId: resultado.id,
           });
         }
       });
@@ -836,7 +833,7 @@ const Chat = () => {
     } finally {
       setEnviando(false);
     }
-  }, [texto, chatId, user, perfil, enviando, conversacionBloqueada, mostrarToast, armarRespondiendoA]);
+  }, [texto, chatId, user, enviando, conversacionBloqueada, mostrarToast, armarRespondiendoA]);
 
   // ── Fase 8: Edición de mensajes ────────────────────────────
   // Precarga el texto del mensaje en el input y cambia el formulario a
@@ -900,13 +897,10 @@ const Chat = () => {
       const comprimida = await comprimirImagen(archivo);
       const url = await subirImagenImgBB(comprimida, setProgresoImagen);
       await enviarMensaje(chatId, user.uid, url, "imagen", respondiendoA).then((resultado) => {
-        if (resultado?.otroUid) {
+        if (resultado?.id) {
           notificarNuevoMensaje({
-            paraUid:  resultado.otroUid,
-            deNombre: perfil?.nombre || user.displayName || "Alguien",
-            deAvatar: perfil?.avatar || user.photoURL || undefined,
-            mensaje:  "📷 Imagen",
             chatId,
+            mensajeId: resultado.id,
           });
         }
       });
