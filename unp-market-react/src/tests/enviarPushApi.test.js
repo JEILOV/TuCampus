@@ -20,6 +20,7 @@ const {
     updates: [], // { path, data }
     creates: [], // { path, data }
     whereCalls: [], // { collection, field, op, val, limit }
+    fallarTransaccion: false,
   };
 
   // Helper in-memory para simular colecciones/subcolecciones de Firestore Admin
@@ -85,6 +86,18 @@ const {
   const mockFirestoreFn = Object.assign(
     () => ({
       collection: (name) => crearCollectionRef(name),
+      runTransaction: vi.fn(async (cb) => {
+        if (estadoFirestore.fallarTransaccion) {
+          throw new Error("Fallo simulado de transacción en Firestore");
+        }
+        const tx = {
+          get: async (docRef) => docRef.get(),
+          set: (docRef, data) => {
+            estadoFirestore.docs.set(docRef._path, data);
+          },
+        };
+        return cb(tx);
+      }),
     }),
     {
       FieldValue: {
@@ -146,6 +159,7 @@ describe("api/enviar-push.js (TAREA 3)", () => {
     estadoFirestore.updates.length = 0;
     estadoFirestore.creates.length = 0;
     estadoFirestore.whereCalls.length = 0;
+    estadoFirestore.fallarTransaccion = false;
 
     // Por defecto: remitente autenticado UNP
     mockVerifyIdToken.mockResolvedValue({
@@ -548,5 +562,180 @@ describe("api/enviar-push.js (TAREA 3)", () => {
         },
       },
     });
+  });
+
+  it("el cuarto producto de la misma hora no envía y devuelve { limitado: true }", async () => {
+    for (let i = 1; i <= 4; i++) {
+      estadoFirestore.docs.set(`productos/prod-${i}`, {
+        userUid: "uid-remitente",
+        universidadId: "unp",
+        titulo: `Producto ${i}`,
+        fecha: { toMillis: () => Date.now() - 1000 },
+      });
+    }
+
+    for (let i = 1; i <= 3; i++) {
+      const res = crearRes();
+      await handler(
+        {
+          method: "POST",
+          headers: { authorization: "Bearer token-ok" },
+          body: { tipo: "producto", productoId: `prod-${i}` },
+        },
+        res
+      );
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual({ successCount: 1, failureCount: 0 });
+    }
+    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(3);
+
+    // Cuarto producto dentro de la misma hora → bloqueado por tope horario
+    const res4 = crearRes();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer token-ok" },
+        body: { tipo: "producto", productoId: "prod-4" },
+      },
+      res4
+    );
+
+    expect(res4.statusCode).toBe(200);
+    expect(res4.body).toEqual({ limitado: true });
+    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(3);
+  });
+
+  it("una hora después de alcanzar el tope de productos vuelve a permitir el envío", async () => {
+    // Simulamos contador en 3 pero con inicio hace 61 minutos
+    estadoFirestore.docs.set("limitesApi/pushProducto_uid-remitente", {
+      inicio: Date.now() - 61 * 60 * 1000,
+      conteo: 3,
+    });
+    estadoFirestore.docs.set("productos/prod-nuevo-hora", {
+      userUid: "uid-remitente",
+      universidadId: "unp",
+      titulo: "Producto tras 1 hora",
+      fecha: { toMillis: () => Date.now() - 1000 },
+    });
+
+    const res = crearRes();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer token-ok" },
+        body: { tipo: "producto", productoId: "prod-nuevo-hora" },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ successCount: 1, failureCount: 0 });
+    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(1);
+    expect(
+      estadoFirestore.docs.get("limitesApi/pushProducto_uid-remitente")?.conteo
+    ).toBe(1);
+  });
+
+  it("un fallo de Firestore en el contador de productos no bloquea el envío (fail open)", async () => {
+    const spyError = vi.spyOn(console, "error").mockImplementation(() => {});
+    estadoFirestore.fallarTransaccion = true;
+    estadoFirestore.docs.set("productos/prod-failopen", {
+      userUid: "uid-remitente",
+      universidadId: "unp",
+      titulo: "Producto fail open",
+      fecha: { toMillis: () => Date.now() - 1000 },
+    });
+
+    const res = crearRes();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer token-ok" },
+        body: { tipo: "producto", productoId: "prod-failopen" },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ successCount: 1, failureCount: 0 });
+    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(1);
+    spyError.mockRestore();
+  });
+
+  it("los tipos mensaje y resena NO se ven afectados aunque el usuario haya alcanzado el tope de producto", async () => {
+    estadoFirestore.docs.set("limitesApi/pushProducto_uid-remitente", {
+      inicio: Date.now() - 5 * 60 * 1000,
+      conteo: 3,
+    });
+
+    estadoFirestore.docs.set("chats/chat-1", {
+      participantes: ["uid-remitente", "uid-destinatario"],
+    });
+    estadoFirestore.docs.set("chats/chat-1/mensajes/msg-libre", {
+      deUid: "uid-remitente",
+      texto: "Mensaje normal",
+      tipo: "texto",
+      fecha: { toMillis: () => Date.now() - 1000 },
+    });
+    estadoFirestore.docs.set("resenas/uid-remitente_uid-destinatario", {
+      autorUid: "uid-remitente",
+      vendedorUid: "uid-destinatario",
+      estrellas: 4,
+      fecha: { toMillis: () => Date.now() - 1000 },
+    });
+
+    const resMsg = crearRes();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer token-ok" },
+        body: { tipo: "mensaje", chatId: "chat-1", mensajeId: "msg-libre" },
+      },
+      resMsg
+    );
+    expect(resMsg.statusCode).toBe(200);
+    expect(resMsg.body).toEqual({ successCount: 1, failureCount: 0 });
+
+    const resRev = crearRes();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer token-ok" },
+        body: { tipo: "resena", vendedorUid: "uid-destinatario" },
+      },
+      resRev
+    );
+    expect(resRev.statusCode).toBe(200);
+    expect(resRev.body).toEqual({ successCount: 1, failureCount: 0 });
+    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(2);
+  });
+
+  it("codifica chatId, vendedorUid y productoId con encodeURIComponent al construir urlDestino", async () => {
+    const idEspecial = "id con espacio&extra=1";
+    estadoFirestore.docs.set(`chats/${idEspecial}`, {
+      participantes: ["uid-remitente", "uid-destinatario"],
+    });
+    estadoFirestore.docs.set(`chats/${idEspecial}/mensajes/msg-enc`, {
+      deUid: "uid-remitente",
+      texto: "Hola",
+      tipo: "texto",
+      fecha: { toMillis: () => Date.now() - 1000 },
+    });
+
+    const res = crearRes();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer token-ok" },
+        body: { tipo: "mensaje", chatId: idEspecial, mensajeId: "msg-enc" },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(200);
+    const llamada = mockSendEachForMulticast.mock.calls[0][0];
+    expect(llamada.data.url).toBe(
+      `/chat?id=${encodeURIComponent(idEspecial)}`
+    );
   });
 });
