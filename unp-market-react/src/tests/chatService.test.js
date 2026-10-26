@@ -12,7 +12,7 @@ import {
   mockTxSet,
   mockTxUpdate,
 } from "./__mocks__/firebase";
-import { generarChatId, obtenerOCrearChat } from "../services/chatService";
+import { generarChatId, obtenerOCrearChat, editarMensaje, fusionarMensajes } from "../services/chatService";
 
 describe("generarChatId", () => {
   it("ordena lexicográficamente los UIDs y cumple chatId == participantes[0] + '_' + participantes[1]", () => {
@@ -161,5 +161,194 @@ describe("obtenerOCrearChat (R04)", () => {
     expect(res.participantesInfo.uid_comprador.nombre).toBe("Ana Antes");
     expect(res.ultimoMensaje).toBe("Nos vemos en la biblioteca");
     expect(res.noLeidoPor).toEqual({ uid_comprador: 1, uid_vendedor: 0 });
+  });
+});
+
+describe("editarMensaje (H08)", () => {
+  beforeEach(() => {
+    resetAllMocks();
+  });
+
+  it("editar el último mensaje actualiza el mensaje y también ultimoMensaje del chat", async () => {
+    const tsComun = { seconds: 1700000100, nanoseconds: 500000 };
+    mockTxGet
+      .mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ deUid: "uid_yo", tipo: "texto", texto: "Texto viejo", fecha: tsComun }),
+      })
+      .mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({
+          ultimoMensaje: "Texto viejo",
+          ultimoMensajeDeUid: "uid_yo",
+          ultimoMensajeFecha: { seconds: 1700000100, nanoseconds: 500000 },
+        }),
+      });
+
+    await editarMensaje("uid_otro_uid_yo", "msg-1", "uid_yo", "Texto corregido");
+
+    expect(mockRunTransaction).toHaveBeenCalledTimes(1);
+    expect(mockTxUpdate).toHaveBeenCalledTimes(2);
+
+    const [refMsg, payloadMsg] = mockTxUpdate.mock.calls[0];
+    expect(refMsg).toEqual({ _col: "chats", _id: "uid_otro_uid_yo", _subpath: ["mensajes", "msg-1"] });
+    expect(payloadMsg).toEqual({
+      texto: "Texto corregido",
+      editado: true,
+      fechaEdicion: { _type: "serverTimestamp" },
+    });
+
+    const [refChat, payloadChat] = mockTxUpdate.mock.calls[1];
+    expect(refChat).toEqual({ _col: "chats", _id: "uid_otro_uid_yo" });
+    expect(payloadChat).toEqual({ ultimoMensaje: "Texto corregido" });
+  });
+
+  it("editar un mensaje anterior NO toca el documento del chat", async () => {
+    mockTxGet
+      .mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({
+          deUid: "uid_yo",
+          tipo: "texto",
+          texto: "Mensaje antiguo",
+          fecha: { seconds: 1700000000, nanoseconds: 0 },
+        }),
+      })
+      .mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({
+          ultimoMensaje: "Mensaje más reciente",
+          ultimoMensajeDeUid: "uid_yo",
+          ultimoMensajeFecha: { seconds: 1700000200, nanoseconds: 0 },
+        }),
+      });
+
+    await editarMensaje("uid_otro_uid_yo", "msg-antiguo", "uid_yo", "Mensaje antiguo editado");
+
+    expect(mockTxUpdate).toHaveBeenCalledTimes(1);
+    const [refMsg] = mockTxUpdate.mock.calls[0];
+    expect(refMsg).toEqual({
+      _col: "chats",
+      _id: "uid_otro_uid_yo",
+      _subpath: ["mensajes", "msg-antiguo"],
+    });
+  });
+
+  it("trunca el preview de ultimoMensaje a 120 caracteres terminando en '...' cuando el texto supera 120", async () => {
+    const tsComun = {
+      isEqual: (otro) => otro?.id === "ts-1",
+      id: "ts-1",
+    };
+    mockTxGet
+      .mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ deUid: "uid_yo", tipo: "texto", texto: "Corto", fecha: tsComun }),
+      })
+      .mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({
+          ultimoMensaje: "Corto",
+          ultimoMensajeDeUid: "uid_yo",
+          ultimoMensajeFecha: tsComun,
+        }),
+      });
+
+    const textoLargo = "x".repeat(150);
+    await editarMensaje("uid_otro_uid_yo", "msg-largo", "uid_yo", textoLargo);
+
+    expect(mockTxUpdate).toHaveBeenCalledTimes(2);
+    const [, payloadChat] = mockTxUpdate.mock.calls[1];
+    expect(payloadChat.ultimoMensaje.length).toBe(120);
+    expect(payloadChat.ultimoMensaje).toBe("x".repeat(117) + "...");
+  });
+
+  it("lanza error sin escribir si el texto está vacío o supera 1000 caracteres", async () => {
+    await expect(editarMensaje("chat-1", "msg-1", "uid_yo", "   ")).rejects.toThrow(
+      "El mensaje no puede quedar vacío."
+    );
+    await expect(editarMensaje("chat-1", "msg-1", "uid_yo", "a".repeat(1001))).rejects.toThrow(
+      "El mensaje es demasiado largo."
+    );
+    expect(mockRunTransaction).not.toHaveBeenCalled();
+    expect(mockTxUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("fusionarMensajes (H07)", () => {
+  it("(a) maneja listas vacías devolviendo arreglo vacío", () => {
+    expect(fusionarMensajes([], [])).toEqual([]);
+    expect(fusionarMensajes([], [{ id: "m1", texto: "Hola", fecha: { seconds: 10, nanoseconds: 0 } }])).toEqual([
+      { id: "m1", texto: "Hola", fecha: { seconds: 10, nanoseconds: 0 } },
+    ]);
+  });
+
+  it("(b) en IDs repetidos gana el mensaje nuevo (ej. edición o marcado como leído)", () => {
+    const previos = [
+      { id: "m1", texto: "Original", leido: false, fecha: { seconds: 10, nanoseconds: 0 } },
+      { id: "m2", texto: "Segundo", leido: false, fecha: { seconds: 20, nanoseconds: 0 } },
+    ];
+    const nuevos = [
+      { id: "m1", texto: "Editado", editado: true, leido: true, fecha: { seconds: 10, nanoseconds: 0 } },
+    ];
+
+    const res = fusionarMensajes(previos, nuevos);
+    expect(res).toHaveLength(2);
+    expect(res[0]).toEqual({
+      id: "m1",
+      texto: "Editado",
+      editado: true,
+      leido: true,
+      fecha: { seconds: 10, nanoseconds: 0 },
+    });
+  });
+
+  it("(c) ventana deslizante de 40 + llegada del mensaje 41 conserva el primer mensaje (total 41)", () => {
+    const primeros40 = Array.from({ length: 40 }, (_, i) => ({
+      id: `msg-${i + 1}`,
+      texto: `Mensaje ${i + 1}`,
+      fecha: { seconds: 1000 + i, nanoseconds: 0 },
+    }));
+    // El nuevo snapshot de limitToLast(40) trae del 2 al 41
+    const ventana2a41 = Array.from({ length: 40 }, (_, i) => ({
+      id: `msg-${i + 2}`,
+      texto: `Mensaje ${i + 2}`,
+      fecha: { seconds: 1001 + i, nanoseconds: 0 },
+    }));
+
+    const res = fusionarMensajes(primeros40, ventana2a41);
+    expect(res).toHaveLength(41);
+    expect(res[0].id).toBe("msg-1");
+    expect(res[40].id).toBe("msg-41");
+  });
+
+  it("(d) trata los mensajes con fecha null (serverTimestamp pendiente) como los más recientes al final", () => {
+    const previos = [
+      { id: "m2", texto: "Dos", fecha: { seconds: 200, nanoseconds: 0 } },
+      { id: "m1", texto: "Uno", fecha: { seconds: 100, nanoseconds: 0 } },
+    ];
+    const nuevos = [
+      { id: "m3", texto: "Pendiente", fecha: null },
+    ];
+
+    const res = fusionarMensajes(previos, nuevos);
+    expect(res.map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
+  });
+
+  it("(e) no muta los arreglos de entrada", () => {
+    const previos = [
+      { id: "m2", texto: "B", fecha: { seconds: 20, nanoseconds: 0 } },
+      { id: "m1", texto: "A", fecha: { seconds: 10, nanoseconds: 0 } },
+    ];
+    const nuevos = [
+      { id: "m3", texto: "C", fecha: { seconds: 30, nanoseconds: 0 } },
+    ];
+    const copiaPrevios = [...previos];
+    const copiaNuevos  = [...nuevos];
+
+    const res = fusionarMensajes(previos, nuevos);
+    expect(previos).toEqual(copiaPrevios);
+    expect(nuevos).toEqual(copiaNuevos);
+    expect(res).not.toBe(previos);
+    expect(res).not.toBe(nuevos);
   });
 });

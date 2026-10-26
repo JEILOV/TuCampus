@@ -15,6 +15,7 @@ import {
 import { db }                          from "../services/firebase";
 import { useAuth }                     from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
+import { useObjectUrls }               from "../hooks/useObjectUrls";
 import { obtenerContactoPrivado, guardarContactoPrivado } from "../services/userService";
 import {
   obtenerColorUniversidad, oscurecerColor,
@@ -176,6 +177,7 @@ const Perfil = () => {
   const avatarInputRef  = useRef(null);
   const portadaInputRef = useRef(null);
   const dropdownRef     = useRef(null);
+  const { crearUrl, revocarUrl, revocarTodas } = useObjectUrls();
 
   // ✅ Toast helper unificado (modo array)
   const mostrarToast = useToast(setToasts);
@@ -225,6 +227,7 @@ const Perfil = () => {
   };
 
   const abrirModal = async () => {
+    revocarTodas();
     const p = perfil || {};
     setMNombre(p.nombre       || "");
     setMBio(p.bio             || "");
@@ -253,9 +256,9 @@ const Perfil = () => {
 
   const handleFileSelect = (tipo, file) => {
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (tipo === "avatar")  { setMAvatarFile(file);  setMAvatarPrev(url); }
-    if (tipo === "portada") { setMPortadaFile(file); setMPortadaPrev(url); }
+    const url = crearUrl(file);
+    if (tipo === "avatar")  { revocarUrl(mAvatarPrev);  setMAvatarFile(file);  setMAvatarPrev(url); }
+    if (tipo === "portada") { revocarUrl(mPortadaPrev); setMPortadaFile(file); setMPortadaPrev(url); }
   };
 
   const ejecutarGuardadoReal = async () => {

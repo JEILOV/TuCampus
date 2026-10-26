@@ -36,7 +36,104 @@ import { logError }     from "../utils/errorHandler";
 // pedir de entrada). El mismo tamaño se reutiliza para cada página
 // siguiente del scroll infinito (cargarMas), así que el "cargar más"
 // también trae de 12 en 12 en vez de 20 en 20.
-const PAGE_SIZE = 12;
+export const PAGE_SIZE = 12;
+
+// 🔧 Tope de páginas por llamada cuando se combinan texto (array-contains
+// en Firestore) + categoría (filtrada en cliente), para no inflar lecturas.
+export const MAX_PAGINAS_BUSQUEDA = 3;
+
+/**
+ * Función pura (H01): determina qué restricción enviar a Firestore y
+ * recolecta hasta `pageSize` productos aplicando el filtro de categoría
+ * en cliente cuando hay texto y categoría simultáneamente, con un tope
+ * de `maxPaginas` lecturas de página por invocación.
+ *
+ * @param {Object} params
+ * @param {(cursor: any) => Promise<{ docs: Array<Object>, rawDocs?: Array<any>, ordenadoEnMemoria?: boolean }>} params.fetchPagina
+ * @param {string} [params.busqueda=""]
+ * @param {string} [params.categoriaActiva="todos"]
+ * @param {any} [params.cursorInicial=null]
+ * @param {number} [params.pageSize=PAGE_SIZE]
+ * @param {number} [params.maxPaginas=MAX_PAGINAS_BUSQUEDA]
+ * @param {() => boolean} [params.estaCancelado]
+ */
+export const recolectarPaginaProductos = async ({
+  fetchPagina,
+  busqueda = "",
+  categoriaActiva = "todos",
+  cursorInicial = null,
+  pageSize = PAGE_SIZE,
+  maxPaginas = MAX_PAGINAS_BUSQUEDA,
+  estaCancelado = () => false,
+}) => {
+  const termino = (busqueda || "").trim().toLowerCase();
+  const tieneTexto = termino !== "";
+  const tieneCategoria = Boolean(categoriaActiva && categoriaActiva !== "todos");
+  const filtrarCategoriaEnCliente = tieneTexto && tieneCategoria;
+
+  const modoFiltro = filtrarCategoriaEnCliente
+    ? "texto+categoria"
+    : tieneTexto
+      ? "texto"
+      : tieneCategoria
+        ? "categoria"
+        : "ninguno";
+
+  const limitePaginas = filtrarCategoriaEnCliente ? Math.max(1, maxPaginas) : 1;
+
+  const acumulados = [];
+  let cursorActual = cursorInicial;
+  let todoCargado = false;
+  let paginasLeidas = 0;
+  let ordenadoEnMemoria = false;
+
+  while (
+    paginasLeidas < limitePaginas &&
+    acumulados.length < pageSize &&
+    !todoCargado
+  ) {
+    const pagina = await fetchPagina(cursorActual);
+    if (estaCancelado()) {
+      return {
+        cancelado: true,
+        items: [],
+        ultimoCursor: cursorActual,
+        todoCargado: false,
+        paginasLeidas,
+        ordenadoEnMemoria,
+        modoFiltro,
+      };
+    }
+
+    paginasLeidas += 1;
+    const docs = pagina?.docs || [];
+    const rawDocs = pagina?.rawDocs || docs;
+    if (pagina?.ordenadoEnMemoria) ordenadoEnMemoria = true;
+
+    if (rawDocs.length > 0) {
+      cursorActual = rawDocs[rawDocs.length - 1];
+    }
+    if (rawDocs.length < pageSize) {
+      todoCargado = true;
+    }
+
+    const candidatos = filtrarCategoriaEnCliente
+      ? docs.filter((p) => p.categoria === categoriaActiva)
+      : docs;
+
+    acumulados.push(...candidatos);
+  }
+
+  return {
+    cancelado: false,
+    items: acumulados,
+    ultimoCursor: cursorActual,
+    todoCargado,
+    paginasLeidas,
+    ordenadoEnMemoria,
+    modoFiltro,
+  };
+};
 
 const ORDEN_CONFIG = {
   recientes:      { campo: "fecha",                dir: "desc" },
@@ -185,46 +282,65 @@ export const useProducts = ({ orden, categoriaActiva, busquedaFirebase, universi
         constraintsBase.push(where("categoria", "==", categoriaActiva));
       }
 
-      const hayCursor = ultimoDocRef.current && !esNuevoFiltro;
+      const hayCursorInicial = !esNuevoFiltro ? ultimoDocRef.current : null;
 
-      let snapshot;
-      let ordenadoEnMemoria = false;
+      const fetchPaginaFirestore = async (cursor) => {
+        let snapshot;
+        let enMemoria = false;
 
-      try {
-        // ── Intento primario: orden en el servidor (requiere índice compuesto
-        //    universidadId + categoria/keywords + campo de orden) ──
-        const constraintsConOrden = [
-          ...constraintsBase,
-          orderBy(campo, dir),
-          limit(PAGE_SIZE),
-        ];
-        if (hayCursor) constraintsConOrden.push(startAfter(ultimoDocRef.current));
+        try {
+          // ── Intento primario: orden en el servidor (requiere índice compuesto
+          //    universidadId + categoria/keywords + campo de orden) ──
+          const constraintsConOrden = [
+            ...constraintsBase,
+            orderBy(campo, dir),
+            limit(PAGE_SIZE),
+          ];
+          if (cursor) constraintsConOrden.push(startAfter(cursor));
 
-        snapshot = await getDocs(query(col, ...constraintsConOrden));
-      } catch (errPrimario) {
-        if (!esErrorRecuperable(errPrimario)) throw errPrimario; // bug real: no enmascarar
+          snapshot = await getDocs(query(col, ...constraintsConOrden));
+        } catch (errPrimario) {
+          if (!esErrorRecuperable(errPrimario)) throw errPrimario; // bug real: no enmascarar
 
-        logError("[useProducts.cargarMas] fallback a orden en memoria (posible índice faltante)", errPrimario);
+          logError("[useProducts.cargarMas] fallback a orden en memoria (posible índice faltante)", errPrimario);
 
-        // ── Fallback: mismos where(), SIN orderBy en el servidor. Firestore
-        //    ordena implícitamente por __name__, así que startAfter(doc)
-        //    sigue siendo un cursor válido aunque no coincida con el orden
-        //    que el usuario pidió. El orden solicitado (precio/calificación)
-        //    se aplica después, en memoria, sobre lo que ya se cargó. ──
-        const constraintsSinOrden = [...constraintsBase, limit(PAGE_SIZE)];
-        if (hayCursor) constraintsSinOrden.push(startAfter(ultimoDocRef.current));
+          // ── Fallback: mismos where(), SIN orderBy en el servidor. Firestore
+          //    ordena implícitamente por __name__, así que startAfter(doc)
+          //    sigue siendo un cursor válido aunque no coincida con el orden
+          //    que el usuario pidió. El orden solicitado (precio/calificación)
+          //    se aplica después, en memoria, sobre lo que ya se cargó. ──
+          const constraintsSinOrden = [...constraintsBase, limit(PAGE_SIZE)];
+          if (cursor) constraintsSinOrden.push(startAfter(cursor));
 
-        snapshot = await getDocs(query(col, ...constraintsSinOrden));
-        ordenadoEnMemoria = true;
-      }
+          snapshot = await getDocs(query(col, ...constraintsSinOrden));
+          enMemoria = true;
+        }
+
+        return {
+          docs: snapshot.docs.map((d) => ({ id: d.id, ...d.data() })),
+          rawDocs: snapshot.docs,
+          ordenadoEnMemoria: enMemoria,
+        };
+      };
+
+      const resultado = await recolectarPaginaProductos({
+        fetchPagina: fetchPaginaFirestore,
+        busqueda: busquedaFirebase,
+        categoriaActiva,
+        cursorInicial: hayCursorInicial,
+        pageSize: PAGE_SIZE,
+        maxPaginas: MAX_PAGINAS_BUSQUEDA,
+        estaCancelado: () => requestGenRef.current !== miGeneracion,
+      });
 
       // Si la combinación de filtros cambió mientras esta consulta estaba
       // en vuelo, se descarta el resultado sin tocar estado ni disparar error.
-      if (requestGenRef.current !== miGeneracion) return;
+      if (resultado.cancelado || requestGenRef.current !== miGeneracion) return;
 
-      if (snapshot.size < PAGE_SIZE) setTodoCargado(true);
+      if (resultado.todoCargado) setTodoCargado(true);
 
-      const nuevos = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const nuevos = resultado.items;
+      const ordenadoEnMemoria = resultado.ordenadoEnMemoria;
 
       setProductos((prev) => {
         const base = esNuevoFiltro ? [] : prev;
@@ -235,10 +351,6 @@ export const useProducts = ({ orden, categoriaActiva, busquedaFirebase, universi
 
         // Ordenamiento en memoria (fallback): mismo campo/dir que se le
         // pidió a Firestore, aplicado sobre TODO lo acumulado hasta ahora.
-        // Nota: al no poder ordenar en el servidor, esto es un orden
-        // "mejor esfuerzo" sobre las páginas ya traídas, no un orden
-        // global garantizado en todo el catálogo — trade-off aceptado
-        // para no romper el hook mientras falta el índice compuesto.
         const factor = dir === "asc" ? 1 : -1;
         return [...combinados].sort((a, b) => {
           const va = a?.[campo];
@@ -252,8 +364,8 @@ export const useProducts = ({ orden, categoriaActiva, busquedaFirebase, universi
         });
       });
 
-      if (!snapshot.empty) {
-        ultimoDocRef.current = snapshot.docs[snapshot.docs.length - 1];
+      if (resultado.ultimoCursor) {
+        ultimoDocRef.current = resultado.ultimoCursor;
       }
     } catch (err) {
       // Descarta también errores de una generación ya obsoleta.

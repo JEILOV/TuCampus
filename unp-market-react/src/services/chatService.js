@@ -334,6 +334,17 @@ export const enviarMensaje = async (chatId, deUid, contenido, tipo = "texto", re
  * @param {string} nuevoTexto
  * @returns {Promise<void>}
  */
+const timestampsIguales = (a, b) => {
+  if (!a || !b) return false;
+  if (typeof a.isEqual === "function" && typeof b.isEqual === "function") {
+    return a.isEqual(b);
+  }
+  if (typeof a.seconds === "number" && typeof b.seconds === "number") {
+    return a.seconds === b.seconds && (a.nanoseconds || 0) === (b.nanoseconds || 0);
+  }
+  return a === b;
+};
+
 export const editarMensaje = async (chatId, mensajeId, miUid, nuevoTexto) => {
   const limpio = (nuevoTexto || "").trim();
   if (!chatId || !mensajeId || !miUid) return;
@@ -344,12 +355,36 @@ export const editarMensaje = async (chatId, mensajeId, miUid, nuevoTexto) => {
     throw new Error("El mensaje es demasiado largo.");
   }
 
-  const mensajeRef = doc(db, "chats", chatId, "mensajes", mensajeId);
+  const chatRef      = doc(db, "chats", chatId);
+  const mensajeRef   = doc(db, "chats", chatId, "mensajes", mensajeId);
+  const previewLista = limpio.length > 120 ? limpio.slice(0, 117) + "..." : limpio;
+
   try {
-    await updateDoc(mensajeRef, {
-      texto:        limpio,
-      editado:      true,
-      fechaEdicion: serverTimestamp(),
+    await runTransaction(db, async (tx) => {
+      const [mensajeSnap, chatSnap] = await Promise.all([
+        tx.get(mensajeRef),
+        tx.get(chatRef),
+      ]);
+
+      tx.update(mensajeRef, {
+        texto:        limpio,
+        editado:      true,
+        fechaEdicion: serverTimestamp(),
+      });
+
+      if (mensajeSnap?.exists?.() && chatSnap?.exists?.()) {
+        const msgData  = mensajeSnap.data() || {};
+        const chatData = chatSnap.data() || {};
+        const esUltimoMio =
+          chatData.ultimoMensajeDeUid === miUid &&
+          timestampsIguales(chatData.ultimoMensajeFecha, msgData.fecha);
+
+        if (esUltimoMio) {
+          tx.update(chatRef, {
+            ultimoMensaje: previewLista,
+          });
+        }
+      }
     });
   } catch (err) {
     logError("[chatService.editarMensaje]", err);
@@ -367,6 +402,44 @@ export const editarMensaje = async (chatId, mensajeId, miUid, nuevoTexto) => {
 // traen bajo demanda con `cargarMensajesAnteriores` (una sola lectura,
 // sin listener) cuando el usuario los pide explícitamente.
 export const MENSAJES_LIMITE_INICIAL = 40;
+
+const obtenerMsFecha = (fecha) => {
+  if (fecha == null) return Number.POSITIVE_INFINITY;
+  if (typeof fecha === "number") return fecha;
+  if (typeof fecha.toMillis === "function") return fecha.toMillis();
+  if (typeof fecha.seconds === "number") {
+    return fecha.seconds * 1000 + (fecha.nanoseconds || 0) / 1e6;
+  }
+  if (fecha instanceof Date) return fecha.getTime();
+  return Number.POSITIVE_INFINITY;
+};
+
+/**
+ * Función pura (H07): fusiona la lista previa de mensajes con un nuevo lote
+ * (por ejemplo, el snapshot de los últimos 40 mensajes), combinando por `id`
+ * (los nuevos pisan a los previos con el mismo `id`), ordenando por `fecha`
+ * ascendente y ubicando al final los mensajes con `fecha` null/pendiente.
+ * No muta los arreglos de entrada.
+ *
+ * @param {Array<Object>} [previos=[]]
+ * @param {Array<Object>} [nuevos=[]]
+ * @returns {Array<Object>}
+ */
+export const fusionarMensajes = (previos = [], nuevos = []) => {
+  const mapa = new Map();
+  for (const m of previos) {
+    if (m && m.id != null) mapa.set(m.id, m);
+  }
+  for (const m of nuevos) {
+    if (m && m.id != null) mapa.set(m.id, m);
+  }
+  return Array.from(mapa.values()).sort((a, b) => {
+    const msA = obtenerMsFecha(a.fecha);
+    const msB = obtenerMsFecha(b.fecha);
+    if (msA !== msB) return msA - msB;
+    return 0;
+  });
+};
 
 // ── Suscribirse a los mensajes de un chat (tiempo real) ──────
 /**

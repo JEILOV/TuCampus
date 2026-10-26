@@ -7,6 +7,7 @@ import { db }                           from "../services/firebase";
 import { useAuth }                      from "../context/AuthContext";
 import { comprimirImagen, subirBlobsComprimidos } from "../utils/imageUtils";
 import { actualizarProducto, normalizarCategoria, normalizarCondicion } from "../services/productService";
+import { useObjectUrls }                from "../hooks/useObjectUrls";
 import Spinner                          from "../components/Spinner";
 import Toast, { useToast }              from "../components/Toast";
 
@@ -64,6 +65,7 @@ const EditarProducto = () => {
 
   const fileInputRef = useRef(null);
   const enviandoRef = useRef(false); // 🔧 guard contra doble-submit, ver Publicar.jsx
+  const { crearUrl, revocarUrl } = useObjectUrls();
 
   // Carga del producto
   useEffect(() => {
@@ -130,15 +132,6 @@ const EditarProducto = () => {
     cargar();
   }, [productoId, user, navigate]);
 
-  // Limpiar los object URL de fotos NUEVAS al desmontar (las
-  // "existing" son URLs remotas reales, no hay nada que revocar ahí).
-  useEffect(() => {
-    return () => {
-      fotos.forEach((f) => { if (f.kind === "new") URL.revokeObjectURL(f.url); });
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const MAX_IMAGEN_MB = 5;
 
   const handleFileChange = async (e) => {
@@ -193,7 +186,7 @@ const EditarProducto = () => {
             id:   `new-${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
             kind: "new",
             blob,
-            url:  URL.createObjectURL(blob), // preview del BLOB comprimido, no del file original
+            url:  crearUrl(blob), // preview del BLOB comprimido, no del file original
           });
         } catch (err) {
           console.error("[EditarProducto] Error al procesar imagen:", err);
@@ -213,7 +206,7 @@ const EditarProducto = () => {
   const quitarFoto = (id) => {
     setFotos((prev) => {
       const objetivo = prev.find((f) => f.id === id);
-      if (objetivo?.kind === "new") URL.revokeObjectURL(objetivo.url);
+      if (objetivo?.kind === "new") revocarUrl(objetivo.url);
       return prev.filter((f) => f.id !== id);
     });
   };

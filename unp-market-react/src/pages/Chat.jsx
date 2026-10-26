@@ -25,6 +25,7 @@ import {
   suscribirMensajes,
   cargarMensajesAnteriores,
   MENSAJES_LIMITE_INICIAL,
+  fusionarMensajes,
   enviarMensaje,
   editarMensaje,
   marcarComoLeido,
@@ -592,7 +593,7 @@ const Chat = () => {
   // ventana en vivo. No hay overlap mientras haya más mensajes que
   // MENSAJES_LIMITE_INICIAL, porque `cargarMensajesAnteriores` siempre
   // pide `endBefore` el más viejo que ya se ve en pantalla.
-  const mensajesCombinados = [...mensajesAntiguos, ...mensajes];
+  const mensajesCombinados = fusionarMensajes(mensajesAntiguos, mensajes);
   const [perfilOtroVivo, setPerfilOtroVivo] = useState(null); // nombre/avatar EN VIVO de /usuarios/{otroUid}
 
   // ── Fase 6: Chat Avanzado ─────────────────────────────────
@@ -647,7 +648,8 @@ const Chat = () => {
 
   // Mensajes en tiempo real (ventana de los últimos MENSAJES_LIMITE_INICIAL)
   useEffect(() => {
-    if (!chatId) { setMensajes([]); return; }
+    setMensajes([]);
+    if (!chatId) return;
 
     // Nuevo chat abierto → se limpia el historial paginado del chat anterior
     // y se vuelve a evaluar desde cero si hay más mensajes viejos por cargar.
@@ -656,7 +658,7 @@ const Chat = () => {
     esPrimeraVentana.current = true;
 
     const unsub = suscribirMensajes(chatId, (nuevos) => {
-      setMensajes(nuevos);
+      setMensajes((prev) => fusionarMensajes(prev, nuevos));
       // Solo en la primera entrega de este chat: si la ventana en vivo ya
       // viene "llena" (= al límite), es probable que existan mensajes más
       // viejos todavía sin cargar → se habilita el botón de historial.

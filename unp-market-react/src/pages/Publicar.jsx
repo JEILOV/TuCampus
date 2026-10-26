@@ -1,5 +1,5 @@
 // src/pages/Publicar.jsx
-import { useState, useEffect, useRef }          from "react";
+import { useState, useRef }                     from "react";
 import { useNavigate }                          from "react-router-dom";
 import { doc, getDoc, collection, writeBatch, serverTimestamp } from "firebase/firestore";
 import { ChevronLeft, Camera, Lightbulb, Send, X, Plus } from "lucide-react";
@@ -8,6 +8,7 @@ import { useAuth }                              from "../context/AuthContext";
 import { comprimirImagen, subirBlobsComprimidos } from "../utils/imageUtils";
 import { obtenerContactoPrivado }               from "../services/userService";
 import { crearProducto }                        from "../services/productService";
+import { useObjectUrls }                        from "../hooks/useObjectUrls";
 import Toast, { useToast }                      from "../components/Toast"; // ✅ Nuevo import
 
 // 🖼️ Múltiples fotos por producto — ver EditarProducto.jsx (misma
@@ -70,13 +71,7 @@ const Publicar = () => {
   // botón se deshabilite visualmente. El ref se lee/escribe de forma
   // síncrona, sin esperar al render.
   const enviandoRef = useRef(false);
-
-  // Limpiar TODOS los object URL al desmontar (no solo al cambiar,
-  // sino también los que ya existían al momento de desmontar).
-  useEffect(() => {
-    return () => { previews.forEach((p) => URL.revokeObjectURL(p.url)); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { crearUrl, revocarUrl } = useObjectUrls();
 
   const MAX_IMAGEN_MB = 5;
 
@@ -142,7 +137,7 @@ const Publicar = () => {
           nuevos.push({
             id:   `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
             blob,
-            url:  URL.createObjectURL(blob), // preview del BLOB comprimido, no del file original
+            url:  crearUrl(blob), // preview del BLOB comprimido, no del file original
           });
         } catch (err) {
           // Si comprimirImagen() falla acá (archivo corrupto, etc.) se
@@ -168,7 +163,7 @@ const Publicar = () => {
   const quitarFoto = (id) => {
     setPreviews((prev) => {
       const objetivo = prev.find((p) => p.id === id);
-      if (objetivo) URL.revokeObjectURL(objetivo.url);
+      if (objetivo) revocarUrl(objetivo.url);
       return prev.filter((p) => p.id !== id);
     });
   };
