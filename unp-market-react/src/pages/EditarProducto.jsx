@@ -7,6 +7,7 @@ import { db }                           from "../services/firebase";
 import { useAuth }                      from "../context/AuthContext";
 import { comprimirImagen, subirBlobsComprimidos } from "../utils/imageUtils";
 import { actualizarProducto, normalizarCategoria, normalizarCondicion } from "../services/productService";
+import { limpiarCacheSecciones }        from "../services/seccionesService";
 import { useObjectUrls }                from "../hooks/useObjectUrls";
 import Spinner                          from "../components/Spinner";
 import Toast, { useToast }              from "../components/Toast";
@@ -265,6 +266,7 @@ const EditarProducto = () => {
         imagenes: imagenesFinal,
       });
 
+      limpiarCacheSecciones();
       navigate("/perfil", { state: { toastEditar: true } });
     } catch (err) {
       console.error("[EditarProducto] Error:", err);

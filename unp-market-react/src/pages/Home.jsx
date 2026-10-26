@@ -1,17 +1,20 @@
 // src/pages/Home.jsx
-import { useState, useEffect, useMemo, useRef }     from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams }             from "react-router-dom";
 import { ChevronDown, MapPin, SearchX, Store }      from "lucide-react";
 import { useAuth }                                  from "../context/AuthContext";
 import { useCampus }                                from "../context/CampusContext";
 import { useProducts }                              from "../hooks/useProducts";
+import { obtenerProductosSeccion }                  from "../services/seccionesService";
 import { useToast, ToastContainer }                 from "../components/Toast";
 import BottomNav                                    from "../components/BottomNav";
 import BotonNotificaciones                          from "../components/BotonNotificaciones";
 import BannerNotificaciones                          from "../components/BannerNotificaciones";
 import ProductCard                                  from "../components/ProductCard";
+import SeccionCarrusel                              from "../components/SeccionCarrusel";
 import CarruselAnuncios                             from "../components/CarruselAnuncios";
 import FeedFiltros, {
+  CATEGORIAS,
   FILTROS_AVANZADOS_INICIALES,
 }                                                    from "../components/FeedFiltros";
 import { LISTA_UNIVERSIDADES, obtenerColorUniversidad } from "../config/universidades";
@@ -19,6 +22,64 @@ import { LISTA_UNIVERSIDADES, obtenerColorUniversidad } from "../config/universi
 // ── Constantes ───────────────────────────────────────────────
 // Placeholder de imagen — reemplazar por el archivo final.
 const MASCOTA_ICONO = "/assets/mascota-icono-placeholder.png";
+
+const ORDEN_CATEGORIAS_SECCIONES = [
+  "comida",
+  "tecnologia",
+  "ropa",
+  "materiales",
+  "servicios",
+  "otros",
+];
+
+const SECCIONES_INICIO = [
+  { id: "recientes", titulo: "Recién publicados", categoria: null },
+  ...ORDEN_CATEGORIAS_SECCIONES.map((catKey) => ({
+    id: catKey,
+    titulo: CATEGORIAS.find((c) => c.key === catKey)?.label || catKey,
+    categoria: catKey,
+  })),
+];
+
+/**
+ * Función pura (FASE 5): devuelve true únicamente cuando NO hay búsqueda,
+ * categoría ni filtros avanzados activos.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export const esModoSecciones = ({
+  busqueda = "",
+  categoriaActiva = "todos",
+  filtrosAvanzados = FILTROS_AVANZADOS_INICIALES,
+} = {}) => {
+  if (String(busqueda || "").trim() !== "") return false;
+  if ((categoriaActiva || "todos") !== "todos") return false;
+  const f = filtrosAvanzados || FILTROS_AVANZADOS_INICIALES;
+  if (
+    (f.condicion ?? FILTROS_AVANZADOS_INICIALES.condicion) !==
+    FILTROS_AVANZADOS_INICIALES.condicion
+  ) {
+    return false;
+  }
+  if (
+    (f.precioMin ?? FILTROS_AVANZADOS_INICIALES.precioMin) !==
+    FILTROS_AVANZADOS_INICIALES.precioMin
+  ) {
+    return false;
+  }
+  if (
+    (f.precioMax ?? FILTROS_AVANZADOS_INICIALES.precioMax) !==
+    FILTROS_AVANZADOS_INICIALES.precioMax
+  ) {
+    return false;
+  }
+  if (
+    (f.orden ?? FILTROS_AVANZADOS_INICIALES.orden) !==
+    FILTROS_AVANZADOS_INICIALES.orden
+  ) {
+    return false;
+  }
+  return true;
+};
 
 // ── Componente principal ─────────────────────────────────────
 const Home = () => {
@@ -37,6 +98,16 @@ const Home = () => {
   const [filtrosAvanzados,  setFiltrosAvanzados]  = useState(FILTROS_AVANZADOS_INICIALES);
   const [toasts,            setToasts]            = useState([]);
 
+  // Permite pasar al modo grilla sin categoría (orden por recientes) al tocar
+  // "Ver todo" en la sección "Recién publicados", sin inventar UI nueva.
+  const [forzarGrillaRecientes, setForzarGrillaRecientes] = useState(false);
+
+  // Estado de secciones horizontales indexado por sede (evita mostrar estado viejo al cambiar sede)
+  const [seccionesPorSede, setSeccionesPorSede] = useState({});
+  // Modo degradado por sede: si falla la consulta de "Recién publicados" (p. ej. falta índice),
+  // cae automáticamente a la grilla tradicional para que el Inicio nunca quede vacío.
+  const [degradadoPorSede, setDegradadoPorSede] = useState({});
+
   // 🏫 Multicampus — sede que el Home está EXPLORANDO en este momento.
   // Ahora vive en CampusContext (compartido con toda la app) en vez de
   // estado local: así el selector de acá también recolorea BottomNav
@@ -45,10 +116,38 @@ const Home = () => {
   const { sedeActiva: universidadActiva, setSedeActiva, resetearSedeActiva, explorandoOtraSede } = useCampus();
   const [selectorCampusAbierto, setSelectorCampusAbierto] = useState(false);
 
+  const sedeActivaRef = useRef(universidadActiva);
+  const enVueloSeccionesRef = useRef(new Set());
+
+  useEffect(() => {
+    sedeActivaRef.current = universidadActiva;
+  }, [universidadActiva]);
+
   const handleCambiarCampus = (universidadId) => {
+    sedeActivaRef.current = universidadId;
+    setForzarGrillaRecientes(false);
+    setSeccionesPorSede({});
     setSedeActiva(universidadId);
     setSelectorCampusAbierto(false);
   };
+
+  const handleSeleccionarCategoria = useCallback((cat) => {
+    setForzarGrillaRecientes(false);
+    setSeccionesPorSede({});
+    setCategoriaActiva(cat);
+  }, []);
+
+  const handleAplicarFiltros = useCallback((nuevosFiltros) => {
+    setForzarGrillaRecientes(false);
+    setSeccionesPorSede({});
+    setFiltrosAvanzados(nuevosFiltros);
+  }, []);
+
+  const handleBusquedaChange = useCallback((nuevoTexto) => {
+    setForzarGrillaRecientes(false);
+    setSeccionesPorSede({});
+    setBusqueda(nuevoTexto);
+  }, []);
 
   const tabUrl = searchParams.get("tab") || "inicio";
   const [tabActiva, setTabActiva] = useState(tabUrl);
@@ -66,26 +165,85 @@ const Home = () => {
   // ✅ Toast helper unificado (modo array)
   const mostrarToast = useToast(setToasts);
 
+  const modoDegradado = Boolean(universidadActiva && degradadoPorSede[universidadActiva]);
+  const mostrarSecciones =
+    esModoSecciones({ busqueda, categoriaActiva, filtrosAvanzados }) &&
+    !forzarGrillaRecientes &&
+    !modoDegradado;
+
+  // ── Carga de una sección individual (protegida contra carrera al cambiar de sede) ──
+  const solicitarCargaSeccion = useCallback(async (sedeObjetivo, seccion) => {
+    if (!sedeObjetivo) return;
+    const claveVuelo = `${sedeObjetivo}:${seccion.id}`;
+    if (enVueloSeccionesRef.current.has(claveVuelo)) return;
+    enVueloSeccionesRef.current.add(claveVuelo);
+
+    setSeccionesPorSede((prev) => ({
+      ...prev,
+      [sedeObjetivo]: {
+        ...(prev[sedeObjetivo] || {}),
+        [seccion.id]: {
+          cargando: true,
+          terminada: false,
+          productos: prev[sedeObjetivo]?.[seccion.id]?.productos || [],
+          error: null,
+        },
+      },
+    }));
+
+    const res = await obtenerProductosSeccion({
+      universidadId: sedeObjetivo,
+      categoria: seccion.categoria,
+      limite: 10,
+    });
+
+    enVueloSeccionesRef.current.delete(claveVuelo);
+
+    // Si el usuario cambió de sede mientras la consulta estaba en vuelo, se ignora la respuesta
+    if (sedeActivaRef.current !== sedeObjetivo) return;
+
+    // MODO DEGRADADO: si "Recién publicados" falla (índice u otro error), cae al modo grilla
+    if (seccion.id === "recientes" && (res.error === "indice" || res.error === "otro")) {
+      setDegradadoPorSede((prev) => ({ ...prev, [sedeObjetivo]: true }));
+      return;
+    }
+
+    setSeccionesPorSede((prev) => ({
+      ...prev,
+      [sedeObjetivo]: {
+        ...(prev[sedeObjetivo] || {}),
+        [seccion.id]: {
+          cargando: false,
+          terminada: true,
+          productos: res.productos,
+          error: res.error,
+        },
+      },
+    }));
+  }, []);
+
   // ── Hook: Productos (server-side: sede, categoría, orden, keywords) ──
+  // En modo secciones (pestaña inicio) se deshabilita para no duplicar lecturas.
   const { productos, cargando, todoCargado, cargarMas } = useProducts({
     orden: filtrosAvanzados.orden,
     categoriaActiva,
     busquedaFirebase: busqueda,
     universidadId: universidadActiva, // 🏫 Multicampus — sede que se está explorando (puede diferir de la del perfil)
     onError: (msg) => mostrarToast(msg, "error"),
+    habilitado: !mostrarSecciones || tabActiva === "favoritos",
   });
 
-  // ── Infinite scroll ──────────────────────────────────────
+  // ── Infinite scroll (solo aplica en modo grilla) ──────────────────────
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
-    if (todoCargado || !sentinelRef.current) return;
+    if (mostrarSecciones || todoCargado || !sentinelRef.current) return;
     observerRef.current = new IntersectionObserver(
       (entries) => { if (entries[0].isIntersecting) cargarMas(); },
       { root: null, rootMargin: "200px", threshold: 0.1 }
     );
     observerRef.current.observe(sentinelRef.current);
     return () => observerRef.current?.disconnect();
-  }, [cargarMas, todoCargado]);
+  }, [mostrarSecciones, cargarMas, todoCargado]);
 
   // ── Filtrado client-side ──────────────────────────────────
   // Se aplica sobre lo que ya trajo useProducts (server-side ya filtró
@@ -127,12 +285,22 @@ const Home = () => {
     filtrosAvanzados.precioMax !== "";
 
   const handleResetearFiltros = () => {
+    setForzarGrillaRecientes(false);
+    setSeccionesPorSede({});
     setBusqueda("");
     setCategoriaActiva("todos");
     setFiltrosAvanzados(FILTROS_AVANZADOS_INICIALES);
   };
 
   const handleVerDetalle = (id) => navigate(`/producto?id=${id}`);
+
+  const seccionesActuales = (universidadActiva && seccionesPorSede[universidadActiva]) || {};
+  const estadoRecientes = seccionesActuales.recientes;
+  const sedeSinProductosEnSecciones = Boolean(
+    estadoRecientes?.terminada &&
+      !estadoRecientes?.error &&
+      (estadoRecientes.productos || []).length === 0
+  );
 
   // 🎨 Multicampus: el color del header sigue la sede que se está
   // EXPLORANDO (`universidadActiva`), no necesariamente la del perfil
@@ -210,7 +378,11 @@ const Home = () => {
         {explorandoOtraSede && (
           <div className="relative z-20 mt-2.5 flex justify-center">
             <button
-              onClick={resetearSedeActiva}
+              onClick={() => {
+                setForzarGrillaRecientes(false);
+                setSeccionesPorSede({});
+                resetearSedeActiva();
+              }}
               className="flex items-center gap-1.5 rounded-chip bg-background/10 px-3 py-1 text-[11px] font-semibold text-background/85 backdrop-blur-sm"
             >
               Estás explorando {LISTA_UNIVERSIDADES.find((u) => u.id === universidadActiva)?.nombre ?? "otra sede"}
@@ -234,10 +406,10 @@ const Home = () => {
           <div className="relative z-10 -mt-5">
             <FeedFiltros
               categoriaActiva={categoriaActiva}
-              onCategoriaChange={setCategoriaActiva}
+              onCategoriaChange={handleSeleccionarCategoria}
               filtros={filtrosAvanzados}
-              onAplicarFiltros={setFiltrosAvanzados}
-              onBusquedaChange={setBusqueda}
+              onAplicarFiltros={handleAplicarFiltros}
+              onBusquedaChange={handleBusquedaChange}
             />
           </div>
 
@@ -255,46 +427,8 @@ const Home = () => {
 
       {tabActiva === "inicio" && (
         <section className="px-4 pb-28 pt-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-extrabold text-ink">Destacados</h2>
-            {hayFiltrosActivos && (
-              <span className="text-[12px] font-bold text-ink/40">
-                {productosFiltrados.length} resultado{productosFiltrados.length === 1 ? "" : "s"}
-              </span>
-            )}
-          </div>
-
-          {productosFiltrados.length > 0 ? (
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {productosFiltrados.map((p) => (
-                <ProductCard key={p.id} producto={p} onVerDetalle={handleVerDetalle} />
-              ))}
-            </div>
-          ) : !cargando ? (
-            hayFiltrosActivos ? (
-              // ── Empty state: sin coincidencias con los filtros actuales ──
-              <div className="mt-10 flex flex-col items-center gap-3 px-6 text-center">
-                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-ink/5">
-                  <SearchX size={28} className="text-ink/30" strokeWidth={2} />
-                </span>
-                <p className="text-[15px] font-extrabold text-ink">
-                  No encontramos productos con esos filtros
-                </p>
-                <p className="text-[13px] font-semibold text-ink/50">
-                  Probá con otra palabra clave o ajustá los filtros aplicados.
-                </p>
-                <button
-                  onClick={handleResetearFiltros}
-                  className="mt-1 rounded-btn bg-primary px-5 py-2.5 text-[13.5px] font-extrabold text-white shadow-soft transition-transform active:scale-95"
-                >
-                  Limpiar búsqueda y filtros
-                </button>
-              </div>
-            ) : (
-              // ── Empty state MULTICAMPUS: la sede todavía no tiene
-              // ningún producto publicado (sin filtros de por medio) —
-              // distinto del caso de arriba: acá no hay nada que limpiar,
-              // hay que invitar a publicar el primer producto de la sede.
+          {mostrarSecciones ? (
+            sedeSinProductosEnSecciones ? (
               <div className="mt-10 flex flex-col items-center gap-3 px-6 text-center">
                 <span className="flex h-16 w-16 items-center justify-center rounded-full bg-ink/5">
                   <Store size={28} className="text-ink/30" strokeWidth={2} />
@@ -313,23 +447,115 @@ const Home = () => {
                   Publicar mi primer producto
                 </button>
               </div>
-            )
-          ) : null}
+            ) : (
+              <div key={universidadActiva || "sin-sede"}>
+                {SECCIONES_INICIO.map((seccion, idx) => {
+                  const estadoSeccion = seccionesActuales[seccion.id];
+                  const cargandoSeccion = Boolean(estadoSeccion?.cargando);
+                  const pendienteCarga = !estadoSeccion?.terminada && !cargandoSeccion;
 
-          {!todoCargado && <div ref={sentinelRef} className="h-2" />}
-
-          {cargando && (
-            <div className="mt-6 flex justify-center">
-              <div className="flex items-center gap-2 rounded-chip bg-card px-4 py-2 text-[13px] font-bold text-ink/60 shadow-soft">
-                <svg className="h-[18px] w-[18px] animate-spin" viewBox="0 0 24 24" fill="none" stroke="#0639B8" strokeWidth="2.5">
-                  <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
-                  <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
-                  <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
-                  <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
-                </svg>
-                Cargando más productos...
+                  return (
+                    <SeccionCarrusel
+                      key={`${universidadActiva || "sede"}:${seccion.id}`}
+                      indice={idx}
+                      titulo={seccion.titulo}
+                      ariaLabel={seccion.titulo}
+                      productos={estadoSeccion?.productos || []}
+                      cargando={cargandoSeccion}
+                      pendienteCarga={pendienteCarga}
+                      onVisible={() => solicitarCargaSeccion(universidadActiva, seccion)}
+                      onVerDetalle={handleVerDetalle}
+                      onVerTodo={() => {
+                        if (seccion.categoria) {
+                          handleSeleccionarCategoria(seccion.categoria);
+                        } else {
+                          setForzarGrillaRecientes(true);
+                        }
+                      }}
+                    />
+                  );
+                })}
               </div>
-            </div>
+            )
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-extrabold text-ink">Destacados</h2>
+                {hayFiltrosActivos && (
+                  <span className="text-[12px] font-bold text-ink/40">
+                    {productosFiltrados.length} resultado{productosFiltrados.length === 1 ? "" : "s"}
+                  </span>
+                )}
+              </div>
+
+              {productosFiltrados.length > 0 ? (
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {productosFiltrados.map((p) => (
+                    <ProductCard key={p.id} producto={p} onVerDetalle={handleVerDetalle} />
+                  ))}
+                </div>
+              ) : !cargando ? (
+                hayFiltrosActivos ? (
+                  // ── Empty state: sin coincidencias con los filtros actuales ──
+                  <div className="mt-10 flex flex-col items-center gap-3 px-6 text-center">
+                    <span className="flex h-16 w-16 items-center justify-center rounded-full bg-ink/5">
+                      <SearchX size={28} className="text-ink/30" strokeWidth={2} />
+                    </span>
+                    <p className="text-[15px] font-extrabold text-ink">
+                      No encontramos productos con esos filtros
+                    </p>
+                    <p className="text-[13px] font-semibold text-ink/50">
+                      Probá con otra palabra clave o ajustá los filtros aplicados.
+                    </p>
+                    <button
+                      onClick={handleResetearFiltros}
+                      className="mt-1 rounded-btn bg-primary px-5 py-2.5 text-[13.5px] font-extrabold text-white shadow-soft transition-transform active:scale-95"
+                    >
+                      Limpiar búsqueda y filtros
+                    </button>
+                  </div>
+                ) : (
+                  // ── Empty state MULTICAMPUS: la sede todavía no tiene
+                  // ningún producto publicado (sin filtros de por medio) —
+                  // distinto del caso de arriba: acá no hay nada que limpiar,
+                  // hay que invitar a publicar el primer producto de la sede.
+                  <div className="mt-10 flex flex-col items-center gap-3 px-6 text-center">
+                    <span className="flex h-16 w-16 items-center justify-center rounded-full bg-ink/5">
+                      <Store size={28} className="text-ink/30" strokeWidth={2} />
+                    </span>
+                    <p className="text-[15px] font-extrabold text-ink">
+                      Todavía no hay productos en{" "}
+                      {LISTA_UNIVERSIDADES.find((u) => u.id === universidadActiva)?.nombre || "esta sede"}
+                    </p>
+                    <p className="text-[13px] font-semibold text-ink/50">
+                      Sé el primero en vender algo a tus compañeros de campus.
+                    </p>
+                    <button
+                      onClick={() => navigate("/publicar")}
+                      className="mt-1 rounded-btn bg-primary px-5 py-2.5 text-[13.5px] font-extrabold text-white shadow-soft transition-transform active:scale-95"
+                    >
+                      Publicar mi primer producto
+                    </button>
+                  </div>
+                )
+              ) : null}
+
+              {!todoCargado && <div ref={sentinelRef} className="h-2" />}
+
+              {cargando && (
+                <div className="mt-6 flex justify-center">
+                  <div className="flex items-center gap-2 rounded-chip bg-card px-4 py-2 text-[13px] font-bold text-ink/60 shadow-soft">
+                    <svg className="h-[18px] w-[18px] animate-spin" viewBox="0 0 24 24" fill="none" stroke="#0639B8" strokeWidth="2.5">
+                      <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+                      <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
+                      <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+                      <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+                    </svg>
+                    Cargando más productos...
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </section>
       )}

@@ -15,6 +15,7 @@ import {
 import { db }                          from "../services/firebase";
 import { useAuth }                     from "../context/AuthContext";
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
+import { limpiarCacheSecciones } from "../services/seccionesService";
 import { useObjectUrls }               from "../hooks/useObjectUrls";
 import { obtenerContactoPrivado, guardarContactoPrivado } from "../services/userService";
 import {
@@ -354,6 +355,7 @@ const Perfil = () => {
     if (!productoABorrar) return;
     try {
       await deleteDoc(doc(db, "productos", productoABorrar.id));
+      limpiarCacheSecciones();
       setProductos((prev) => prev.filter((p) => p.id !== productoABorrar.id));
       mostrarToast("Producto eliminado");
     } catch (err) {

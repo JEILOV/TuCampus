@@ -8,6 +8,7 @@ import { useAuth }                              from "../context/AuthContext";
 import { comprimirImagen, subirBlobsComprimidos } from "../utils/imageUtils";
 import { obtenerContactoPrivado }               from "../services/userService";
 import { crearProducto }                        from "../services/productService";
+import { limpiarCacheSecciones }                from "../services/seccionesService";
 import { useObjectUrls }                        from "../hooks/useObjectUrls";
 import Toast, { useToast }                      from "../components/Toast"; // ✅ Nuevo import
 
@@ -265,6 +266,7 @@ const Publicar = () => {
         console.warn("[Publicar] Error al notificar seguidores:", notifErr);
       }
 
+      limpiarCacheSecciones();
       navigate("/", { state: { toastPublicar: true } });
     } catch (err) {
       console.error("[Publicar] Error:", err);

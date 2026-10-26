@@ -201,7 +201,7 @@ const esErrorRecuperable = (err) => {
  *     onError: (msg) => mostrarToast(msg, "error"),
  *   });
  */
-export const useProducts = ({ orden, categoriaActiva, busquedaFirebase, universidadId, onError }) => {
+export const useProducts = ({ orden, categoriaActiva, busquedaFirebase, universidadId, onError, habilitado = true }) => {
   const [productos,   setProductos]   = useState([]);
   const [cargando,    setCargando]    = useState(false);
   const [todoCargado, setTodoCargado] = useState(false);
@@ -246,6 +246,7 @@ export const useProducts = ({ orden, categoriaActiva, busquedaFirebase, universi
 
   // ── Función de carga (identidad estable mientras los filtros no cambien) ──
   const cargarMas = useCallback(async (esNuevoFiltro = false) => {
+    if (!habilitado) return;
     if (cargandoRef.current) return;           // ya hay una carga en curso
     if (erroreRef.current) return;              // la última carga falló: no reintentar solo
     if (todoCargado && !esNuevoFiltro) return;   // ya no hay más páginas
@@ -384,7 +385,7 @@ export const useProducts = ({ orden, categoriaActiva, busquedaFirebase, universi
         setCargando(false);
       }
     }
-  }, [todoCargado, orden, categoriaActiva, busquedaFirebase, universidadId, onError]);
+  }, [habilitado, todoCargado, orden, categoriaActiva, busquedaFirebase, universidadId, onError]);
 
   // ── Reset y recarga al cambiar cualquier filtro (incluye universidadId,
   //    por si el perfil termina de cargar después del primer render) ──
@@ -406,11 +407,12 @@ export const useProducts = ({ orden, categoriaActiva, busquedaFirebase, universi
 
   // ── Carga inicial (y tras reset de filtros) ──
   useEffect(() => {
+    if (!habilitado) return;
     if (!universidadId) return; // 🏫 esperar a que el perfil resuelva la sede
     if (!todoCargado && !errorCarga && productos.length === 0 && !cargandoRef.current) {
       cargarMas(true);
     }
-  }, [productos, todoCargado, errorCarga, universidadId, cargarMas]);
+  }, [habilitado, productos, todoCargado, errorCarga, universidadId, cargarMas]);
 
   // 🔧 Reintento manual explícito — para un botón "Reintentar" en la UI
   // si Home.jsx quiere ofrecerlo, en vez de reintentos automáticos.
