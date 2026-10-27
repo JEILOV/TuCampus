@@ -29,6 +29,18 @@ export const debeCargarSeccion = ({
   return Boolean(esVisible);
 };
 
+/**
+ * Función pura que decide si se debe invocar `onVisible` para iniciar la carga:
+ * solo cuando la sección ya está habilitada (por índice o visibilidad), sigue
+ * pendiente de carga y no hay una carga en curso.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export const debeSolicitarCarga = ({
+  habilitada = false,
+  pendienteCarga = false,
+  cargando = false,
+} = {}) => Boolean(habilitada && pendienteCarga && !cargando);
+
 const useVisible = (ref, { indice = 0, rootMargin = "300px" } = {}) => {
   const soportaObserver = typeof IntersectionObserver === "function";
   const [visible, setVisible] = useState(() =>
@@ -86,21 +98,18 @@ const SeccionCarrusel = ({
   pendienteCarga = false,
 }) => {
   const containerRef = useRef(null);
-  const notificadoRef = useRef(false);
+  const onVisibleRef = useRef(onVisible);
   const habilitada = useVisible(containerRef, { indice, rootMargin: "300px" });
 
   useEffect(() => {
-    if (habilitada && onVisible && !notificadoRef.current) {
-      notificadoRef.current = true;
-      onVisible();
-    }
-  }, [habilitada, onVisible]);
+    onVisibleRef.current = onVisible;
+  }, [onVisible]);
 
-  // Si la sección tiene carga diferida pendiente (aún fuera del viewport),
-  // montamos un centinela mínimo para que IntersectionObserver pueda observarlo.
-  if (!habilitada && pendienteCarga && !cargando) {
-    return <div ref={containerRef} className="h-4" aria-hidden="true" />;
-  }
+  useEffect(() => {
+    if (debeSolicitarCarga({ habilitada, pendienteCarga, cargando })) {
+      onVisibleRef.current?.();
+    }
+  }, [habilitada, pendienteCarga, cargando]);
 
   const lista = Array.isArray(productos) ? productos : [];
 
@@ -112,19 +121,28 @@ const SeccionCarrusel = ({
   return (
     <div ref={containerRef} className="mt-6 first:mt-0">
       <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-1.5 text-lg font-extrabold text-ink">
-          {icono && <span className="shrink-0">{icono}</span>}
-          <span>{titulo}</span>
-        </h2>
-        {onVerTodo && (
-          <button
-            type="button"
-            onClick={onVerTodo}
-            className="flex items-center gap-0.5 text-[13px] font-bold text-primary transition-opacity active:opacity-70"
-          >
-            Ver todo
-            <ChevronRight size={15} strokeWidth={2.5} />
-          </button>
+        {pendienteCarga && !habilitada ? (
+          <div
+            aria-hidden="true"
+            className="h-6 w-36 animate-pulse rounded bg-ink/10"
+          />
+        ) : (
+          <>
+            <h2 className="flex items-center gap-1.5 text-lg font-extrabold text-ink">
+              {icono && <span className="shrink-0">{icono}</span>}
+              <span>{titulo}</span>
+            </h2>
+            {onVerTodo && (
+              <button
+                type="button"
+                onClick={onVerTodo}
+                className="flex items-center gap-0.5 text-[13px] font-bold text-primary transition-opacity active:opacity-70"
+              >
+                Ver todo
+                <ChevronRight size={15} strokeWidth={2.5} />
+              </button>
+            )}
+          </>
         )}
       </div>
 

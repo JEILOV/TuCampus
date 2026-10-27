@@ -14,7 +14,10 @@ import {
   limpiarCacheSecciones,
   TTL_CACHE_SECCIONES_MS,
 } from "../services/seccionesService";
-import { debeCargarSeccion } from "../components/SeccionCarrusel";
+import {
+  debeCargarSeccion,
+  debeSolicitarCarga,
+} from "../components/SeccionCarrusel";
 import { esModoSecciones } from "../pages/Home";
 import { FILTROS_AVANZADOS_INICIALES } from "../components/FeedFiltros";
 
@@ -193,6 +196,55 @@ describe("debeCargarSeccion — carga diferida (TAREA 2)", () => {
         debeCargarSeccion({ indice: i, esVisible: false, soportaObserver: false })
       ).toBe(true);
     }
+  });
+});
+
+describe("debeSolicitarCarga — disparo idempotente y autorreparable (TAREA 2)", () => {
+  it("pendiente y habilitada devuelve true", () => {
+    expect(
+      debeSolicitarCarga({
+        habilitada: true,
+        pendienteCarga: true,
+        cargando: false,
+      })
+    ).toBe(true);
+  });
+
+  it("ya cargando devuelve false", () => {
+    expect(
+      debeSolicitarCarga({
+        habilitada: true,
+        pendienteCarga: true,
+        cargando: true,
+      })
+    ).toBe(false);
+    expect(
+      debeSolicitarCarga({
+        habilitada: true,
+        pendienteCarga: false,
+        cargando: true,
+      })
+    ).toBe(false);
+  });
+
+  it("ya terminada (pendienteCarga: false, cargando: false) devuelve false", () => {
+    expect(
+      debeSolicitarCarga({
+        habilitada: true,
+        pendienteCarga: false,
+        cargando: false,
+      })
+    ).toBe(false);
+  });
+
+  it("no habilitada devuelve false aunque esté pendiente", () => {
+    expect(
+      debeSolicitarCarga({
+        habilitada: false,
+        pendienteCarga: true,
+        cargando: false,
+      })
+    ).toBe(false);
   });
 });
 

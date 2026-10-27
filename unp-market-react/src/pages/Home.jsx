@@ -133,19 +133,16 @@ const Home = () => {
 
   const handleSeleccionarCategoria = useCallback((cat) => {
     setForzarGrillaRecientes(false);
-    setSeccionesPorSede({});
     setCategoriaActiva(cat);
   }, []);
 
   const handleAplicarFiltros = useCallback((nuevosFiltros) => {
     setForzarGrillaRecientes(false);
-    setSeccionesPorSede({});
     setFiltrosAvanzados(nuevosFiltros);
   }, []);
 
   const handleBusquedaChange = useCallback((nuevoTexto) => {
     setForzarGrillaRecientes(false);
-    setSeccionesPorSede({});
     setBusqueda(nuevoTexto);
   }, []);
 
@@ -286,7 +283,6 @@ const Home = () => {
 
   const handleResetearFiltros = () => {
     setForzarGrillaRecientes(false);
-    setSeccionesPorSede({});
     setBusqueda("");
     setCategoriaActiva("todos");
     setFiltrosAvanzados(FILTROS_AVANZADOS_INICIALES);
@@ -380,7 +376,6 @@ const Home = () => {
             <button
               onClick={() => {
                 setForzarGrillaRecientes(false);
-                setSeccionesPorSede({});
                 resetearSedeActiva();
               }}
               className="flex items-center gap-1.5 rounded-chip bg-background/10 px-3 py-1 text-[11px] font-semibold text-background/85 backdrop-blur-sm"
