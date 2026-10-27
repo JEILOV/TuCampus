@@ -52,7 +52,7 @@ const ProductCard = ({ producto, onVerDetalle }) => {
   return (
     <article
       onClick={() => onVerDetalle(id)}
-      className={`h-fit w-full cursor-pointer self-start overflow-hidden rounded-card bg-card shadow-soft transition-all duration-200 ease-out active:scale-[0.98]${
+      className={`h-fit w-full cursor-pointer self-start overflow-hidden rounded-card bg-card shadow-soft transition-all duration-200 ease-out active:scale-[0.98] md:hover:-translate-y-0.5 md:hover:shadow-softLg${
         estaAgotado ? " opacity-70" : ""
       }`}
     >

@@ -19,6 +19,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth }     from "../context/AuthContext";
 import { useNotifications } from "../hooks/useNotifications";
+import { useEsAncho }  from "../hooks/useMediaQuery";
 
 const IconoCampana = () => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
@@ -28,7 +29,7 @@ const IconoCampana = () => (
   </svg>
 );
 
-const BotonNotificaciones = () => {
+const BotonNotificacionesInterno = () => {
   const navigate = useNavigate();
   const { user }  = useAuth();
   const { noLeidas: sinLeerCount } = useNotifications(user?.uid);
@@ -50,6 +51,11 @@ const BotonNotificaciones = () => {
       )}
     </button>
   );
+};
+
+const BotonNotificaciones = () => {
+  if (useEsAncho()) return null;
+  return <BotonNotificacionesInterno />;
 };
 
 export default BotonNotificaciones;

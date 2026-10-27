@@ -5,6 +5,7 @@ import Login          from "./pages/Login";
 import RutaProtegida  from "./components/RutaProtegida";
 import NotificacionToast from "./components/NotificacionToast";
 import InstalarPWABanner from "./components/InstalarPWABanner";
+import CabeceraEscritorio from "./components/CabeceraEscritorio";
 import Spinner        from "./components/Spinner";
 
 // 🚀 Code splitting (rendimiento): Home y Login se importan de forma
@@ -42,6 +43,9 @@ const App = () => (
         el navegador no soporta instalación (ej. iOS Safari) o si el
         usuario ya la descartó recientemente (ver el propio componente). */}
     <InstalarPWABanner />
+
+    {/* Cabecera de escritorio y tablet (md+); en < 768px o en /login devuelve null */}
+    <CabeceraEscritorio />
 
     {/* Suspense ÚNICO envolviendo todas las rutas: mientras el chunk de
         la página lazy pedida termina de descargar, se muestra el mismo

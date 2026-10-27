@@ -31,6 +31,7 @@ import { useNavigate }      from "react-router-dom";
 import { useAuth }          from "../context/AuthContext";
 import { useCampus }        from "../context/CampusContext";
 import { useChatsNoLeidos } from "../hooks/useChatsNoLeidos";
+import { useEsAncho }       from "../hooks/useMediaQuery";
 
 // ── Badge numérico reutilizable (notifs y mensajes usan el mismo estilo) ──
 const Badge = ({ cantidad }) => {
@@ -80,7 +81,7 @@ const NavItem = ({ activo, to, onClick, label, children }) => {
   );
 };
 
-const BottomNav = ({ activo = null }) => {
+const BottomNavInterno = ({ activo = null }) => {
   const navigate = useNavigate();
   const { user }  = useAuth();
 
@@ -164,6 +165,11 @@ const BottomNav = ({ activo = null }) => {
       </NavItem>
     </nav>
   );
+};
+
+const BottomNav = (props) => {
+  if (useEsAncho()) return null;
+  return <BottomNavInterno {...props} />;
 };
 
 export default BottomNav;

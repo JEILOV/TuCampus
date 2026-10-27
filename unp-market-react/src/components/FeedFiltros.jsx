@@ -135,7 +135,7 @@ const FeedFiltros = ({
   return (
     <div>
       {/* ── Barra de búsqueda ── */}
-      <div className="relative z-10 px-4">
+      <div className="relative z-10 px-4 md:hidden">
         <div className="flex items-center gap-2.5 rounded-btn bg-card px-4 py-3.5 shadow-softLg">
           <Search size={18} className="shrink-0 text-ink/40" />
           <input

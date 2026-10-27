@@ -90,7 +90,7 @@ const NotificacionToast = () => {
 
   return (
     <div
-      className="fixed inset-x-4 top-4 z-50 flex justify-center sm:inset-x-auto sm:right-4 sm:left-auto sm:justify-end"
+      className="fixed inset-x-4 top-4 z-[60] flex justify-center sm:inset-x-auto sm:right-4 sm:left-auto sm:justify-end md:top-20 lg:top-28"
       aria-live="polite"
     >
       <div
