@@ -9,6 +9,7 @@
 
 import { useState } from "react";
 import { RotateCcw } from "lucide-react";
+import { useCampus } from "../context/CampusContext";
 import {
   CATEGORIAS,
   CONDICIONES,
@@ -83,6 +84,13 @@ const PanelFiltrosLateral = ({
 }) => {
   const f = filtros || FILTROS_AVANZADOS_INICIALES;
 
+  // FASE 7A.1: si se explora otra sede, CabeceraEscritorio suma la fila C
+  // (~31px: 68 fila A + 43 fila B + 31 fila C ≈ 142px), así que el panel
+  // baja su tope sticky para no quedar debajo. Se lee del contexto (sin
+  // lecturas a Firestore) para no cambiar la API que usa Home.
+  const { explorandoOtraSede } = useCampus();
+  const claseTop = explorandoOtraSede ? "lg:top-[9.25rem]" : "lg:top-28";
+
   const cambiarCondicion = (condicionId) => {
     onAplicarFiltros?.({ ...f, condicion: condicionId });
   };
@@ -94,7 +102,7 @@ const PanelFiltrosLateral = ({
   return (
     <aside
       aria-label="Filtros de productos"
-      className="hidden w-64 shrink-0 self-start rounded-card bg-card p-5 shadow-soft lg:sticky lg:top-28 lg:block"
+      className={`hidden w-64 shrink-0 self-start rounded-card bg-card p-5 shadow-soft lg:sticky lg:block ${claseTop}`}
     >
       {/* Categorías */}
       <div>

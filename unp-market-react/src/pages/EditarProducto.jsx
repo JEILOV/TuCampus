@@ -294,189 +294,216 @@ const EditarProducto = () => {
   if (cargando) return <Spinner mensaje="Cargando producto..." />;
 
   return (
-    <div className="app-shell bg-background pb-8 font-sans">
+    <div className="w-full bg-background md:min-h-screen">
+      <div className="app-shell font-sans pb-8 md:max-w-[760px] md:overflow-visible md:bg-transparent md:px-5 md:pb-12 md:shadow-none lg:max-w-[920px] lg:px-6">
 
-      {/* ════════════════════════════════════════════════════
-             HEADER AZUL (mismo patrón que Publicar.jsx)
-        ════════════════════════════════════════════════════ */}
-      <header className="relative rounded-b-[32px] bg-primary px-6 pb-10 pt-8">
-        <button
-          onClick={() => navigate(-1)}
-          aria-label="Volver"
-          className="absolute left-5 top-8 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
-        >
-          <ChevronLeft size={20} />
-        </button>
+        {/* ════════════════════════════════════════════════════
+               HEADER MÓVIL (< 768px)
+          ════════════════════════════════════════════════════ */}
+        <div className="md:hidden">
+          <header className="relative rounded-b-[32px] bg-primary px-6 pb-10 pt-8">
+            <button
+              onClick={() => navigate(-1)}
+              aria-label="Volver"
+              className="absolute left-5 top-8 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
+            >
+              <ChevronLeft size={20} />
+            </button>
 
-        <div className="flex items-center justify-center gap-3">
-          <img src={MASCOTA_ICONO} alt="TuCampus" className="h-14 w-14 object-contain" />
-          <div className="text-left">
-            <p className="text-2xl font-extrabold leading-none text-background">TuCampus</p>
-            <p className="mt-1 text-[12px] font-medium text-background/75">Edita tu producto</p>
-          </div>
+            <div className="flex items-center justify-center gap-3">
+              <img src={MASCOTA_ICONO} alt="TuCampus" className="h-14 w-14 object-contain" />
+              <div className="text-left">
+                <p className="text-2xl font-extrabold leading-none text-background">TuCampus</p>
+                <p className="mt-1 text-[12px] font-medium text-background/75">Edita tu producto</p>
+              </div>
+            </div>
+          </header>
         </div>
-      </header>
 
-      {/* ════════════════════════════════════════════════════
-             TARJETA BLANCA SUPERPUESTA — Formulario
-        ════════════════════════════════════════════════════ */}
-      <main className="relative -mt-6 px-4">
-        <form onSubmit={handleSubmit} className="rounded-t-[32px] bg-card p-5 pb-6 shadow-soft">
-
-          {/* FOTOS (hasta 4) */}
-          <div className="mb-5">
-            <div className="flex items-baseline justify-between">
-              <label className={labelClass}>Fotos del producto</label>
-              <span className="text-[11px] font-semibold text-ink/40">
-                {procesandoImagenes ? "Procesando..." : `${fotos.length}/${MAX_FOTOS}`}
-              </span>
-            </div>
-
-            {fotos.length === 0 ? (
-              <div
-                onClick={() => !procesandoImagenes && fileInputRef.current?.click()}
-                aria-disabled={procesandoImagenes}
-                className={`mt-2 rounded-2xl border-2 border-dashed border-ink/15 bg-background p-5 text-center transition-colors ${
-                  procesandoImagenes ? "cursor-wait opacity-60" : "cursor-pointer"
-                }`}
-              >
-                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Camera size={26} />
-                </span>
-                <p className="mt-2 text-[14.5px] font-extrabold text-ink">
-                  {procesandoImagenes ? "Procesando foto..." : "Toca para abrir la cámara o galería"}
-                </p>
-                <p className="mt-1 text-[12px] font-semibold text-ink/40">
-                  Hasta {MAX_FOTOS} fotos · JPG, PNG · Máx. 5MB c/u
-                </p>
-              </div>
-            ) : (
-              <div className="mt-2 grid grid-cols-4 gap-2">
-                {fotos.map((f, idx) => (
-                  <div key={f.id} className="relative aspect-square overflow-hidden rounded-2xl bg-background">
-                    <img src={f.url} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" />
-                    {idx === 0 && (
-                      <span className="absolute bottom-1 left-1 rounded-chip bg-black/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
-                        Portada
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => quitarFoto(f.id)}
-                      aria-label={`Quitar foto ${idx + 1}`}
-                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
-                    >
-                      <X size={12} strokeWidth={3} />
-                    </button>
-                  </div>
-                ))}
-
-                {fotos.length < MAX_FOTOS && (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={procesandoImagenes}
-                    aria-label="Agregar foto"
-                    className="flex aspect-square items-center justify-center rounded-2xl border-2 border-dashed border-ink/15 bg-background text-ink/30 transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-wait disabled:opacity-60"
-                  >
-                    <Plus size={22} />
-                  </button>
-                )}
-              </div>
-            )}
-
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              disabled={procesandoImagenes}
-              className="hidden"
-            />
-          </div>
-
-          {/* TÍTULO */}
-          <div className="mb-4">
-            <label className={labelClass}>¿Qué vas a vender?</label>
-            <input type="text" required maxLength={200} placeholder="Ej: Galletas de avena"
-              value={titulo} onChange={(e) => setTitulo(e.target.value)}
-              className={`${inputClass} mt-2`} />
-          </div>
-
-          {/* PRECIO + CATEGORÍA */}
-          <div className="mb-4 grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelClass}>Precio (S/)</label>
-              <div className="relative mt-2">
-                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[14px] font-extrabold text-ink/40">
-                  S/
-                </span>
-                <input type="number" required placeholder="0.00" min="0.01" max="10000" step="0.01"
-                  value={precio} onChange={(e) => setPrecio(e.target.value)}
-                  className={`${inputClass} pl-9`} />
-              </div>
-            </div>
-            <div>
-              <label className={labelClass}>Categoría</label>
-              {/* 🔧 Mismo set que Publicar.jsx / Home.jsx — ver
-                  CATEGORIAS_VALIDAS en services/productService.js. */}
-              <select value={categoria} onChange={(e) => setCategoria(e.target.value)}
-                className={`${inputClass} mt-2 cursor-pointer`}>
-                <option value="comida">🍔 Comida & Snacks</option>
-                <option value="tecnologia">🎧 Tecnología</option>
-                <option value="ropa">👕 Ropa & Moda</option>
-                <option value="materiales">📚 Materiales & Libros</option>
-                <option value="servicios">🛠️ Servicios & Tipeos</option>
-                <option value="otros">📦 Otros</option>
-              </select>
-            </div>
-          </div>
-
-          {/* CONDICIÓN */}
-          <div className="mb-4">
-            <label className={labelClass}>Condición</label>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              {CONDICIONES.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => setCondicion(c.value)}
-                  aria-pressed={condicion === c.value}
-                  className={`rounded-btn border-[1.5px] py-2.5 text-[12.5px] font-extrabold transition-colors ${
-                    condicion === c.value
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-ink/10 bg-background text-ink/60"
-                  }`}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* DESCRIPCIÓN */}
-          <div className="mb-5">
-            <div className="flex items-center justify-between">
-              <label className={labelClass}>Descripción</label>
-              <span className="text-[11px] font-semibold text-ink/30">{descripcion.length}/500</span>
-            </div>
-            <textarea required rows={3} maxLength={500} placeholder="Cuéntanos más detalles de tu producto..."
-              value={descripcion} onChange={(e) => setDescripcion(e.target.value)}
-              className={`${inputClass} mt-2 resize-none`} />
-          </div>
-
-          {/* CTA */}
+        {/* ════════════════════════════════════════════════════
+               HEADER TABLET/ESCRITORIO (md+)
+          ════════════════════════════════════════════════════ */}
+        <div className="hidden items-center justify-between py-5 md:flex">
           <button
-            type="submit"
-            disabled={enviando || procesandoImagenes}
-            className="flex w-full items-center justify-center gap-2 rounded-btn bg-primary py-4 text-[15px] font-extrabold text-white shadow-soft transition-all duration-200 ease-out active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
+            type="button"
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 rounded-btn bg-card px-4 py-2 text-[13px] font-bold text-ink shadow-soft transition-colors hover:bg-background"
           >
-            <Send size={18} />
-            {enviando ? btnTexto : "Guardar Cambios"}
+            <ChevronLeft size={18} strokeWidth={2.4} />
+            <span>Volver</span>
           </button>
-        </form>
-      </main>
+          <h1 className="text-xl font-extrabold text-ink">Edita tu producto</h1>
+          <div className="w-20" aria-hidden="true" />
+        </div>
+
+        {/* ════════════════════════════════════════════════════
+               TARJETA — Formulario (1 col móvil/tablet, 2 col en lg)
+          ════════════════════════════════════════════════════ */}
+        <main className="relative -mt-6 px-4 md:mt-0 md:px-0">
+          <form onSubmit={handleSubmit} className="rounded-t-[32px] bg-card p-5 pb-6 shadow-soft md:rounded-card md:p-7">
+
+            <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
+
+              {/* COLUMNA IZQUIERDA EN LG: Fotos */}
+              <div className="lg:col-span-1">
+                {/* FOTOS (hasta 4) */}
+                <div className="mb-5">
+                  <div className="flex items-baseline justify-between">
+                    <label className={labelClass}>Fotos del producto</label>
+                    <span className="text-[11px] font-semibold text-ink/40">
+                      {procesandoImagenes ? "Procesando..." : `${fotos.length}/${MAX_FOTOS}`}
+                    </span>
+                  </div>
+
+                  {fotos.length === 0 ? (
+                    <div
+                      onClick={() => !procesandoImagenes && fileInputRef.current?.click()}
+                      aria-disabled={procesandoImagenes}
+                      className={`mt-2 rounded-2xl border-2 border-dashed border-ink/15 bg-background p-5 text-center transition-colors ${
+                        procesandoImagenes ? "cursor-wait opacity-60" : "cursor-pointer"
+                      }`}
+                    >
+                      <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Camera size={26} />
+                      </span>
+                      <p className="mt-2 text-[14.5px] font-extrabold text-ink">
+                        {procesandoImagenes ? "Procesando foto..." : "Toca para abrir la cámara o galería"}
+                      </p>
+                      <p className="mt-1 text-[12px] font-semibold text-ink/40">
+                        Hasta {MAX_FOTOS} fotos · JPG, PNG · Máx. 5MB c/u
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-2 grid grid-cols-4 gap-2">
+                      {fotos.map((f, idx) => (
+                        <div key={f.id} className="relative aspect-square overflow-hidden rounded-2xl bg-background">
+                          <img src={f.url} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" />
+                          {idx === 0 && (
+                            <span className="absolute bottom-1 left-1 rounded-chip bg-black/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                              Portada
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => quitarFoto(f.id)}
+                            aria-label={`Quitar foto ${idx + 1}`}
+                            className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
+                          >
+                            <X size={12} strokeWidth={3} />
+                          </button>
+                        </div>
+                      ))}
+
+                      {fotos.length < MAX_FOTOS && (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={procesandoImagenes}
+                          aria-label="Agregar foto"
+                          className="flex aspect-square items-center justify-center rounded-2xl border-2 border-dashed border-ink/15 bg-background text-ink/30 transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-wait disabled:opacity-60"
+                        >
+                          <Plus size={22} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    disabled={procesandoImagenes}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
+              {/* COLUMNA DERECHA EN LG: Campos del formulario */}
+              <div className="lg:col-span-1">
+                {/* TÍTULO */}
+                <div className="mb-4">
+                  <label className={labelClass}>¿Qué vas a vender?</label>
+                  <input type="text" required maxLength={200} placeholder="Ej: Galletas de avena"
+                    value={titulo} onChange={(e) => setTitulo(e.target.value)}
+                    className={`${inputClass} mt-2`} />
+                </div>
+
+                {/* PRECIO + CATEGORÍA */}
+                <div className="mb-4 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClass}>Precio (S/)</label>
+                    <div className="relative mt-2">
+                      <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[14px] font-extrabold text-ink/40">
+                        S/
+                      </span>
+                      <input type="number" required placeholder="0.00" min="0.01" max="10000" step="0.01"
+                        value={precio} onChange={(e) => setPrecio(e.target.value)}
+                        className={`${inputClass} pl-9`} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Categoría</label>
+                    <select value={categoria} onChange={(e) => setCategoria(e.target.value)}
+                      className={`${inputClass} mt-2 cursor-pointer`}>
+                      <option value="comida">🍔 Comida & Snacks</option>
+                      <option value="tecnologia">🎧 Tecnología</option>
+                      <option value="ropa">👕 Ropa & Moda</option>
+                      <option value="materiales">📚 Materiales & Libros</option>
+                      <option value="servicios">🛠️ Servicios & Tipeos</option>
+                      <option value="otros">📦 Otros</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* CONDICIÓN */}
+                <div className="mb-4">
+                  <label className={labelClass}>Condición</label>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {CONDICIONES.map((c) => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => setCondicion(c.value)}
+                        aria-pressed={condicion === c.value}
+                        className={`rounded-btn border-[1.5px] py-2.5 text-[12.5px] font-extrabold transition-colors ${
+                          condicion === c.value
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-ink/10 bg-background text-ink/60"
+                        }`}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* DESCRIPCIÓN */}
+                <div className="mb-5">
+                  <div className="flex items-center justify-between">
+                    <label className={labelClass}>Descripción</label>
+                    <span className="text-[11px] font-semibold text-ink/30">{descripcion.length}/500</span>
+                  </div>
+                  <textarea required rows={3} maxLength={500} placeholder="Cuéntanos más detalles de tu producto..."
+                    value={descripcion} onChange={(e) => setDescripcion(e.target.value)}
+                    className={`${inputClass} mt-2 resize-none`} />
+                </div>
+              </div>
+
+            </div>
+
+            {/* CTA A ANCHO COMPLETO AL FINAL */}
+            <button
+              type="submit"
+              disabled={enviando || procesandoImagenes}
+              className="flex w-full items-center justify-center gap-2 rounded-btn bg-primary py-4 text-[15px] font-extrabold text-white shadow-soft transition-all duration-200 ease-out hover:brightness-105 active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 lg:mt-2"
+            >
+              <Send size={18} />
+              {enviando ? btnTexto : "Guardar Cambios"}
+            </button>
+          </form>
+        </main>
 
       {/* ✅ TOAST LIMPIO */}
       {toast && (
@@ -484,6 +511,7 @@ const EditarProducto = () => {
           <Toast mensaje={toast.mensaje} tipo={toast.tipo} />
         </div>
       )}
+      </div>
     </div>
   );
 };

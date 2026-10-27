@@ -184,7 +184,8 @@ const Terminos = () => {
   const [tab, setTab] = useState("terminos"); // "terminos" | "privacidad"
 
   return (
-    <div className="app-shell bg-background pb-10 font-sans">
+    <div className="w-full bg-background md:min-h-screen">
+    <div className="app-shell bg-background pb-10 font-sans md:max-w-[760px] md:overflow-visible md:bg-transparent md:shadow-none">
 
       {/* ════════════════════════════════════════════════════
              HEADER — back button + título (mismo patrón que
@@ -247,6 +248,7 @@ const Terminos = () => {
           nuestra Política de Privacidad.
         </p>
       </section>
+    </div>
     </div>
   );
 };

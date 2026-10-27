@@ -240,8 +240,9 @@ const PanelAdminAnuncios = () => {
   }
 
   return (
-    <div className="app-shell bg-background pb-10 font-sans">
-      <header className="relative rounded-b-[32px] bg-primary px-6 pb-8 pt-8">
+    <div className="w-full bg-background md:min-h-screen">
+    <div className="app-shell bg-background pb-10 font-sans md:max-w-[1000px] md:overflow-visible md:bg-transparent md:px-5 md:shadow-none lg:px-6">
+      <header className="relative rounded-b-[32px] bg-primary px-6 pb-8 pt-8 md:hidden">
         <button
           onClick={() => navigate(-1)}
           aria-label="Volver"
@@ -255,7 +256,23 @@ const PanelAdminAnuncios = () => {
         </p>
       </header>
 
-      <main className="relative -mt-5 px-4">
+      {/* Barra de tablet/escritorio (md+): Volver + título, en lugar del header azul */}
+      <div className="hidden items-center gap-4 py-4 md:flex">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-2 rounded-btn bg-card px-4 py-2 text-[13px] font-bold text-ink shadow-soft transition-colors hover:bg-background"
+        >
+          <ChevronLeft size={18} strokeWidth={2.4} />
+          <span>Volver</span>
+        </button>
+        <div>
+          <h1 className="text-xl font-extrabold leading-tight text-ink">Gestión de Anuncios</h1>
+          <p className="text-[12px] font-semibold text-ink/50">Se reflejan en vivo en el carrusel de Home</p>
+        </div>
+      </div>
+
+      <main className="relative -mt-5 px-4 md:mt-0 md:px-0">
         {/* ── DASHBOARD DE MÉTRICAS POR SEDE ─────────────── */}
         <div className="mb-5">
           <EstadisticasCampus />
@@ -381,7 +398,7 @@ const PanelAdminAnuncios = () => {
           <p className="mb-2.5 px-1 text-[13.5px] font-extrabold text-ink/60">
             Anuncios ({anuncios.length})
           </p>
-          <div className="flex flex-col gap-2.5">
+          <div className="flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:gap-4">
             {anuncios.map((a) => {
               const badge = badgeDeAnuncio(a);
               return (
@@ -424,7 +441,7 @@ const PanelAdminAnuncios = () => {
               );
             })}
             {anuncios.length === 0 && (
-              <p className="px-1 text-[13px] font-semibold text-ink/40">
+              <p className="px-1 text-[13px] font-semibold text-ink/40 lg:col-span-2">
                 Aún no hay anuncios. El carrusel de Home muestra los banners locales por defecto.
               </p>
             )}
@@ -437,6 +454,7 @@ const PanelAdminAnuncios = () => {
           <Toast mensaje={toast.mensaje} tipo={toast.tipo} />
         </div>
       )}
+    </div>
     </div>
   );
 };

@@ -63,6 +63,19 @@ export const CampusProvider = ({ children }) => {
     setSedeActivaState(universidadId);
   };
 
+  // 🏫 FASE 7A.1: vuelve a la sede del perfil y reactiva la
+  // sincronización automática del efecto de arriba (como si el
+  // usuario nunca hubiera tocado el selector). Lo usan el chip
+  // "Estás explorando…" de Home, el botón Inicio del BottomNav y
+  // la cabecera de escritorio.
+  const resetearSedeActiva = () => {
+    tocoSelectorRef.current = false;
+    setSedeActivaState(perfil?.universidadId || "unp");
+  };
+
+  // true solo si hay perfil con sede y la sede activa es otra.
+  const explorandoOtraSede = Boolean(perfil?.universidadId) && sedeActiva !== perfil.universidadId;
+
   const colorAccent = obtenerColorAccent(sedeActiva);
 
   // Publica el color como variable CSS global — así cualquier
@@ -71,7 +84,7 @@ export const CampusProvider = ({ children }) => {
     document.documentElement.style.setProperty("--color-accent", colorAccent);
   }, [colorAccent]);
 
-  const value = { sedeActiva, setSedeActiva, colorAccent };
+  const value = { sedeActiva, setSedeActiva, colorAccent, resetearSedeActiva, explorandoOtraSede };
 
   return <CampusContext.Provider value={value}>{children}</CampusContext.Provider>;
 };

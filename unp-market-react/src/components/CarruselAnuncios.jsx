@@ -75,9 +75,12 @@ const CarruselAnuncios = ({ universidadId }) => {
   const [flyerAbierto, setFlyerAbierto] = useState(null);
 
   const scrollRef = useRef(null);
+  // FASE 7A.1: la dependencia incluye `cargando` para que las flechas se
+  // recalculen cuando el contenedor real (scrollRef) aparece tras el
+  // skeleton, aunque la cantidad de anuncios no cambie (p. ej. caché).
   const { puedeIzq, puedeDer, ir } = useFlechasScroll(
     scrollRef,
-    anuncios?.length || 0
+    `${cargando}-${anuncios?.length || 0}`
   );
 
   if (cargando) return <SkeletonAnuncios />;
@@ -135,9 +138,12 @@ const CarruselAnuncios = ({ universidadId }) => {
           </button>
         )}
 
+        {/* FASE 7A.1: md:scroll-px-5 lg:scroll-px-6 hacen que el snap respete
+            el padding, así la primera tarjeta queda alineada con el resto del
+            Inicio (BannerNotificaciones y secciones) en lugar de pegarse al borde. */}
         <div
           ref={scrollRef}
-          className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:px-5 lg:px-6"
+          className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:scroll-px-5 md:px-5 lg:scroll-px-6 lg:px-6"
           aria-label="Anuncios y flyers del campus"
         >
           {anuncios.map((a) => {

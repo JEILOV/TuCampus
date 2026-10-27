@@ -111,7 +111,8 @@ const Notificaciones = () => {
   };
 
   return (
-    <div className="app-shell bg-background pb-28 font-sans">
+    <div className="w-full bg-background md:min-h-screen">
+    <div className="app-shell bg-background pb-28 font-sans md:max-w-[720px] md:overflow-visible md:bg-transparent md:pb-8 md:shadow-none">
 
       {/* ════════════════════════════════════════════════════
              HEADER — back button + título + Limpiar
@@ -275,6 +276,7 @@ const Notificaciones = () => {
       <BottomNav />
 
       <ToastContainer toasts={toasts} />
+    </div>
     </div>
   );
 };

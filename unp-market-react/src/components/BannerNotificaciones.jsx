@@ -65,8 +65,10 @@ const BannerNotificaciones = () => {
 
   if (!visible) return null;
 
+  // FASE 7A.1: md:mx-5 lg:mx-6 = mismo margen horizontal que las secciones
+  // del Inicio (px-4 md:px-5 lg:px-6), para alinear los bordes izquierdos.
   return (
-    <div className="relative z-10 mx-4 mt-3 flex items-center gap-3 rounded-card bg-card px-4 py-3 shadow-soft">
+    <div className="relative z-10 mx-4 mt-3 flex items-center gap-3 rounded-card bg-card px-4 py-3 shadow-soft md:mx-5 lg:mx-6">
       <span className="text-xl" aria-hidden="true">
         🔔
       </span>

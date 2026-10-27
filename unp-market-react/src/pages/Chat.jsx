@@ -44,6 +44,7 @@ import Spinner                         from "../components/Spinner";
 import BottomNav                       from "../components/BottomNav";
 import BotonNotificaciones             from "../components/BotonNotificaciones";
 import MenuChat, { MenuMensaje }       from "../components/MenuChat";
+import { useEsEscritorio }             from "../hooks/useMediaQuery";
 
 // Placeholder — reemplazar por los archivos finales de la mascota
 // (mismo ícono que usan Home.jsx/Publicar.jsx en su header azul).
@@ -211,7 +212,7 @@ const IconoMenu = () => (
 );
 
 // ── Sub-vista: lista de conversaciones ───────────────────────
-const ListaChats = ({ chats, cargando, miUid, onAbrir }) => {
+const ListaChats = ({ chats, cargando, miUid, onAbrir, chatActivoId }) => {
   if (cargando) return <Spinner mensaje="Cargando tus chats..." fullScreen={false} />;
 
   if (chats.length === 0) {
@@ -234,11 +235,13 @@ const ListaChats = ({ chats, cargando, miUid, onAbrir }) => {
         const noLeidos    = chat.noLeidoPor?.[miUid] || 0;
         const soyYoUltimo = chat.ultimoMensajeDeUid === miUid;
 
+        const esActivo = chat.id === chatActivoId;
+
         return (
           <button
             key={chat.id}
             onClick={() => onAbrir(chat.id)}
-            className="flex w-full items-center gap-3 border-b border-background bg-card px-5 py-3.5 text-left last:border-b-0"
+            className={`flex w-full items-center gap-3 border-b border-background bg-card px-5 py-3.5 text-left last:border-b-0 ${esActivo ? "lg:bg-primary/5" : "lg:hover:bg-background/60"}`}
           >
             <div className="relative shrink-0">
               <Avatar nombre={otroInfo.nombre} avatar={otroInfo.avatar} />
@@ -553,6 +556,7 @@ const Chat = () => {
   const [searchParams]  = useSearchParams();
   const chatId          = searchParams.get("id");
   const { user, bloqueados, actualizarBloqueados, cargando: cargandoAuth } = useAuth();
+  const esEscritorio    = useEsEscritorio();
 
   const [toasts, setToasts] = useState([]);
   const mostrarToast        = useToast(setToasts);
@@ -562,15 +566,19 @@ const Chat = () => {
   const [cargandoChats, setCargandoChats] = useState(true);
   const [busquedaChats, setBusquedaChats] = useState(""); // filtro visual del buscador (mockup)
 
+  // FASE 7C.1: en escritorio (lg) la lista se mantiene viva aunque haya chatId abierto.
+  // En móvil/tablet (< lg) se desactiva al entrar a un chat individual.
+  const mantenerLista = !chatId || esEscritorio;
+
   useEffect(() => {
-    if (chatId || !user?.uid) return; // solo corre en modo lista
+    if (!mantenerLista || !user?.uid) return;
     setCargandoChats(true);
     const unsub = suscribirMisChats(user.uid, (data) => {
       setChats(data);
       setCargandoChats(false);
     });
     return () => unsub();
-  }, [user?.uid, chatId]);
+  }, [user?.uid, mantenerLista]);
 
   // ── Modo conversación ────────────────────────────────────
   const [chatMeta, setChatMeta]         = useState(null);
@@ -967,95 +975,50 @@ const Chat = () => {
   if (cargandoAuth) return <Spinner mensaje="Cargando..." />;
 
   // ════════════════════════════════════════════════════════════
-  //  MODO LISTA (Misión C): header azul + tarjeta blanca
-  //  superpuesta, buscador y tarjetas de chat (mockup 3).
-  //  La conversación individual (modo charla) sigue el layout
-  //  WhatsApp/Instagram ya ajustado más abajo — no se toca acá.
+  //  FASE 7C.1: Extracción de paneles para soportar dos columnas en lg:
+  //  (estilo WhatsApp Web) y columna única en móvil/tablet (< lg).
   // ════════════════════════════════════════════════════════════
-  if (!chatId) {
-    const chatsFiltrados = chats.filter((chat) => {
-      if (!busquedaChats.trim()) return true;
-      const otroUidF  = chat.participantes?.find((u) => u !== user?.uid);
-      const nombreF   = chat.participantesInfo?.[otroUidF]?.nombre || "";
-      const haystack  = `${nombreF} ${obtenerProductoRef(chat)?.titulo || ""} ${chat.ultimoMensaje || ""}`.toLowerCase();
-      return haystack.includes(busquedaChats.trim().toLowerCase());
-    });
+  const chatsFiltrados = chats.filter((chat) => {
+    if (!busquedaChats.trim()) return true;
+    const otroUidF  = chat.participantes?.find((u) => u !== user?.uid);
+    const nombreF   = chat.participantesInfo?.[otroUidF]?.nombre || "";
+    const haystack  = `${nombreF} ${obtenerProductoRef(chat)?.titulo || ""} ${chat.ultimoMensaje || ""}`.toLowerCase();
+    return haystack.includes(busquedaChats.trim().toLowerCase());
+  });
 
-    return (
-      <div className="app-shell bg-background pb-28 font-sans">
+  const panelLista = (
+    <div className="flex flex-col md:h-full">
+      <div className="shrink-0 px-5 md:pt-4">
+        <h1 className="text-[19px] font-extrabold text-ink">Mensajes</h1>
+        <p className="mt-0.5 text-[12.5px] font-semibold text-ink/50">Revisa tus conversaciones</p>
 
-        {/* HEADER AZUL (mismo patrón que Home.jsx / Publicar.jsx) */}
-        <header className="relative rounded-b-[32px] bg-primary px-6 pb-10 pt-8">
-          <button
-            onClick={() => navigate(-1)}
-            aria-label="Volver"
-            className="absolute left-5 top-8 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
-          >
-            <IconoVolver />
-          </button>
-
-          <div className="flex items-center justify-center gap-3">
-            <img src={MASCOTA_ICONO} alt="TuCampus" className="h-14 w-14 object-contain" />
-            <div className="text-left">
-              <p className="text-2xl font-extrabold leading-none text-background">TuCampus</p>
-              <p className="mt-1 text-[12px] font-medium text-background/75">Conecta. Comparte. Crece.</p>
-            </div>
-          </div>
-        </header>
-
-        <BotonNotificaciones />
-
-        {/* TARJETA BLANCA SUPERPUESTA */}
-        <main className="relative -mt-6 px-4">
-          <div className="rounded-t-[32px] bg-card pb-2 pt-6 shadow-soft">
-            <div className="px-5">
-              <h1 className="text-[19px] font-extrabold text-ink">Mensajes</h1>
-              <p className="mt-0.5 text-[12.5px] font-semibold text-ink/50">Revisa tus conversaciones</p>
-
-              {/* Buscador — filtro visual local, no toca la suscripción real */}
-              <div className="relative mt-4 mb-1">
-                <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink/30" />
-                <input
-                  type="text"
-                  value={busquedaChats}
-                  onChange={(e) => setBusquedaChats(e.target.value)}
-                  placeholder="Buscar mensajes..."
-                  className="w-full rounded-full border-none bg-background py-3 pl-10 pr-4 text-[13.5px] font-semibold text-ink outline-none placeholder:text-ink/30"
-                />
-              </div>
-            </div>
-
-            <ListaChats chats={chatsFiltrados} cargando={cargandoChats} miUid={user?.uid} onAbrir={abrirChat} />
-          </div>
-        </main>
-
-        <BottomNav activo="mensajes" />
-        <ToastContainer toasts={toasts} />
+        {/* Buscador — filtro visual local, no toca la suscripción real */}
+        <div className="relative mb-1 mt-4">
+          <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink/30" />
+          <input
+            type="text"
+            value={busquedaChats}
+            onChange={(e) => setBusquedaChats(e.target.value)}
+            placeholder="Buscar mensajes..."
+            className="w-full rounded-full border-none bg-background py-3 pl-10 pr-4 text-[13.5px] font-semibold text-ink outline-none placeholder:text-ink/30"
+          />
+        </div>
       </div>
-    );
-  }
 
-  // ── Render (modo charla) ────────────────────────────────────
-  return (
-    <div
-      className="app-shell"
-      style={{
-        background: "var(--bg-crema)",
-        // 🔧 Layout fijo tipo WhatsApp/Instagram: el shell ocupa exactamente
-        // el alto del viewport (100dvh = dynamic viewport height, se ajusta
-        // solo cuando el teclado móvil abre/cierra, a diferencia de 100vh).
-        // Header e input viven como hijos normales de este flex-column —
-        // YA NO usan position:sticky/fixed, así nunca "flotan" ni se
-        // desalinean. Solo el contenedor de mensajes hace scroll interno.
-        height: "100dvh",
-        maxHeight: "100dvh",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        padding: 0,
-      }}
-    >
+      <div className="md:flex-1 md:overflow-y-auto">
+        <ListaChats
+          chats={chatsFiltrados}
+          cargando={cargandoChats}
+          miUid={user?.uid}
+          onAbrir={abrirChat}
+          chatActivoId={chatId}
+        />
+      </div>
+    </div>
+  );
 
+  const panelConversacion = chatId ? (
+    <>
       {/* ── HEADER (fijo: flexShrink 0 + zIndex, fuera del área con scroll) ── */}
       <div style={{
         flexShrink: 0, position: "relative", zIndex: 20,
@@ -1065,11 +1028,11 @@ const Chat = () => {
         <button
           onClick={volverALista}
           aria-label="Volver"
+          className="flex items-center justify-center lg:hidden"
           style={{
             width: "36px", height: "36px", flexShrink: 0,
             background: "var(--bg-crema)", borderRadius: "50%",
             border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
             color: "var(--azul-oscuro)",
           }}
         >
@@ -1463,9 +1426,120 @@ const Chat = () => {
           )}
         </>
       )}
+    </>
+  ) : null;
 
+  // ── Render Escritorio (lg: >= 1024px) — Dos paneles estilo WhatsApp Web ──
+  if (esEscritorio) {
+    return (
+      <>
+        <div className="w-full bg-background md:fixed md:inset-x-0 md:bottom-0 md:top-[var(--alto-cabecera,68px)] md:z-10 md:overflow-hidden">
+          <div className="mx-auto h-full max-w-[1280px] px-6 py-4">
+            <div className="flex h-full gap-4">
+              {/* Panel Izquierdo: Lista de Chats */}
+              <aside className="flex w-[360px] shrink-0 flex-col overflow-hidden rounded-card bg-card shadow-soft xl:w-[400px]">
+                {panelLista}
+              </aside>
+
+              {/* Panel Derecho: Conversación o Estado Vacío */}
+              <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-card bg-card shadow-soft">
+                {chatId ? (
+                  <div
+                    className="flex h-full flex-col overflow-hidden"
+                    style={{ background: "var(--bg-crema)" }}
+                  >
+                    {panelConversacion}
+                  </div>
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+                    <img
+                      src={MASCOTA_ICONO}
+                      alt="TuCampus"
+                      className="h-20 w-20 object-contain opacity-80"
+                    />
+                    <h2 className="mt-4 text-xl font-extrabold text-ink">
+                      Selecciona una conversación
+                    </h2>
+                    <p className="mt-1 max-w-[320px] text-sm font-semibold text-ink/50">
+                      Elige un chat de la lista para empezar a conversar.
+                    </p>
+                  </div>
+                )}
+              </main>
+            </div>
+          </div>
+        </div>
+        <ToastContainer toasts={toasts} />
+      </>
+    );
+  }
+
+  // ── Render Móvil/Tablet (< 1024px) — Modo Lista ──
+  if (!chatId) {
+    return (
+      <>
+        <div className="w-full bg-background md:fixed md:inset-x-0 md:bottom-0 md:top-[var(--alto-cabecera,68px)] md:z-10 md:overflow-hidden">
+          <div className="app-shell bg-background pb-28 font-sans md:mx-auto md:h-full md:min-h-0 md:max-w-[720px] md:overflow-visible md:bg-transparent md:px-5 md:py-4 md:shadow-none">
+
+            {/* HEADER AZUL — solo móvil */}
+            <header className="relative rounded-b-[32px] bg-primary px-6 pb-10 pt-8 md:hidden">
+              <button
+                onClick={() => navigate(-1)}
+                aria-label="Volver"
+                className="absolute left-5 top-8 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
+              >
+                <IconoVolver />
+              </button>
+
+              <div className="flex items-center justify-center gap-3">
+                <img src={MASCOTA_ICONO} alt="TuCampus" className="h-14 w-14 object-contain" />
+                <div className="text-left">
+                  <p className="text-2xl font-extrabold leading-none text-background">TuCampus</p>
+                  <p className="mt-1 text-[12px] font-medium text-background/75">Conecta. Comparte. Crece.</p>
+                </div>
+              </div>
+            </header>
+
+            <BotonNotificaciones />
+
+            {/* TARJETA BLANCA SUPERPUESTA */}
+            <main className="relative -mt-6 px-4 md:mt-0 md:h-full md:px-0">
+              <div className="rounded-t-[32px] bg-card pb-2 pt-6 shadow-soft md:h-full md:overflow-hidden md:rounded-card md:pt-0">
+                {panelLista}
+              </div>
+            </main>
+
+            <BottomNav activo="mensajes" />
+          </div>
+        </div>
+        <ToastContainer toasts={toasts} />
+      </>
+    );
+  }
+
+  // ── Render Móvil/Tablet (< 1024px) — Modo Conversación ──
+  return (
+    <>
+      <div className="w-full bg-background md:fixed md:inset-x-0 md:bottom-0 md:top-[var(--alto-cabecera,68px)] md:z-10 md:overflow-hidden">
+        <div className="mx-auto h-full md:max-w-[720px] md:px-5 md:py-4">
+          <div
+            className="app-shell md:h-full md:max-w-[720px] md:min-h-0 md:rounded-card md:shadow-softLg md:[--alto-chat:100%]"
+            style={{
+              background: "var(--bg-crema)",
+              height: "var(--alto-chat, 100dvh)",
+              maxHeight: "var(--alto-chat, 100dvh)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              padding: 0,
+            }}
+          >
+            {panelConversacion}
+          </div>
+        </div>
+      </div>
       <ToastContainer toasts={toasts} />
-    </div>
+    </>
   );
 };
 

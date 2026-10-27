@@ -341,233 +341,404 @@ const Vendedor = () => {
         : 0);
 
   return (
-    <div className="app-shell font-sans pb-8">
+    <div className="w-full bg-background md:min-h-screen">
+      <div className="app-shell font-sans pb-8 md:max-w-[1100px] md:overflow-visible md:bg-transparent md:px-5 md:shadow-none lg:px-6">
 
-      {/* CABECERA — Color de la sede del vendedor, o imagen de portada tal cual (sin overlay) */}
-      <div
-        className="relative flex min-h-[300px] w-full flex-col items-center justify-center overflow-hidden rounded-b-[32px] px-6 pb-10 pt-14"
-        style={estiloBanner}
-      >
-        <button
-          onClick={() => navigate(-1)}
-          aria-label="Volver"
-          className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
-        >
-          <ChevronLeft size={20} />
-        </button>
+        {/* Barra superior con botón volver en tablet/escritorio (md+) */}
+        <div className="hidden items-center py-4 md:flex">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 rounded-btn bg-card px-4 py-2 text-[13px] font-bold text-ink shadow-soft transition-colors hover:bg-background"
+          >
+            <ChevronLeft size={18} strokeWidth={2.4} />
+            <span>Volver</span>
+          </button>
+        </div>
 
-        <div className="relative z-[5] flex w-full flex-col items-center gap-2">
-          <div className="relative mb-1">
-            <div className="flex h-[92px] w-[92px] items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-primary-dark text-3xl font-bold text-white shadow-softLg">
-              {v.avatar?.trim()
-                ? <img src={v.avatar} alt={v.nombre} decoding="async" className="h-full w-full object-cover" />
-                : (v.nombre || "V")[0].toUpperCase()
-              }
-            </div>
-            {esPropio && (
-              <button
-                onClick={() => navigate("/perfil", { state: { abrirModalEdicion: true } })}
-                aria-label="Editar mi perfil"
-                className="absolute bottom-0.5 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white shadow-soft"
+        {/* Disposición: en móvil 1 columna normal, en lg 2 columnas (perfil vendedor lateral ~300px / publicaciones + opiniones) */}
+        <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-8">
+
+          {/* ════════════════════════════════════════════════════
+                 PERFIL DEL VENDEDOR EN ESCRITORIO (lg:)
+            ════════════════════════════════════════════════════ */}
+          <aside className="hidden lg:col-span-4 lg:sticky lg:top-24 lg:block lg:space-y-4">
+            <div className="overflow-hidden rounded-card bg-card shadow-soft">
+              {/* Mini banner superior */}
+              <div
+                className="relative flex h-24 w-full items-center justify-center"
+                style={estiloBanner}
               >
-                <Pencil size={13} />
+                <div className="absolute -bottom-10">
+                  <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-primary-dark text-2xl font-bold text-white shadow-softLg">
+                    {v.avatar?.trim()
+                      ? <img src={v.avatar} alt={v.nombre} decoding="async" className="h-full w-full object-cover" />
+                      : (v.nombre || "V")[0].toUpperCase()
+                    }
+                  </div>
+                  {esPropio && (
+                    <button
+                      onClick={() => navigate("/perfil", { state: { abrirModalEdicion: true } })}
+                      aria-label="Editar mi perfil"
+                      className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white shadow-soft"
+                    >
+                      <Pencil size={11} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Datos del vendedor */}
+              <div className="flex flex-col items-center px-5 pb-5 pt-12 text-center">
+                <h1 className="text-xl font-extrabold text-ink">
+                  {v.nombre || vendedorPorDefecto(v.universidadId)}
+                </h1>
+                <p className="mt-0.5 text-[12px] font-bold uppercase tracking-wide text-ink/60">
+                  {v.bio || bioEstudiantePorDefecto(v.universidadId)}
+                </p>
+
+                {/* Sede y ubicación */}
+                <p className="mt-1 flex items-center gap-1 text-[12px] font-semibold text-ink/50">
+                  <MapPin size={13} className="text-primary" />
+                  <span>{(universidadVendedor?.id || "SEDE").toUpperCase()} – {v.ubicacion || "Piura"}</span>
+                </p>
+
+                {/* Reputación */}
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-chip bg-ink/5 px-3 py-1 text-[12.5px] font-extrabold text-ink">
+                  {totalResenasReal > 0 ? (
+                    <>
+                      <Star size={13} fill="#f5a623" stroke="none" />
+                      {promedioReal.toFixed(1)}
+                      <span className="font-bold opacity-70">({totalResenasReal})</span>
+                    </>
+                  ) : (
+                    <span className="font-bold opacity-75">Sin reseñas todavía</span>
+                  )}
+                </div>
+
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-chip border border-primary/20 bg-primary/5 px-3 py-1 text-[11px] font-bold text-primary">
+                  <CheckCircle2 size={13} />
+                  Estudiante verificado
+                </div>
+
+                {/* Métodos de pago */}
+                {(v.aceptaYape || v.aceptaPlin) && (
+                  <div className="mt-3 flex items-center justify-center gap-2 rounded-2xl border border-ink/5 bg-background px-3 py-2">
+                    {v.aceptaYape && <img src={YAPE_PLACEHOLDER} alt="Yape" className="h-6 w-6 rounded-full object-cover" />}
+                    {v.aceptaYape && v.aceptaPlin && <span className="h-4 w-px bg-ink/10" />}
+                    {v.aceptaPlin && <img src={PLIN_PLACEHOLDER} alt="Plin" className="h-6 w-6 rounded-full object-cover" />}
+                  </div>
+                )}
+
+                <hr className="my-4 w-full border-ink/10" />
+
+                {/* Acciones del vendedor */}
+                <div className="flex w-full flex-col gap-2">
+                  {/* Seguir */}
+                  {esSeguidor ? (
+                    <button
+                      onClick={handleToggleSeguir}
+                      className="w-full rounded-btn border-2 border-ink/15 py-2.5 text-[13px] font-extrabold text-ink/60 transition-colors hover:border-ink/30"
+                    >
+                      Siguiendo
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleToggleSeguir}
+                      className="w-full rounded-btn bg-ink py-2.5 text-[13px] font-extrabold text-white shadow-soft transition-transform hover:brightness-110 active:scale-95"
+                    >
+                      Seguir Vendedor
+                    </button>
+                  )}
+
+                  {/* Chat interno */}
+                  {user?.uid !== uid && (
+                    <button
+                      onClick={handleChatInterno}
+                      disabled={iniciandoChat}
+                      className="flex w-full items-center justify-center gap-2 rounded-btn bg-primary py-2.5 text-[13.5px] font-extrabold text-white shadow-soft transition-transform hover:brightness-105 active:scale-95 disabled:opacity-70"
+                    >
+                      <MessageCircle size={17} />
+                      {iniciandoChat ? "Abriendo chat..." : "Chat interno"}
+                    </button>
+                  )}
+
+                  {/* WhatsApp */}
+                  {contactoPrivado?.telefono && (
+                    <a
+                      href={`https://wa.me/51${String(contactoPrivado.telefono).replace(/\s+/g, "")}?text=${encodeURIComponent(`Hola ${v.nombre || "vendedor"}, vi tu perfil en TuCampus y me gustaría hacerte una consulta.`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex w-full items-center justify-center gap-2 rounded-btn bg-[#287653] py-2.5 text-[13.5px] font-extrabold text-white shadow-soft hover:brightness-105"
+                    >
+                      <MessageCircle size={17} />
+                      Contactar por WhatsApp
+                    </a>
+                  )}
+
+                  {/* Calificar */}
+                  {user?.uid !== uid && (
+                    <button
+                      onClick={handleAbrirModalResena}
+                      className={`flex w-full items-center justify-center gap-1.5 rounded-btn py-2.5 text-[13px] font-extrabold ${
+                        miResena
+                          ? "border-2 border-[#287653] bg-white text-[#287653]"
+                          : "bg-[#287653] text-white shadow-soft"
+                      }`}
+                    >
+                      <Star size={14} fill="currentColor" />
+                      {miResena ? "Editar mi reseña" : "Calificar vendedor"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Acerca de mí en lateral de escritorio */}
+            <div className="rounded-card bg-card p-4 shadow-soft">
+              <div className="mb-2 flex items-center gap-2">
+                <MessageCircle size={15} className="text-primary" />
+                <span className="text-[13px] font-bold text-ink">Acerca de mí</span>
+              </div>
+              <p className="text-[12.5px] font-semibold leading-relaxed text-ink/70">
+                {v.acercaDe || "¡Hola! Bienvenido a mi tienda."}
+              </p>
+            </div>
+          </aside>
+
+          {/* ════════════════════════════════════════════════════
+                 PERFIL DEL VENDEDOR EN MÓVIL Y TABLET (< lg:)
+            ════════════════════════════════════════════════════ */}
+          <div className="lg:hidden">
+            {/* CABECERA — Color de la sede del vendedor, o imagen de portada tal cual (sin overlay) */}
+            <div
+              className="relative flex min-h-[300px] w-full flex-col items-center justify-center overflow-hidden rounded-b-[32px] px-6 pb-10 pt-14 md:rounded-card md:shadow-soft"
+              style={estiloBanner}
+            >
+              <button
+                onClick={() => navigate(-1)}
+                aria-label="Volver"
+                className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur md:hidden"
+              >
+                <ChevronLeft size={20} />
               </button>
-            )}
+
+              <div className="relative z-[5] flex w-full flex-col items-center gap-2">
+                <div className="relative mb-1">
+                  <div className="flex h-[92px] w-[92px] items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-primary-dark text-3xl font-bold text-white shadow-softLg">
+                    {v.avatar?.trim()
+                      ? <img src={v.avatar} alt={v.nombre} decoding="async" className="h-full w-full object-cover" />
+                      : (v.nombre || "V")[0].toUpperCase()
+                    }
+                  </div>
+                  {esPropio && (
+                    <button
+                      onClick={() => navigate("/perfil", { state: { abrirModalEdicion: true } })}
+                      aria-label="Editar mi perfil"
+                      className="absolute bottom-0.5 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white shadow-soft"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  )}
+                </div>
+
+                <h1 className="text-center text-2xl font-extrabold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.4)]">
+                  {v.nombre || vendedorPorDefecto(v.universidadId)}
+                </h1>
+                <p className="text-[13px] font-bold uppercase tracking-wide text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
+                  {v.bio || bioEstudiantePorDefecto(v.universidadId)}
+                </p>
+
+                {/* Reputación */}
+                <div className="mt-0.5 inline-flex items-center gap-1.5 rounded-chip bg-white/15 px-3 py-1 text-[13px] font-extrabold text-white">
+                  {totalResenasReal > 0 ? (
+                    <>
+                      <Star size={14} fill="#f5a623" stroke="none" />
+                      {promedioReal.toFixed(1)}
+                      <span className="font-bold opacity-80">({totalResenasReal})</span>
+                    </>
+                  ) : (
+                    <span className="font-bold opacity-85">Sin reseñas todavía</span>
+                  )}
+                </div>
+
+                <div className="mt-1 inline-flex items-center gap-1.5 rounded-chip border border-white/40 bg-white/20 px-3.5 py-1.5 text-[12px] font-bold text-white backdrop-blur">
+                  <CheckCircle2 size={14} />
+                  Estudiante verificado
+                </div>
+              </div>
+            </div>
+
+            {/* UBICACIÓN + MÉTODOS DE PAGO */}
+            <div className="relative z-10 -mt-5 flex gap-3 px-4 md:px-0">
+              <div className="flex flex-1 items-center gap-2 rounded-card bg-card px-4 py-3.5 shadow-soft">
+                <MapPin size={18} className="shrink-0 text-primary" />
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-extrabold leading-tight text-ink">
+                    {v.ubicacion || "Piura"}
+                  </p>
+                  <p className="text-[11px] font-semibold text-ink/50">
+                    {(universidadVendedor?.id || "SEDE").toUpperCase()} – {v.ubicacion || "Piura"}
+                  </p>
+                </div>
+              </div>
+
+              {(v.aceptaYape || v.aceptaPlin) && (
+                <div className="flex items-center justify-center gap-2.5 rounded-card bg-card px-4 py-3.5 shadow-soft">
+                  {v.aceptaYape && <img src={YAPE_PLACEHOLDER} alt="Yape" className="h-8 w-8 rounded-full object-cover" />}
+                  {v.aceptaYape && v.aceptaPlin && <span className="h-6 w-px bg-ink/10" />}
+                  {v.aceptaPlin && <img src={PLIN_PLACEHOLDER} alt="Plin" className="h-8 w-8 rounded-full object-cover" />}
+                </div>
+              )}
+            </div>
+
+            {/* ACERCA DE */}
+            <div className="px-4 pb-4 pt-4 md:px-0">
+              <div className="rounded-card bg-card p-4 shadow-soft">
+                <div className="mb-2 flex items-center gap-2">
+                  <MessageCircle size={16} className="text-primary" />
+                  <span className="text-sm font-bold text-ink">Acerca de mí</span>
+                </div>
+                <p className="text-[13px] font-semibold leading-relaxed text-ink/70">
+                  {v.acercaDe || "¡Hola! Bienvenido a mi tienda."}
+                </p>
+              </div>
+            </div>
+
+            {/* CONTACTO: CHAT INTERNO + WHATSAPP */}
+            <div className="flex flex-col gap-2.5 px-4 pb-5 md:px-0">
+              {user?.uid !== uid && (
+                <button
+                  onClick={handleChatInterno}
+                  disabled={iniciandoChat}
+                  className="flex w-full items-center justify-center gap-2 rounded-btn bg-ink py-3.5 text-[15px] font-extrabold text-white disabled:opacity-70"
+                >
+                  <MessageCircle size={20} />
+                  {iniciandoChat ? "Abriendo chat..." : "Chat interno"}
+                </button>
+              )}
+
+              {contactoPrivado?.telefono && (
+                <a
+                  href={`https://wa.me/51${String(contactoPrivado.telefono).replace(/\s+/g, "")}?text=${encodeURIComponent(`Hola ${v.nombre || "vendedor"}, vi tu perfil en TuCampus y me gustaría hacerte una consulta.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex w-full items-center justify-center gap-2 rounded-btn bg-[#287653] py-3.5 text-[15px] font-extrabold text-white shadow-soft"
+                >
+                  <MessageCircle size={20} />
+                  Contactar por WhatsApp
+                </a>
+              )}
+            </div>
+
+            {/* SEGUIR / DEJAR DE SEGUIR */}
+            <div className="flex gap-2.5 px-4 pb-3 md:px-0">
+              {esSeguidor ? (
+                <button
+                  onClick={handleToggleSeguir}
+                  className="flex-1 rounded-btn border-2 border-ink/15 py-3 text-[14px] font-extrabold text-ink/60"
+                >
+                  Siguiendo
+                </button>
+              ) : (
+                <button
+                  onClick={handleToggleSeguir}
+                  className="flex-1 rounded-btn bg-ink py-3.5 text-[14px] font-extrabold text-white"
+                >
+                  Seguir Vendedor
+                </button>
+              )}
+
+              {user?.uid !== uid && (
+                <button
+                  onClick={handleAbrirModalResena}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-btn py-3 text-[14px] font-extrabold ${
+                    miResena
+                      ? "border-2 border-[#287653] bg-white text-[#287653]"
+                      : "bg-[#287653] text-white"
+                  }`}
+                >
+                  <Star size={15} fill="currentColor" />
+                  {miResena ? "Editar mi reseña" : "Calificar vendedor"}
+                </button>
+              )}
+            </div>
           </div>
 
-          <h1 className="text-center text-2xl font-extrabold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.4)]">
-            {v.nombre || vendedorPorDefecto(v.universidadId)}
-          </h1>
-          <p className="text-[13px] font-bold uppercase tracking-wide text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
-            {v.bio || bioEstudiantePorDefecto(v.universidadId)}
-          </p>
+          {/* ════════════════════════════════════════════════════
+                 COLUMNA DERECHA: PUBLICACIONES + OPINIONES (lg:col-span-8)
+                 En móvil/tablet: order-1 opiniones, order-2 publicaciones.
+                 En escritorio (lg): order-1 publicaciones, order-2 opiniones.
+            ════════════════════════════════════════════════════ */}
+          <div className="flex flex-col lg:col-span-8 lg:gap-6">
+            {/* PUBLICACIONES */}
+            <div className="order-2 px-4 pb-5 md:px-0 lg:order-1">
+              <div className="mb-3 flex items-center justify-between border-b-2 border-[#287653]/25 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <LayoutGrid size={16} className="text-[#287653]" />
+                  <span className="text-[15px] font-extrabold text-[#287653]">Publicaciones Activas</span>
+                </div>
+              </div>
+              {productos.length === 0 ? (
+                <p className="py-5 text-center text-[13px] font-bold text-ink/50">
+                  Este vendedor aún no tiene publicaciones.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-3">
+                  {productos.map((prod) => (
+                    <ProductCard key={prod.id} producto={prod} onVerDetalle={handleVerDetalle} />
+                  ))}
+                </div>
+              )}
+            </div>
 
-          {/* Reputación: promedio de estrellas + total de reseñas.
-              Calculado a partir de `resenas` (la misma lista de abajo),
-              no del contador guardado aparte — ver nota más arriba. */}
-          <div className="mt-0.5 inline-flex items-center gap-1.5 rounded-chip bg-white/15 px-3 py-1 text-[13px] font-extrabold text-white">
-            {totalResenasReal > 0 ? (
-              <>
-                <Star size={14} fill="#f5a623" stroke="none" />
-                {promedioReal.toFixed(1)}
-                <span className="font-bold opacity-80">({totalResenasReal})</span>
-              </>
-            ) : (
-              <span className="font-bold opacity-85">Sin reseñas todavía</span>
-            )}
+            {/* OPINIONES */}
+            <div className="order-1 px-4 pb-5 md:px-0 lg:order-2">
+              <div className="mb-3 flex items-center gap-2 border-b-2 border-[#287653]/25 pb-2.5">
+                <Star size={16} className="text-[#287653]" fill="#287653" />
+                <span className="text-[15px] font-extrabold text-[#287653]">
+                  Opiniones {resenas.length > 0 ? `(${resenas.length})` : ""}
+                </span>
+              </div>
+              {cargandoResenas ? (
+                <Spinner mensaje="Cargando opiniones..." fullScreen={false} />
+              ) : resenas.length === 0 ? (
+                <p className="py-4 text-center text-[13px] font-bold text-ink/50">
+                  Todavía no tiene reseñas. ¡Sé el primero en calificarlo!
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  {resenas.map((r) => (
+                    <TarjetaResena
+                      key={r.id}
+                      resena={r}
+                      esMia={r.autorUid === user?.uid}
+                      onEditar={handleAbrirModalResena}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="mt-1 inline-flex items-center gap-1.5 rounded-chip border border-white/40 bg-white/20 px-3.5 py-1.5 text-[12px] font-bold text-white backdrop-blur">
-            <CheckCircle2 size={14} />
-            Estudiante verificado
-          </div>
         </div>
+
+        <ToastContainer toasts={toasts} />
+
+        {/* MODAL DE RESEÑA */}
+        <ModalResena
+          abierto={modalResenaAbierto}
+          onCerrar={() => setModalResenaAbierto(false)}
+          vendedorUid={uid}
+          vendedorNombre={v.nombre}
+          miUid={user?.uid}
+          miNombre={perfil?.nombre || user?.displayName}
+          miAvatar={perfil?.avatar || user?.photoURL}
+          resenaExistente={miResena}
+          onToast={mostrarToast}
+          onGuardado={handleResenaGuardada}
+        />
       </div>
-
-      {/* UBICACIÓN + MÉTODOS DE PAGO */}
-      <div className="relative z-10 -mt-5 flex gap-3 px-4">
-        <div className="flex flex-1 items-center gap-2 rounded-card bg-card px-4 py-3.5 shadow-soft">
-          <MapPin size={18} className="shrink-0 text-primary" />
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-extrabold leading-tight text-ink">
-              {v.ubicacion || "Piura"}
-            </p>
-            {/* 🏫 Multicampus: antes decía "UNP – Piura" fijo; ahora
-                muestra la sede real del vendedor. */}
-            <p className="text-[11px] font-semibold text-ink/50">
-              {(universidadVendedor?.id || "SEDE").toUpperCase()} – {v.ubicacion || "Piura"}
-            </p>
-          </div>
-        </div>
-
-        {(v.aceptaYape || v.aceptaPlin) && (
-          <div className="flex items-center justify-center gap-2.5 rounded-card bg-card px-4 py-3.5 shadow-soft">
-            {v.aceptaYape && <img src={YAPE_PLACEHOLDER} alt="Yape" className="h-8 w-8 rounded-full object-cover" />}
-            {v.aceptaYape && v.aceptaPlin && <span className="h-6 w-px bg-ink/10" />}
-            {v.aceptaPlin && <img src={PLIN_PLACEHOLDER} alt="Plin" className="h-8 w-8 rounded-full object-cover" />}
-          </div>
-        )}
-      </div>
-
-      {/* ACERCA DE */}
-      <div className="px-4 pb-4 pt-4">
-        <div className="rounded-card bg-card p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <MessageCircle size={16} className="text-primary" />
-            <span className="text-sm font-bold text-ink">Acerca de mí</span>
-          </div>
-          <p className="text-[13px] font-semibold leading-relaxed text-ink/70">
-            {v.acercaDe || "¡Hola! Bienvenido a mi tienda."}
-          </p>
-        </div>
-      </div>
-
-      {/* CONTACTO: CHAT INTERNO + WHATSAPP */}
-      <div className="flex flex-col gap-2.5 px-4 pb-5">
-        {user?.uid !== uid && (
-          <button
-            onClick={handleChatInterno}
-            disabled={iniciandoChat}
-            className="flex w-full items-center justify-center gap-2 rounded-btn bg-ink py-3.5 text-[15px] font-extrabold text-white disabled:opacity-70"
-          >
-            <MessageCircle size={20} />
-            {iniciandoChat ? "Abriendo chat..." : "Chat interno"}
-          </button>
-        )}
-
-        {/* El número real solo llega desde /usuarios/{uid}/privado/contacto,
-            jamás se imprime como texto: únicamente arma el enlace de WhatsApp. */}
-        {contactoPrivado?.telefono && (
-          <a
-            href={`https://wa.me/51${String(contactoPrivado.telefono).replace(/\s+/g, "")}?text=${encodeURIComponent(`Hola ${v.nombre || "vendedor"}, vi tu perfil en TuCampus y me gustaría hacerte una consulta.`)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex w-full items-center justify-center gap-2 rounded-btn bg-[#287653] py-3.5 text-[15px] font-extrabold text-white shadow-soft"
-          >
-            <MessageCircle size={20} />
-            Contactar por WhatsApp
-          </a>
-        )}
-      </div>
-
-      {/* SEGUIR / DEJAR DE SEGUIR */}
-      <div className="flex gap-2.5 px-4 pb-3">
-        {esSeguidor ? (
-          <button
-            onClick={handleToggleSeguir}
-            className="flex-1 rounded-btn border-2 border-ink/15 py-3 text-[14px] font-extrabold text-ink/60"
-          >
-            Siguiendo
-          </button>
-        ) : (
-          <button
-            onClick={handleToggleSeguir}
-            className="flex-1 rounded-btn bg-ink py-3.5 text-[14px] font-extrabold text-white"
-          >
-            Seguir Vendedor
-          </button>
-        )}
-
-        {/* Calificar / editar reseña — oculto si estás viendo tu propio perfil */}
-        {user?.uid !== uid && (
-          <button
-            onClick={handleAbrirModalResena}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-btn py-3 text-[14px] font-extrabold ${
-              miResena
-                ? "border-2 border-[#287653] bg-white text-[#287653]"
-                : "bg-[#287653] text-white"
-            }`}
-          >
-            <Star size={15} fill="currentColor" />
-            {miResena ? "Editar mi reseña" : "Calificar vendedor"}
-          </button>
-        )}
-      </div>
-
-      {/* OPINIONES */}
-      <div className="px-4 pb-5">
-        <div className="mb-3 flex items-center gap-2 border-b-2 border-[#287653]/25 pb-2.5">
-          <Star size={16} className="text-[#287653]" fill="#287653" />
-          <span className="text-[15px] font-extrabold text-[#287653]">
-            Opiniones {resenas.length > 0 ? `(${resenas.length})` : ""}
-          </span>
-        </div>
-        {cargandoResenas ? (
-          <Spinner mensaje="Cargando opiniones..." fullScreen={false} />
-        ) : resenas.length === 0 ? (
-          <p className="py-4 text-center text-[13px] font-bold text-ink/50">
-            Todavía no tiene reseñas. ¡Sé el primero en calificarlo!
-          </p>
-        ) : (
-          <div className="flex flex-col gap-2.5">
-            {resenas.map((r) => (
-              <TarjetaResena
-                key={r.id}
-                resena={r}
-                esMia={r.autorUid === user?.uid}
-                onEditar={handleAbrirModalResena}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* PUBLICACIONES */}
-      <div className="px-4 pb-5">
-        <div className="mb-3 flex items-center justify-between border-b-2 border-[#287653]/25 pb-2.5">
-          <div className="flex items-center gap-2">
-            <LayoutGrid size={16} className="text-[#287653]" />
-            <span className="text-[15px] font-extrabold text-[#287653]">Publicaciones Activas</span>
-          </div>
-        </div>
-        {productos.length === 0 ? (
-          <p className="py-5 text-center text-[13px] font-bold text-ink/50">
-            Este vendedor aún no tiene publicaciones.
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {productos.map((prod) => (
-              <ProductCard key={prod.id} producto={prod} onVerDetalle={handleVerDetalle} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <ToastContainer toasts={toasts} />
-
-      {/* MODAL DE RESEÑA */}
-      <ModalResena
-        abierto={modalResenaAbierto}
-        onCerrar={() => setModalResenaAbierto(false)}
-        vendedorUid={uid}
-        vendedorNombre={v.nombre}
-        miUid={user?.uid}
-        miNombre={perfil?.nombre || user?.displayName}
-        miAvatar={perfil?.avatar || user?.photoURL}
-        resenaExistente={miResena}
-        onToast={mostrarToast}
-        onGuardado={handleResenaGuardada}
-      />
     </div>
   );
 };

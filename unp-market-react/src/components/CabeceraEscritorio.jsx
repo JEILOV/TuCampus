@@ -106,7 +106,7 @@ const CabeceraEscritorioInterna = ({ location }) => {
     setSedeActiva,
     resetearSedeActiva,
     explorandoOtraSede,
-  } = useCampus() || {};
+  } = useCampus();
 
   const mensajesNoLeidos = useChatsNoLeidos(user?.uid);
   const { noLeidas: notifsNoLeidas } = useNotifications(user?.uid);
@@ -116,28 +116,51 @@ const CabeceraEscritorioInterna = ({ location }) => {
 
   const sedeContainerRef = useRef(null);
   const perfilContainerRef = useRef(null);
+  const headerRef = useRef(null);
+
+  // FASE 7C: publica el alto real de la cabecera como variable CSS
+  // (--alto-cabecera) para que la conversación de Chat calcule su alto
+  // sin doble scroll. Solo corre mientras la cabecera está montada
+  // (ancho >= 768 y fuera de /login). No toca Firestore.
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return undefined;
+    const raiz = document.documentElement;
+
+    const publicarAlto = () => {
+      raiz.style.setProperty(
+        "--alto-cabecera",
+        `${Math.round(header.getBoundingClientRect().height)}px`
+      );
+    };
+
+    publicarAlto();
+
+    let observador = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observador = new ResizeObserver(publicarAlto);
+      observador.observe(header);
+    }
+
+    return () => {
+      observador?.disconnect();
+      raiz.style.removeProperty("--alto-cabecera");
+    };
+  }, []);
 
   const filtrosUrl = leerFiltrosDeUrl(location.search);
   const enHome = location.pathname === "/";
 
-  const explorandoOtra =
-    explorandoOtraSede ??
-    Boolean(
-      perfil?.universidadId &&
-        sedeActiva &&
-        sedeActiva !== perfil.universidadId
-    );
+  // FASE 7A.1: CampusContext ya expone explorandoOtraSede y
+  // resetearSedeActiva; se usan directamente, sin respaldo local.
+  const explorandoOtra = explorandoOtraSede;
 
   // Duplica las 2 líneas de color de sede de Home.jsx sin refactorizar Home
   const esUnp = sedeActiva === "unp";
   const colorHeader = obtenerColorUniversidad(sedeActiva);
 
   const ejecutarResetSede = () => {
-    if (typeof resetearSedeActiva === "function") {
-      resetearSedeActiva();
-    } else if (perfil?.universidadId && typeof setSedeActiva === "function") {
-      setSedeActiva(perfil.universidadId);
-    }
+    resetearSedeActiva();
   };
 
   // Cerrar menús con clic fuera o tecla Escape
@@ -210,7 +233,7 @@ const CabeceraEscritorioInterna = ({ location }) => {
     "otra sede";
 
   return (
-    <header className="sticky top-0 z-50 w-full font-sans shadow-soft">
+    <header ref={headerRef} className="sticky top-0 z-50 w-full font-sans shadow-soft">
       {/* ── Fila A: Marca + Selector de Sede + Buscador + Acciones ── */}
       <div
         className={`w-full transition-colors duration-200${esUnp ? " bg-primary" : ""}`}
@@ -341,7 +364,8 @@ const CabeceraEscritorioInterna = ({ location }) => {
                   : "text-background/90 hover:bg-background/15"
               }`}
             >
-              <span className="relative flex items-center justify-center">
+              {/* lg:mr-1.5 separa el badge (absolute -right-1.5) del texto */}
+              <span className="relative flex items-center justify-center lg:mr-1.5">
                 <MessageCircle size={19} strokeWidth={2.2} />
                 <BadgeContador cantidad={mensajesNoLeidos} />
               </span>
@@ -363,7 +387,8 @@ const CabeceraEscritorioInterna = ({ location }) => {
                   : "text-background/90 hover:bg-background/15"
               }`}
             >
-              <span className="relative flex items-center justify-center">
+              {/* lg:mr-1.5 separa el badge (absolute -right-1.5) del texto */}
+              <span className="relative flex items-center justify-center lg:mr-1.5">
                 <Bell size={19} strokeWidth={2.2} />
                 <BadgeContador cantidad={notifsNoLeidas} />
               </span>
@@ -474,7 +499,8 @@ const CabeceraEscritorioInterna = ({ location }) => {
         </div>
       </div>
 
-      {/* ── Fila B: Categorías (solo en lg) ── */}
+      {/* ── Fila B: Categorías (solo en lg y solo en Inicio, FASE 7A.1) ── */}
+      {enHome && (
       <div className="hidden border-b border-ink/10 bg-card lg:block">
         <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto px-6">
           {CATEGORIAS.map(({ key, label }) => {
@@ -499,6 +525,7 @@ const CabeceraEscritorioInterna = ({ location }) => {
           })}
         </div>
       </div>
+      )}
 
       {/* ── Fila C: Banner fino si se está explorando otra sede ── */}
       {explorandoOtra && (

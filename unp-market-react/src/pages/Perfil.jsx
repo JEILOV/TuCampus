@@ -382,176 +382,284 @@ const Perfil = () => {
     : { background: `linear-gradient(to bottom, ${colorSede}, ${oscurecerColor(colorSede, 20)})` };
 
   return (
-    <div className="app-shell font-sans pb-6">
+    <div className="w-full bg-background md:min-h-screen">
+      <div className="app-shell font-sans pb-6 md:max-w-[1000px] md:overflow-visible md:bg-transparent md:px-5 md:pb-12 md:shadow-none lg:px-6">
 
-      {/* ════════════════════════════════════════════════════
-             CABECERA — Banner + Avatar + Nombre
-        ════════════════════════════════════════════════════ */}
-      <div
-        className="relative flex min-h-[300px] w-full flex-col items-center justify-center overflow-hidden rounded-b-[32px] px-6 pb-10 pt-14"
-        style={estiloBanner}
-      >
-        {/* Botón volver */}
-        <button
-          onClick={() => navigate(-1)}
-          aria-label="Volver"
-          className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
-        >
-          <ChevronLeft size={20} />
-        </button>
-
-        {/* Botón ⚙️ + Dropdown */}
-        <div ref={dropdownRef} className="absolute right-4 top-4 z-10">
+        {/* Barra superior con botón volver en tablet/escritorio (md+) */}
+        <div className="hidden items-center py-4 md:flex">
           <button
-            onClick={() => setDropdownOpen((v) => !v)}
-            aria-label="Configuración"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
+            type="button"
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 rounded-btn bg-card px-4 py-2 text-[13px] font-bold text-ink shadow-soft transition-colors hover:bg-background"
           >
-            <Settings size={18} />
+            <ChevronLeft size={18} strokeWidth={2.4} />
+            <span>Volver</span>
           </button>
-
-          {dropdownOpen && (
-            <div className="absolute right-0 top-[46px] z-[200] min-w-[190px] overflow-hidden rounded-btn border border-ink/5 bg-card shadow-softLg">
-              <button
-                onClick={abrirModal}
-                className="flex w-full items-center gap-2.5 border-b border-background px-4 py-3.5 text-left text-[14px] font-bold text-ink"
-              >
-                <Pencil size={16} />
-                Editar perfil
-              </button>
-              <button
-                onClick={handleSignOut}
-                className="flex w-full items-center gap-2.5 px-4 py-3.5 text-left text-[14px] font-bold text-red-500"
-              >
-                <LogOut size={16} />
-                Cerrar sesión
-              </button>
-            </div>
-          )}
         </div>
 
-        {/* Contenedor Central: Avatar + Textos */}
-        <div className="relative z-[5] flex flex-col items-center gap-2.5">
+        {/* Disposición: en móvil 1 columna normal, en lg 2 columnas (perfil lateral ~300px / publicaciones) */}
+        <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-8">
 
-          {/* Avatar circular con botón de edición */}
-          <div className="relative mb-1">
-            <div className="flex h-[100px] w-[100px] items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-primary-dark text-4xl font-bold text-white shadow-softLg">
-              {p.avatar?.trim() ? <img src={p.avatar} alt={p.nombre} decoding="async" className="h-full w-full object-cover" /> : (p.nombre || "U")[0].toUpperCase()}
+          {/* ════════════════════════════════════════════════════
+                 PERFIL EN ESCRITORIO (lg:)
+            ════════════════════════════════════════════════════ */}
+          <aside className="hidden lg:col-span-4 lg:sticky lg:top-24 lg:block lg:space-y-4">
+            <div className="overflow-hidden rounded-card bg-card shadow-soft">
+              {/* Mini banner */}
+              <div
+                className="relative flex h-24 w-full items-center justify-center"
+                style={estiloBanner}
+              >
+                <div className="absolute -bottom-10">
+                  <div className="relative">
+                    <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-primary-dark text-3xl font-bold text-white shadow-softLg">
+                      {p.avatar?.trim() ? <img src={p.avatar} alt={p.nombre} decoding="async" className="h-full w-full object-cover" /> : (p.nombre || "U")[0].toUpperCase()}
+                    </div>
+                    <button
+                      onClick={abrirModal}
+                      aria-label="Editar foto"
+                      className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white shadow-soft"
+                    >
+                      <Pencil size={11} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Datos del usuario */}
+              <div className="flex flex-col items-center px-5 pb-5 pt-12 text-center">
+                <h1 className="text-xl font-extrabold text-ink">
+                  {p.nombre || nombreEstudiantePorDefecto(p.universidadId)}
+                </h1>
+                <p className="mt-0.5 text-[12px] font-bold text-ink/60">
+                  {p.bio || bioEstudiantePorDefecto(p.universidadId)}
+                </p>
+
+                {/* Ubicación */}
+                <p className="mt-1 flex items-center gap-1 text-[12px] font-semibold text-ink/50">
+                  <MapPin size={13} className="text-primary" />
+                  <span>{p.ubicacion || "Piura"}</span>
+                </p>
+
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-chip border border-primary/20 bg-primary/5 px-3 py-1 text-[11px] font-bold text-primary">
+                  <CheckCircle2 size={13} />
+                  Estudiante verificado
+                </div>
+
+                {/* Métodos de pago */}
+                {(p.aceptaYape || p.aceptaPlin) && (
+                  <div className="mt-3 flex items-center justify-center gap-2 rounded-2xl border border-ink/5 bg-background px-3 py-2">
+                    {p.aceptaYape && <img src={YAPE_PLACEHOLDER} alt="Yape" className="h-6 w-6 rounded-full object-cover" />}
+                    {p.aceptaYape && p.aceptaPlin && <span className="h-4 w-px bg-ink/10" />}
+                    {p.aceptaPlin && <img src={PLIN_PLACEHOLDER} alt="Plin" className="h-6 w-6 rounded-full object-cover" />}
+                  </div>
+                )}
+
+                <hr className="my-4 w-full border-ink/10" />
+
+                {/* Botones de acción */}
+                <div className="flex w-full flex-col gap-2">
+                  <button
+                    onClick={abrirModal}
+                    className="flex w-full items-center justify-center gap-2 rounded-btn bg-primary py-2.5 text-[13.5px] font-extrabold text-white shadow-soft transition-transform hover:brightness-105 active:scale-95"
+                  >
+                    <Pencil size={15} />
+                    <span>Editar perfil</span>
+                  </button>
+                  <button
+                    onClick={handleSignOut}
+                    className="flex w-full items-center justify-center gap-2 rounded-btn border-[1.5px] border-ink/10 bg-background py-2.5 text-[13px] font-bold text-red-500 transition-colors hover:bg-red-50 hover:border-red-200"
+                  >
+                    <LogOut size={15} />
+                    <span>Cerrar sesión</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Lápiz naranja */}
-            <button
-              onClick={abrirModal}
-              aria-label="Editar foto"
-              className="absolute bottom-1 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white shadow-soft"
+            {/* Acerca de mí en lateral */}
+            <div className="rounded-card bg-card p-4 shadow-soft">
+              <div className="mb-2 flex items-center gap-2">
+                <MessageCircle size={15} className="text-primary" />
+                <span className="text-[13px] font-bold text-ink">Acerca de mí</span>
+              </div>
+              <p className="break-words text-[12.5px] font-semibold leading-relaxed text-ink/70">
+                {p.acercaDe || "¡Hola! Bienvenido a mi tienda en el campus."}
+              </p>
+            </div>
+
+            {/* Términos y privacidad en lateral */}
+            <div className="pt-1 text-center">
+              <Link to="/terminos" className="text-[12px] font-bold text-ink/40 underline">
+                Términos y Privacidad
+              </Link>
+            </div>
+          </aside>
+
+          {/* ════════════════════════════════════════════════════
+                 PERFIL EN MÓVIL Y TABLET (< lg:)
+            ════════════════════════════════════════════════════ */}
+          <div className="lg:hidden">
+            {/* CABECERA — Banner + Avatar + Nombre */}
+            <div
+              className="relative flex min-h-[300px] w-full flex-col items-center justify-center overflow-hidden rounded-b-[32px] px-6 pb-10 pt-14 md:rounded-card md:shadow-soft"
+              style={estiloBanner}
             >
-              <Pencil size={13} />
-            </button>
+              {/* Botón volver */}
+              <button
+                onClick={() => navigate(-1)}
+                aria-label="Volver"
+                className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur md:hidden"
+              >
+                <ChevronLeft size={20} />
+              </button>
+
+              {/* Botón ⚙️ + Dropdown */}
+              <div ref={dropdownRef} className="absolute right-4 top-4 z-10">
+                <button
+                  onClick={() => setDropdownOpen((v) => !v)}
+                  aria-label="Configuración"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
+                >
+                  <Settings size={18} />
+                </button>
+
+                {dropdownOpen && (
+                  <div className="absolute right-0 top-[46px] z-[200] min-w-[190px] overflow-hidden rounded-btn border border-ink/5 bg-card shadow-softLg">
+                    <button
+                      onClick={abrirModal}
+                      className="flex w-full items-center gap-2.5 border-b border-background px-4 py-3.5 text-left text-[14px] font-bold text-ink"
+                    >
+                      <Pencil size={16} />
+                      Editar perfil
+                    </button>
+                    <button
+                      onClick={handleSignOut}
+                      className="flex w-full items-center gap-2.5 px-4 py-3.5 text-left text-[14px] font-bold text-red-500"
+                    >
+                      <LogOut size={16} />
+                      Cerrar sesión
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Contenedor Central: Avatar + Textos */}
+              <div className="relative z-[5] flex flex-col items-center gap-2.5">
+                {/* Avatar circular con botón de edición */}
+                <div className="relative mb-1">
+                  <div className="flex h-[100px] w-[100px] items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-primary-dark text-4xl font-bold text-white shadow-softLg">
+                    {p.avatar?.trim() ? <img src={p.avatar} alt={p.nombre} decoding="async" className="h-full w-full object-cover" /> : (p.nombre || "U")[0].toUpperCase()}
+                  </div>
+                  <button
+                    onClick={abrirModal}
+                    aria-label="Editar foto"
+                    className="absolute bottom-1 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white shadow-soft"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                </div>
+
+                <h1 className="text-center text-2xl font-extrabold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.4)]">
+                  {p.nombre || nombreEstudiantePorDefecto(p.universidadId)}
+                </h1>
+                <p className="text-[13px] font-bold text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
+                  {p.bio || bioEstudiantePorDefecto(p.universidadId)}
+                </p>
+                <div className="mt-1 inline-flex items-center gap-1.5 rounded-chip border border-white/40 bg-white/20 px-4 py-1.5 text-[12px] font-bold text-white backdrop-blur">
+                  <CheckCircle2 size={14} />
+                  Estudiante verificado
+                </div>
+              </div>
+            </div>
+
+            {/* INFO: UBICACIÓN + MÉTODOS DE PAGO */}
+            <div className="relative z-10 -mt-5 flex gap-3 px-4 md:px-0">
+              <div className="flex flex-1 items-center justify-center gap-2 rounded-card bg-card px-4 py-3.5 shadow-soft">
+                <MapPin size={18} className="shrink-0 text-primary" />
+                <span className="truncate text-[13px] font-extrabold text-ink">
+                  {p.ubicacion || "Piura"}
+                </span>
+              </div>
+
+              <div className="flex flex-1 flex-wrap items-center justify-center gap-2.5 rounded-card bg-card px-4 py-3.5 shadow-soft">
+                {p.aceptaYape && <img src={YAPE_PLACEHOLDER} alt="Yape" className="h-7 w-7 rounded-full object-cover" />}
+                {p.aceptaPlin && <img src={PLIN_PLACEHOLDER} alt="Plin" className="h-7 w-7 rounded-full object-cover" />}
+                {!p.aceptaYape && !p.aceptaPlin && (
+                  <span className="text-[12.5px] font-extrabold text-ink/50">Sin métodos configurados</span>
+                )}
+              </div>
+            </div>
+
+            {/* ACERCA DE MÍ */}
+            <div className="px-4 pb-2 pt-4 md:px-0">
+              <div className="rounded-card bg-card p-4 shadow-soft">
+                <div className="mb-2 flex items-center gap-2">
+                  <MessageCircle size={16} className="text-primary" />
+                  <span className="text-sm font-bold text-ink">Acerca de mí</span>
+                </div>
+                <p className="break-words text-[13px] font-semibold leading-relaxed text-ink/70">
+                  {p.acercaDe || "¡Hola! Bienvenido a mi tienda en el campus."}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <h1 className="text-center text-2xl font-extrabold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.4)]">
-            {p.nombre || nombreEstudiantePorDefecto(p.universidadId)}
-          </h1>
-          <p className="text-[13px] font-bold text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
-            {p.bio || bioEstudiantePorDefecto(p.universidadId)}
-          </p>
-          <div className="mt-1 inline-flex items-center gap-1.5 rounded-chip border border-white/40 bg-white/20 px-4 py-1.5 text-[12px] font-bold text-white backdrop-blur">
-            <CheckCircle2 size={14} />
-            Estudiante verificado
+          {/* ════════════════════════════════════════════════════
+                 MIS PUBLICACIONES ACTIVAS (lg:col-span-8)
+            ════════════════════════════════════════════════════ */}
+          <div className="lg:col-span-8 lg:space-y-6">
+            <div className="px-4 pb-5 pt-4 md:px-0 md:pt-0">
+              <div className="mb-3 flex items-center justify-between border-b-2 border-[#287653]/25 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <LayoutGrid size={16} className="text-[#287653]" />
+                  <span className="text-[15px] font-extrabold text-[#287653]">
+                    Mis Publicaciones Activas
+                  </span>
+                </div>
+                {productos.length > 0 && (
+                  <button className="text-[12.5px] font-bold text-primary">Ver todas →</button>
+                )}
+              </div>
+
+              {productos.length === 0 ? (
+                <p className="py-5 text-center text-[13px] font-bold text-ink/50">
+                  Aún no tienes publicaciones.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-3">
+                  {productos.map((prod) => (
+                    <TarjetaPerfil
+                      key={prod.id}
+                      producto={prod}
+                      onAgotar={() => handleAgotar(prod)}
+                      onBorrar={() => handleBorrar(prod)}
+                      onEditar={() => handleEditar(prod)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* TÉRMINOS Y PRIVACIDAD EN MÓVIL/TABLET */}
+            <div className="px-4 pb-4 pt-1 text-center lg:hidden">
+              <Link to="/terminos" className="text-[12px] font-bold text-ink/40 underline">
+                Términos y Privacidad
+              </Link>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* ════════════════════════════════════════════════════
-             INFO: UBICACIÓN + MÉTODOS DE PAGO
-        ════════════════════════════════════════════════════ */}
-      <div className="relative z-10 -mt-5 flex gap-3 px-4">
-        <div className="flex flex-1 items-center justify-center gap-2 rounded-card bg-card px-4 py-3.5 shadow-soft">
-          <MapPin size={18} className="shrink-0 text-primary" />
-          <span className="truncate text-[13px] font-extrabold text-ink">
-            {p.ubicacion || "Piura"}
-          </span>
         </div>
 
-        <div className="flex flex-1 flex-wrap items-center justify-center gap-2.5 rounded-card bg-card px-4 py-3.5 shadow-soft">
-          {/* 🔒 Nunca se imprime el número: solo los logos de qué métodos
-              de contacto/pago acepta este usuario. */}
-          {p.aceptaYape && <img src={YAPE_PLACEHOLDER} alt="Yape" className="h-7 w-7 rounded-full object-cover" />}
-          {p.aceptaPlin && <img src={PLIN_PLACEHOLDER} alt="Plin" className="h-7 w-7 rounded-full object-cover" />}
-          {!p.aceptaYape && !p.aceptaPlin && (
-            <span className="text-[12.5px] font-extrabold text-ink/50">Sin métodos configurados</span>
-          )}
-        </div>
-      </div>
-
-      {/* ════════════════════════════════════════════════════
-             ACERCA DE MÍ
-        ════════════════════════════════════════════════════ */}
-      <div className="px-4 pb-2 pt-4">
-        <div className="rounded-card bg-card p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <MessageCircle size={16} className="text-primary" />
-            <span className="text-sm font-bold text-ink">Acerca de mí</span>
-          </div>
-          <p className="break-words text-[13px] font-semibold leading-relaxed text-ink/70">
-            {p.acercaDe || "¡Hola! Bienvenido a mi tienda en el campus."}
-          </p>
-        </div>
-      </div>
-
-      {/* ════════════════════════════════════════════════════
-             MIS PUBLICACIONES ACTIVAS
-        ════════════════════════════════════════════════════ */}
-      <div className="px-4 pb-5 pt-4">
-        <div className="mb-3 flex items-center justify-between border-b-2 border-[#287653]/25 pb-2.5">
-          <div className="flex items-center gap-2">
-            <LayoutGrid size={16} className="text-[#287653]" />
-            <span className="text-[15px] font-extrabold text-[#287653]">
-              Mis Publicaciones Activas
-            </span>
-          </div>
-          {productos.length > 0 && (
-            <button className="text-[12.5px] font-bold text-primary">Ver todas →</button>
-          )}
-        </div>
-
-        {productos.length === 0 ? (
-          <p className="py-5 text-center text-[13px] font-bold text-ink/50">
-            Aún no tienes publicaciones.
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {productos.map((prod) => (
-              <TarjetaPerfil
-                key={prod.id}
-                producto={prod}
-                onAgotar={() => handleAgotar(prod)}
-                onBorrar={() => handleBorrar(prod)}
-                onEditar={() => handleEditar(prod)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ════════════════════════════════════════════════════
-             TÉRMINOS Y PRIVACIDAD
-        ════════════════════════════════════════════════════ */}
-      <div className="px-4 pb-4 pt-1 text-center">
-        <Link to="/terminos" className="text-[12px] font-bold text-ink/40 underline">
-          Términos y Privacidad
-        </Link>
-      </div>
-
-      {/* ════════════════════════════════════════════════════
-             MODAL: EDITAR PERFIL
-        ════════════════════════════════════════════════════ */}
-      {modalOpen && (
-        <div
-          onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}
-          className="fixed inset-0 z-[500] flex items-end bg-ink/50 backdrop-blur-sm"
-        >
-          <div className="mx-auto box-border max-h-[90vh] w-full max-w-[480px] overflow-y-auto rounded-t-[28px] bg-card px-5 pb-8 pt-6">
+        {/* ════════════════════════════════════════════════════
+               MODAL: EDITAR PERFIL (Centrado en md+)
+          ════════════════════════════════════════════════════ */}
+        {modalOpen && (
+          <div
+            onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}
+            className="fixed inset-0 z-[500] flex items-end bg-ink/50 backdrop-blur-sm md:items-center md:justify-center md:p-4"
+          >
+            <div className="mx-auto box-border max-h-[90vh] w-full max-w-[480px] overflow-y-auto rounded-t-[28px] bg-card px-5 pb-8 pt-6 md:max-w-[560px] md:rounded-card md:p-7 md:shadow-softLg">
             <div className="mb-5 flex items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <User size={20} />
@@ -783,6 +891,7 @@ const Perfil = () => {
 
       <ToastContainer toasts={toasts} />
 
+      </div>
     </div>
   );
 };
