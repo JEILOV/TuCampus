@@ -1,8 +1,8 @@
 import {
-  doc, getDoc, setDoc,
+  doc, getDoc, setDoc, deleteDoc,
   collection, query, where, getDocs,
   updateDoc, arrayUnion, arrayRemove,
-  writeBatch, deleteField,
+  writeBatch, deleteField, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { traducirError, logError } from "../utils/errorHandler";
@@ -166,7 +166,15 @@ export const dejarDeSeguirVendedor = async (vendedorUid, miUid) => {
 export const obtenerOCrearPerfilUsuario = async (user) => {
   try {
     const userRef = doc(db, "usuarios", user.uid);
-    const snap    = await getDoc(userRef);
+    const privRef = doc(db, "usuariosPrivado", user.uid);
+
+    const [snap, privSnap] = await Promise.all([
+      getDoc(userRef),
+      getDoc(privRef).catch((errPriv) => {
+        logError("[userService.obtenerOCrearPerfilUsuario.leerPrivado]", errPriv);
+        return null;
+      }),
+    ]);
 
     // 🏫 Multicampus: se detecta la universidad por el dominio del correo
     // institucional. Si por algún motivo no matchea ninguna sede conocida
@@ -180,7 +188,6 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
       // depende de la sede detectada ("Estudiante UTP", "Estudiante UCV"...)
       // en vez de asumir siempre UNP.
       nombre:    user.displayName || nombreEstudiantePorDefecto(universidad?.id),
-      email:     user.email,
       avatar:    user.photoURL || "",
       ubicacion: "Piura",
       bio:       bioEstudiantePorDefecto(universidad?.id),
@@ -199,13 +206,73 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
 
     if (!snap.exists()) {
       await setDoc(userRef, perfilBase);
-      return { perfil: perfilBase, favoritosGuardados: [] };
+      try {
+        await setDoc(privRef, {
+          uid: user.uid,
+          email: user.email,
+          universidadId: universidad?.id || null,
+          favoritos: [],
+          fcmToken: [],
+        });
+      } catch (errPriv) {
+        logError("[userService.obtenerOCrearPerfilUsuario.crearPrivado]", errPriv);
+      }
+      return { perfil: perfilBase, favoritosGuardados: [], bloqueadosLegados: [] };
     }
 
-    const datosGuardados = snap.data();
+    const datosGuardados = snap.data() || {};
+    const bloqueadosLegados = Array.isArray(datosGuardados.bloqueados)
+      ? datosGuardados.bloqueados.filter((u) => typeof u === "string" && u.trim())
+      : [];
+
+    const existePrivado = Boolean(
+      privSnap && typeof privSnap.exists === "function" && privSnap.exists()
+    );
+    const datosPrivados = existePrivado ? privSnap.data() || {} : null;
+
+    if (!existePrivado) {
+      const favsLegados = Array.isArray(datosGuardados.favoritos)
+        ? datosGuardados.favoritos
+            .filter((f) => typeof f === "string" && f.trim())
+            .slice(0, 500)
+        : [];
+      const tokensLegados = Array.isArray(datosGuardados.fcmToken)
+        ? datosGuardados.fcmToken
+            .filter((t) => typeof t === "string" && t.trim())
+            .slice(-20)
+        : [];
+      try {
+        await setDoc(privRef, {
+          uid: user.uid,
+          email: user.email || datosGuardados.email || "",
+          universidadId: datosGuardados.universidadId || universidad?.id || null,
+          favoritos: favsLegados,
+          fcmToken: tokensLegados,
+        });
+      } catch (errPriv) {
+        logError(
+          "[userService.obtenerOCrearPerfilUsuario.autorrepararPrivado]",
+          errPriv
+        );
+      }
+    }
+
+    const favoritosGuardados = Array.isArray(datosPrivados?.favoritos)
+      ? datosPrivados.favoritos
+      : Array.isArray(datosGuardados.favoritos)
+        ? datosGuardados.favoritos
+        : [];
+
+    const perfilLimpio = { ...perfilBase, ...datosGuardados };
+    delete perfilLimpio.email;
+    delete perfilLimpio.favoritos;
+    delete perfilLimpio.bloqueados;
+    delete perfilLimpio.fcmToken;
+
     return {
-      perfil:             { ...perfilBase, ...datosGuardados },
-      favoritosGuardados: datosGuardados.favoritos || [],
+      perfil: perfilLimpio,
+      favoritosGuardados,
+      bloqueadosLegados,
     };
   } catch (err) {
     logError("[userService.obtenerOCrearPerfilUsuario]", err);
@@ -214,54 +281,150 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
 };
 
 /**
- * Persiste el array de favoritos del usuario en su documento de Firestore.
+ * Persiste el array de favoritos del usuario en /usuariosPrivado/{uid} (máximo 500).
+ * Tolera fallos para no interrumpir la sesión si las reglas aún no se publicaron.
  * @param {string} uid
  * @param {string[]} favoritos
  */
 export const sincronizarFavoritos = async (uid, favoritos) => {
-  await setDoc(doc(db, "usuarios", uid), { favoritos }, { merge: true });
+  if (!uid) return;
+  const listaRecortada = Array.isArray(favoritos) ? favoritos.slice(0, 500) : [];
+  try {
+    await setDoc(
+      doc(db, "usuariosPrivado", uid),
+      { favoritos: listaRecortada },
+      { merge: true }
+    );
+  } catch (err) {
+    logError("[userService.sincronizarFavoritos]", err);
+  }
 };
 
 // ════════════════════════════════════════════════════════════
-//  FASE 6 · Chat Avanzado — Bloqueo de usuarios
-//
-//  `bloqueados` vive en el doc PÚBLICO /usuarios/{uid} (a propósito:
-//  así cualquiera puede leer si "me bloqueó" con una sola lectura de
-//  perfil, sin necesitar una subcolección privada ni una regla nueva).
-//  No expone nada sensible — es solo una lista de UIDs.
+//  FASE 6A · Bloqueo de usuarios en /bloqueos/{miUid}_{otroUid}
 // ════════════════════════════════════════════════════════════
 
 /**
- * Agrega `otroUid` a mi lista de bloqueados. Atómico (arrayUnion):
- * llamarlo dos veces no duplica la entrada.
+ * Crea el documento de bloqueo /bloqueos/{miUid}_{otroUid}.
  * @param {string} miUid
  * @param {string} otroUid
  */
 export const bloquearUsuario = async (miUid, otroUid) => {
   if (!miUid || !otroUid || miUid === otroUid) return;
   try {
-    await updateDoc(doc(db, "usuarios", miUid), {
-      bloqueados: arrayUnion(otroUid),
+    await setDoc(doc(db, "bloqueos", `${miUid}_${otroUid}`), {
+      bloqueadorUid: miUid,
+      bloqueadoUid: otroUid,
+      creadoEn: serverTimestamp(),
     });
   } catch (err) {
     logError("[userService.bloquearUsuario]", err);
     throw new Error(traducirError(err, "firestore"));
   }
+
+  // LEGACY: eliminar en Fase 6B
+  try {
+    await updateDoc(doc(db, "usuarios", miUid), {
+      bloqueados: arrayUnion(otroUid),
+    });
+  } catch (errLegado) {
+    logError("[userService.bloquearUsuario.legado]", errLegado);
+  }
 };
 
 /**
- * Quita a `otroUid` de mi lista de bloqueados.
+ * Elimina el documento de bloqueo /bloqueos/{miUid}_{otroUid}.
  * @param {string} miUid
  * @param {string} otroUid
  */
 export const desbloquearUsuario = async (miUid, otroUid) => {
   if (!miUid || !otroUid) return;
   try {
-    await updateDoc(doc(db, "usuarios", miUid), {
-      bloqueados: arrayRemove(otroUid),
-    });
+    await deleteDoc(doc(db, "bloqueos", `${miUid}_${otroUid}`));
   } catch (err) {
     logError("[userService.desbloquearUsuario]", err);
     throw new Error(traducirError(err, "firestore"));
+  }
+
+  // LEGACY: eliminar en Fase 6B
+  try {
+    await updateDoc(doc(db, "usuarios", miUid), {
+      bloqueados: arrayRemove(otroUid),
+    });
+  } catch (errLegado) {
+    logError("[userService.desbloquearUsuario.legado]", errLegado);
+  }
+};
+
+/**
+ * Devuelve la lista de UIDs bloqueados por `miUid` desde /bloqueos.
+ * En caso de error registra con logError y devuelve [].
+ * @param {string} miUid
+ * @returns {Promise<string[]>}
+ */
+export const obtenerMisBloqueos = async (miUid) => {
+  if (!miUid) return [];
+  try {
+    const q = query(
+      collection(db, "bloqueos"),
+      where("bloqueadorUid", "==", miUid)
+    );
+    const snap = await getDocs(q);
+    return snap.docs
+      .map((d) => d.data()?.bloqueadoUid)
+      .filter((u) => typeof u === "string" && u.trim().length > 0);
+  } catch (err) {
+    logError("[userService.obtenerMisBloqueos]", err);
+    return [];
+  }
+};
+
+/**
+ * Consulta si existe el bloqueo /bloqueos/{bloqueadorUid}_{bloqueadoUid}.
+ * En caso de error registra con logError y devuelve false.
+ * @param {string} bloqueadorUid
+ * @param {string} bloqueadoUid
+ * @returns {Promise<boolean>}
+ */
+export const existeBloqueo = async (bloqueadorUid, bloqueadoUid) => {
+  if (!bloqueadorUid || !bloqueadoUid) return false;
+  try {
+    const snap = await getDoc(
+      doc(db, "bloqueos", `${bloqueadorUid}_${bloqueadoUid}`)
+    );
+    return Boolean(snap.exists());
+  } catch (err) {
+    logError("[userService.existeBloqueo]", err);
+    return false;
+  }
+};
+
+/**
+ * Crea en /bloqueos los documentos que falten a partir del arreglo legado
+ * `bloqueados` del documento público, con try/catch por documento y sin bloquear.
+ * @param {string} miUid
+ * @param {string[]} bloqueadosLegados
+ */
+export const migrarBloqueosLegados = async (miUid, bloqueadosLegados = []) => {
+  if (!miUid || !Array.isArray(bloqueadosLegados) || bloqueadosLegados.length === 0) {
+    return;
+  }
+  const unicos = [
+    ...new Set(
+      bloqueadosLegados.filter(
+        (u) => typeof u === "string" && u.trim().length > 0 && u !== miUid
+      )
+    ),
+  ];
+  for (const otroUid of unicos) {
+    try {
+      await setDoc(doc(db, "bloqueos", `${miUid}_${otroUid}`), {
+        bloqueadorUid: miUid,
+        bloqueadoUid: otroUid,
+        creadoEn: serverTimestamp(),
+      });
+    } catch (err) {
+      logError("[userService.migrarBloqueosLegados]", err);
+    }
   }
 };

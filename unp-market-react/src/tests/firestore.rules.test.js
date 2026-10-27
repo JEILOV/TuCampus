@@ -1,15 +1,19 @@
 // src/tests/firestore.rules.test.js
 import { readFileSync } from "node:fs";
 import process from "node:process";
-import { describe, it, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import {
   initializeTestEnvironment,
   assertSucceeds,
   assertFails,
 } from "@firebase/rules-unit-testing";
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
+  query,
+  where,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -459,6 +463,240 @@ describe.runIf(EMULATOR_ACTIVO)("Firestore Security Rules — Fase 1", () => {
           sumaEstrellas: 4.5,
         })
       );
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────
+  //  8. FASE 6A: /usuariosPrivado/{userId}
+  // ──────────────────────────────────────────────────────────
+  describe("FASE 6A: /usuariosPrivado/{userId}", () => {
+    it("el dueño verificado crea y lee su doc; otro usuario y sin sesión NO lo leen", async () => {
+      const dbDuenio = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      const dbOtro = ctxEstudiante("u2", "u2@alumnos.unp.edu.pe", true).firestore();
+      const dbAnon = testEnv.unauthenticatedContext().firestore();
+
+      await assertSucceeds(
+        setDoc(doc(dbDuenio, "usuariosPrivado", "u1"), {
+          uid: "u1",
+          email: "u1@alumnos.unp.edu.pe",
+          universidadId: "unp",
+          favoritos: ["p1", "p2"],
+          fcmToken: ["tk-1"],
+        })
+      );
+
+      await assertSucceeds(getDoc(doc(dbDuenio, "usuariosPrivado", "u1")));
+      await assertFails(getDoc(doc(dbOtro, "usuariosPrivado", "u1")));
+      await assertFails(getDoc(doc(dbAnon, "usuariosPrivado", "u1")));
+    });
+
+    it("una clave extra (por ejemplo 'rol') se DENIEGA", async () => {
+      const dbDuenio = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+
+      await assertFails(
+        setDoc(doc(dbDuenio, "usuariosPrivado", "u1"), {
+          uid: "u1",
+          email: "u1@alumnos.unp.edu.pe",
+          universidadId: "unp",
+          favoritos: [],
+          fcmToken: [],
+          rol: "admin",
+        })
+      );
+    });
+
+    it("email de otra persona se DENIEGA", async () => {
+      const dbDuenio = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+
+      await assertFails(
+        setDoc(doc(dbDuenio, "usuariosPrivado", "u1"), {
+          uid: "u1",
+          email: "otro@alumnos.unp.edu.pe",
+          universidadId: "unp",
+          favoritos: [],
+          fcmToken: [],
+        })
+      );
+    });
+
+    it("universidadId que no corresponde a su correo se DENIEGA", async () => {
+      const dbDuenio = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+
+      await assertFails(
+        setDoc(doc(dbDuenio, "usuariosPrivado", "u1"), {
+          uid: "u1",
+          email: "u1@alumnos.unp.edu.pe",
+          universidadId: "ucv",
+          favoritos: [],
+          fcmToken: [],
+        })
+      );
+    });
+
+    it("fcmToken con 21 elementos y favoritos con 501 elementos se DENIEGAN", async () => {
+      const dbDuenio = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+
+      const tokens21 = Array.from({ length: 21 }, (_, i) => `tk-${i}`);
+      await assertFails(
+        setDoc(doc(dbDuenio, "usuariosPrivado", "u1"), {
+          uid: "u1",
+          email: "u1@alumnos.unp.edu.pe",
+          universidadId: "unp",
+          favoritos: [],
+          fcmToken: tokens21,
+        })
+      );
+
+      const favs501 = Array.from({ length: 501 }, (_, i) => `prod-${i}`);
+      await assertFails(
+        setDoc(doc(dbDuenio, "usuariosPrivado", "u1"), {
+          uid: "u1",
+          email: "u1@alumnos.unp.edu.pe",
+          universidadId: "unp",
+          favoritos: favs501,
+          fcmToken: [],
+        })
+      );
+    });
+
+    it("cuenta sin verificar se DENIEGA al crear y leer usuariosPrivado", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuariosPrivado", "noVerif"), {
+          uid: "noVerif",
+          email: "noVerif@alumnos.unp.edu.pe",
+          universidadId: "unp",
+          favoritos: [],
+          fcmToken: [],
+        });
+      });
+
+      const dbNoVerif = ctxEstudiante("noVerif", "noVerif@alumnos.unp.edu.pe", false).firestore();
+
+      await assertFails(getDoc(doc(dbNoVerif, "usuariosPrivado", "noVerif")));
+      await assertFails(
+        setDoc(doc(dbNoVerif, "usuariosPrivado", "noVerif"), {
+          uid: "noVerif",
+          email: "noVerif@alumnos.unp.edu.pe",
+          universidadId: "unp",
+          favoritos: ["p1"],
+          fcmToken: [],
+        })
+      );
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────
+  //  9. FASE 6A: /bloqueos/{bloqueoId}
+  // ──────────────────────────────────────────────────────────
+  describe("FASE 6A: /bloqueos/{bloqueoId}", () => {
+    it("A crea A_B con serverTimestamp → PERMITIDO; B NO puede crear A_B; A no puede bloquearse a sí mismo; ID inválido se DENIEGA", async () => {
+      const dbA = ctxEstudiante("A").firestore();
+      const dbB = ctxEstudiante("B").firestore();
+
+      await assertSucceeds(
+        setDoc(doc(dbA, "bloqueos", "A_B"), {
+          bloqueadorUid: "A",
+          bloqueadoUid: "B",
+          creadoEn: serverTimestamp(),
+        })
+      );
+
+      // B no puede crear A_B
+      await assertFails(
+        setDoc(doc(dbB, "bloqueos", "A_B"), {
+          bloqueadorUid: "A",
+          bloqueadoUid: "B",
+          creadoEn: serverTimestamp(),
+        })
+      );
+
+      // A no puede bloquearse a sí mismo
+      await assertFails(
+        setDoc(doc(dbA, "bloqueos", "A_A"), {
+          bloqueadorUid: "A",
+          bloqueadoUid: "A",
+          creadoEn: serverTimestamp(),
+        })
+      );
+
+      // ID que no coincide con {auth.uid}_{bloqueadoUid} se DENIEGA
+      await assertFails(
+        setDoc(doc(dbA, "bloqueos", "id_arbitrario"), {
+          bloqueadorUid: "A",
+          bloqueadoUid: "B",
+          creadoEn: serverTimestamp(),
+        })
+      );
+    });
+
+    it("A y B pueden hacer get de A_B (exista o no); un tercero NO puede", async () => {
+      const dbA = ctxEstudiante("A").firestore();
+      const dbB = ctxEstudiante("B").firestore();
+      const dbTercero = ctxEstudiante("C").firestore();
+
+      // Doc inexistente A_B: A y B pueden hacer get y reciben exists() === false
+      const snapInexistenteA = await assertSucceeds(getDoc(doc(dbA, "bloqueos", "A_B")));
+      expect(snapInexistenteA.exists()).toBe(false);
+      const snapInexistenteB = await assertSucceeds(getDoc(doc(dbB, "bloqueos", "A_B")));
+      expect(snapInexistenteB.exists()).toBe(false);
+      await assertFails(getDoc(doc(dbTercero, "bloqueos", "A_B")));
+
+      // Sembrar A_B
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "bloqueos", "A_B"), {
+          bloqueadorUid: "A",
+          bloqueadoUid: "B",
+          creadoEn: new Date(),
+        });
+      });
+
+      const snapExistenteA = await assertSucceeds(getDoc(doc(dbA, "bloqueos", "A_B")));
+      expect(snapExistenteA.exists()).toBe(true);
+      const snapExistenteB = await assertSucceeds(getDoc(doc(dbB, "bloqueos", "A_B")));
+      expect(snapExistenteB.exists()).toBe(true);
+      await assertFails(getDoc(doc(dbTercero, "bloqueos", "A_B")));
+    });
+
+    it("A lista sus bloqueos (where bloqueadorUid == A) y NO puede listar los de otro; nadie actualiza; solo A borra A_B", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "bloqueos", "A_B"), {
+          bloqueadorUid: "A",
+          bloqueadoUid: "B",
+          creadoEn: new Date(),
+        });
+        await setDoc(doc(ctx.firestore(), "bloqueos", "B_C"), {
+          bloqueadorUid: "B",
+          bloqueadoUid: "C",
+          creadoEn: new Date(),
+        });
+      });
+
+      const dbA = ctxEstudiante("A").firestore();
+      const dbB = ctxEstudiante("B").firestore();
+
+      // A lista sus propios bloqueos
+      const qPropios = query(
+        collection(dbA, "bloqueos"),
+        where("bloqueadorUid", "==", "A")
+      );
+      const snapPropios = await assertSucceeds(getDocs(qPropios));
+      expect(snapPropios.docs.map((d) => d.id)).toEqual(["A_B"]);
+
+      // A NO puede listar los bloqueos de B
+      const qAjenos = query(
+        collection(dbA, "bloqueos"),
+        where("bloqueadorUid", "==", "B")
+      );
+      await assertFails(getDocs(qAjenos));
+
+      // Nadie puede actualizar A_B
+      await assertFails(
+        updateDoc(doc(dbA, "bloqueos", "A_B"), { bloqueadoUid: "C" })
+      );
+
+      // B NO puede borrar A_B; solo A puede borrar A_B
+      await assertFails(deleteDoc(doc(dbB, "bloqueos", "A_B")));
+      await assertSucceeds(deleteDoc(doc(dbA, "bloqueos", "A_B")));
     });
   });
 });

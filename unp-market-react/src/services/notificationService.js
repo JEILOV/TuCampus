@@ -1,9 +1,10 @@
 // src/services/notificationService.js
-import { addDoc, arrayUnion, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, arrayUnion, collection, doc, serverTimestamp, setDoc }    from "firebase/firestore";
 import { getMessaging, getToken, isSupported, onMessage }                  from "firebase/messaging";
-import { app, db }                                                         from "./firebase";
+import { app, auth, db }                                                   from "./firebase";
 import { logError }                                                        from "../utils/errorHandler";
 import { solicitarPush }                                                   from "./pushService";
+import { detectarUniversidad }                                             from "../config/universidades";
 
 /**
  * Crea una notificación para otro usuario en Firestore.
@@ -102,14 +103,15 @@ const obtenerMessaging = () => {
  *   al token para poder segmentar envíos por campus desde el backend.
  * @returns {Promise<string|null>}
  */
-export const solicitarPermisoNotificaciones = async (usuarioId, universidadId) => {
+export const solicitarPermisoNotificaciones = async (usuarioId, universidadId, email) => {
   if (!usuarioId) return null;
 
   if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
     return null; // navegador sin soporte de notificaciones/service workers
   }
 
-  if (!VAPID_KEY) {
+  const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || VAPID_KEY;
+  if (!vapidKey) {
     logError(
       "[notificationService.solicitarPermisoNotificaciones]",
       new Error("Falta VITE_FIREBASE_VAPID_KEY — configúrala en tu .env con la VAPID key de Firebase Console → Cloud Messaging.")
@@ -127,15 +129,24 @@ export const solicitarPermisoNotificaciones = async (usuarioId, universidadId) =
     const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
 
     const token = await getToken(messaging, {
-      vapidKey: VAPID_KEY,
+      vapidKey,
       serviceWorkerRegistration: registration,
     });
     if (!token) return null;
 
-    await updateDoc(doc(db, "usuarios", usuarioId), {
-      fcmToken: arrayUnion(token),
-      ...(universidadId ? { universidadId } : {}),
-    });
+    const correoFallback = email || auth?.currentUser?.email || "";
+    const sedeResuelta =
+      universidadId || detectarUniversidad(correoFallback)?.id || null;
+
+    await setDoc(
+      doc(db, "usuariosPrivado", usuarioId),
+      {
+        uid: usuarioId,
+        ...(sedeResuelta ? { universidadId: sedeResuelta } : {}),
+        fcmToken: arrayUnion(token),
+      },
+      { merge: true }
+    );
 
     return token;
   } catch (err) {

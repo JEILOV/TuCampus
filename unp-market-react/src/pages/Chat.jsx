@@ -36,6 +36,7 @@ import {
   obtenerPerfilVendedor,
   bloquearUsuario,
   desbloquearUsuario,
+  existeBloqueo,
 }                                       from "../services/userService";
 import { notificarNuevoMensaje }       from "../services/notificationService";
 import { comprimirImagen, subirImagenImgBB } from "../utils/imageUtils";
@@ -552,7 +553,7 @@ const Chat = () => {
   const navigate        = useNavigate();
   const [searchParams]  = useSearchParams();
   const chatId          = searchParams.get("id");
-  const { user, perfil, actualizarPerfil, cargando: cargandoAuth } = useAuth();
+  const { user, bloqueados, actualizarBloqueados, cargando: cargandoAuth } = useAuth();
 
   const [toasts, setToasts] = useState([]);
   const mostrarToast        = useToast(setToasts);
@@ -597,8 +598,10 @@ const Chat = () => {
   const [perfilOtroVivo, setPerfilOtroVivo] = useState(null); // nombre/avatar EN VIVO de /usuarios/{otroUid}
 
   // ── Fase 6: Chat Avanzado ─────────────────────────────────
-  const [menuAbierto, setMenuAbierto]       = useState(false);
-  const [otroBloqueados, setOtroBloqueados] = useState([]); // bloqueados[] del OTRO usuario (¿me bloqueó?)
+  const [menuAbierto, setMenuAbierto]         = useState(false);
+  const [meBloqueoPorDoc, setMeBloqueoPorDoc] = useState(false);
+  // LEGACY: eliminar en Fase 6B
+  const [otroBloqueados, setOtroBloqueados]   = useState([]); // bloqueados[] del OTRO usuario (¿me bloqueó?)
   const [subiendoImagen, setSubiendoImagen] = useState(false);
   const [progresoImagen, setProgresoImagen] = useState(0);
   const fileInputRef = useRef(null);
@@ -706,12 +709,20 @@ const Chat = () => {
     }
   }, [chatId, cargandoAntiguos, hayMasAntiguos, mensajesAntiguos, mensajes, mostrarToast]);
 
-  // Fase 6: ¿el otro usuario me bloqueó? — se consulta su perfil PÚBLICO
-  // (bloqueados vive en /usuarios/{uid}, no en una subcolección privada).
+  // Fase 6A: ¿el otro usuario me bloqueó? — lectura puntual en /bloqueos/{otro}_{yo}
+  // más respaldo temporal del arreglo legado `bloqueados` en /usuarios/{otro}.
   useEffect(() => {
     const otro = chatMeta?.participantes?.find((u) => u !== user?.uid);
-    if (!otro) { setOtroBloqueados([]); return; }
+    if (!otro || !user?.uid) {
+      setMeBloqueoPorDoc(false);
+      setOtroBloqueados([]);
+      return;
+    }
     let cancelado = false;
+    existeBloqueo(otro, user.uid)
+      .then((existe) => { if (!cancelado) setMeBloqueoPorDoc(Boolean(existe)); })
+      .catch(() => { if (!cancelado) setMeBloqueoPorDoc(false); });
+    // LEGACY: eliminar en Fase 6B
     obtenerPerfilVendedor(otro)
       .then((p) => { if (!cancelado) setOtroBloqueados(p?.bloqueados || []); })
       .catch(() => { if (!cancelado) setOtroBloqueados([]); });
@@ -775,8 +786,9 @@ const Chat = () => {
   const chatValidoParaMi = !!chatMeta && chatMeta.participantes?.includes(user?.uid);
 
   // Fase 6: bloqueado en cualquiera de los dos sentidos → no se puede escribir
-  const yoLoBloquee          = (perfil?.bloqueados || []).includes(otroUid);
-  const elMeBloqueo          = otroBloqueados.includes(user?.uid);
+  const yoLoBloquee           = Boolean(otroUid && bloqueados?.has(otroUid));
+  // LEGACY: eliminar en Fase 6B
+  const elMeBloqueo           = meBloqueoPorDoc || otroBloqueados.includes(user?.uid);
   const conversacionBloqueada = yoLoBloquee || elMeBloqueo;
 
   // Fase 8 · Contexto dinámico: producto activo de esta conversación,
@@ -918,7 +930,11 @@ const Chat = () => {
     if (!user?.uid || !otroUid) return;
     try {
       await bloquearUsuario(user.uid, otroUid);
-      actualizarPerfil({ bloqueados: [...(perfil?.bloqueados || []), otroUid] });
+      actualizarBloqueados((prev) => {
+        const siguiente = new Set(prev);
+        siguiente.add(otroUid);
+        return siguiente;
+      });
       mostrarToast("Usuario bloqueado. Ya no podrá escribirte.");
     } catch (err) {
       mostrarToast(err.message || "No se pudo bloquear al usuario", "error");
@@ -929,7 +945,11 @@ const Chat = () => {
     if (!user?.uid || !otroUid) return;
     try {
       await desbloquearUsuario(user.uid, otroUid);
-      actualizarPerfil({ bloqueados: (perfil?.bloqueados || []).filter((u) => u !== otroUid) });
+      actualizarBloqueados((prev) => {
+        const siguiente = new Set(prev);
+        siguiente.delete(otroUid);
+        return siguiente;
+      });
       mostrarToast("Usuario desbloqueado.");
     } catch (err) {
       mostrarToast(err.message || "No se pudo desbloquear al usuario", "error");

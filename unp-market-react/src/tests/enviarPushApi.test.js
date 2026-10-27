@@ -50,38 +50,43 @@ const {
     collection: (subcol) => crearCollectionRef(`${path}/${subcol}`),
   });
 
-  const crearCollectionRef = (colPath) => ({
-    doc: (id) => crearDocRef(`${colPath}/${id}`),
-    where: (field, op, val) => ({
-      limit: (max) => ({
-        get: vi.fn(async () => {
-          estadoFirestore.whereCalls.push({
-            collection: colPath,
-            field,
-            op,
-            val,
-            limit: max,
+  const crearCollectionRef = (colPath) => {
+    const ejecutarQuery = async (field, op, val, max = null) => {
+      estadoFirestore.whereCalls.push({
+        collection: colPath,
+        field,
+        op,
+        val,
+        ...(max !== null ? { limit: max } : {}),
+      });
+      const resultados = [];
+      for (const [k, v] of estadoFirestore.docs.entries()) {
+        const partes = k.split("/");
+        if (
+          partes.length === 2 &&
+          partes[0] === colPath &&
+          v?.[field] === val
+        ) {
+          resultados.push({
+            id: partes[1],
+            exists: true,
+            data: () => v,
           });
-          const resultados = [];
-          for (const [k, v] of estadoFirestore.docs.entries()) {
-            const partes = k.split("/");
-            if (
-              partes.length === 2 &&
-              partes[0] === colPath &&
-              v?.[field] === val
-            ) {
-              resultados.push({
-                id: partes[1],
-                exists: true,
-                data: () => v,
-              });
-            }
-          }
-          return { docs: resultados.slice(0, max) };
+        }
+      }
+      return { docs: max !== null ? resultados.slice(0, max) : resultados };
+    };
+
+    return {
+      doc: (id) => crearDocRef(`${colPath}/${id}`),
+      where: (field, op, val) => ({
+        get: vi.fn(() => ejecutarQuery(field, op, val, null)),
+        limit: (max) => ({
+          get: vi.fn(() => ejecutarQuery(field, op, val, max)),
         }),
       }),
-    }),
-  });
+    };
+  };
 
   const mockFirestoreFn = Object.assign(
     () => ({
@@ -175,12 +180,15 @@ describe("api/enviar-push.js (TAREA 3)", () => {
       universidadId: "unp",
     });
 
-    // Perfil de un destinatario con token
+    // Perfil de un destinatario con token en usuariosPrivado (FASE 6A)
     estadoFirestore.docs.set("usuarios/uid-destinatario", {
       nombre: "Ana Destinataria",
-      fcmToken: ["token-ana-1"],
-      bloqueados: [],
       universidadId: "unp",
+    });
+    estadoFirestore.docs.set("usuariosPrivado/uid-destinatario", {
+      uid: "uid-destinatario",
+      universidadId: "unp",
+      fcmToken: ["token-ana-1"],
     });
 
     // Respuesta FCM por defecto: éxito
@@ -357,10 +365,99 @@ describe("api/enviar-push.js (TAREA 3)", () => {
     expect(mockSendEachForMulticast).not.toHaveBeenCalled();
   });
 
-  it("destinatario que bloqueó al remitente → no envía a ese usuario (200 con omitido: true)", async () => {
+  it("respaldo legado: cuando el destinatario NO tiene doc en usuariosPrivado, lee fcmToken de /usuarios/{dest} y limpia ahí si resulta inválido", async () => {
+    estadoFirestore.docs.delete("usuariosPrivado/uid-destinatario");
+    estadoFirestore.docs.set("usuarios/uid-destinatario", {
+      nombre: "Ana Legada",
+      fcmToken: ["token-legado-ok", "token-legado-vencido"],
+      bloqueados: [],
+    });
+    estadoFirestore.docs.set("chats/chat-1", {
+      participantes: ["uid-remitente", "uid-destinatario"],
+    });
+    estadoFirestore.docs.set("chats/chat-1/mensajes/msg-legado", {
+      deUid: "uid-remitente",
+      texto: "Hola con token legado",
+      tipo: "texto",
+      fecha: { toMillis: () => Date.now() - 1000 },
+    });
+
+    mockSendEachForMulticast.mockResolvedValueOnce({
+      successCount: 1,
+      failureCount: 1,
+      responses: [
+        { success: true },
+        {
+          success: false,
+          error: { code: "messaging/invalid-registration-token" },
+        },
+      ],
+    });
+
+    const res = crearRes();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer token-ok" },
+        body: { tipo: "mensaje", chatId: "chat-1", mensajeId: "msg-legado" },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(1);
+    expect(mockSendEachForMulticast.mock.calls[0][0].tokens).toEqual([
+      "token-legado-ok",
+      "token-legado-vencido",
+    ]);
+
+    // La limpieza se hace en usuarios/uid-destinatario porque el token vino del doc legado
+    expect(estadoFirestore.updates).toEqual([
+      {
+        path: "usuarios/uid-destinatario",
+        data: {
+          fcmToken: {
+            _type: "arrayRemove",
+            items: ["token-legado-vencido"],
+          },
+        },
+      },
+    ]);
+  });
+
+  it("bloqueo vía /bloqueos/{dest}_{uid} → no envía a ese usuario (200 con omitido: true)", async () => {
+    estadoFirestore.docs.set("bloqueos/uid-destinatario_uid-remitente", {
+      bloqueadorUid: "uid-destinatario",
+      bloqueadoUid: "uid-remitente",
+    });
+    estadoFirestore.docs.set("chats/chat-1", {
+      participantes: ["uid-remitente", "uid-destinatario"],
+    });
+    estadoFirestore.docs.set("chats/chat-1/mensajes/msg-bloq-nuevo", {
+      deUid: "uid-remitente",
+      texto: "Hola bloqueado",
+      tipo: "texto",
+      fecha: { toMillis: () => Date.now() - 1000 },
+    });
+
+    const res = crearRes();
+    await handler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer token-ok" },
+        body: { tipo: "mensaje", chatId: "chat-1", mensajeId: "msg-bloq-nuevo" },
+      },
+      res
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ omitido: true });
+    expect(mockSendEachForMulticast).not.toHaveBeenCalled();
+  });
+
+  it("destinatario que bloqueó al remitente (respaldo legado en usuarios.bloqueados) → no envía a ese usuario (200 con omitido: true)", async () => {
     estadoFirestore.docs.set("usuarios/uid-destinatario", {
       nombre: "Ana Destinataria",
-      fcmToken: ["token-ana-1"],
       bloqueados: ["uid-remitente"],
     });
     estadoFirestore.docs.set("chats/chat-1", {
@@ -451,7 +548,7 @@ describe("api/enviar-push.js (TAREA 3)", () => {
     });
   });
 
-  it("producto válido → consulta por universidadId con limit(300), excluye al dueño y a quienes lo bloquearon", async () => {
+  it("producto válido → consulta usuariosPrivado por universidadId con limit(300) y bloqueos por bloqueadoUid, excluyendo al dueño y a quienes lo bloquearon", async () => {
     estadoFirestore.docs.set("productos/prod-100", {
       userUid: "uid-remitente",
       universidadId: "unp",
@@ -460,20 +557,22 @@ describe("api/enviar-push.js (TAREA 3)", () => {
       fecha: { toMillis: () => Date.now() - 10000 },
     });
 
-    // Otro estudiante de la misma sede que bloqueó al remitente
-    estadoFirestore.docs.set("usuarios/uid-bloqueador", {
-      nombre: "Luis",
+    // Otro estudiante de la misma sede en usuariosPrivado que bloqueó al remitente en /bloqueos
+    estadoFirestore.docs.set("usuariosPrivado/uid-bloqueador", {
+      uid: "uid-bloqueador",
       universidadId: "unp",
       fcmToken: ["token-luis-bloqueador"],
-      bloqueados: ["uid-remitente"],
+    });
+    estadoFirestore.docs.set("bloqueos/uid-bloqueador_uid-remitente", {
+      bloqueadorUid: "uid-bloqueador",
+      bloqueadoUid: "uid-remitente",
     });
 
     // Estudiante de otra sede (no debe entrar en el where)
-    estadoFirestore.docs.set("usuarios/uid-ucv", {
-      nombre: "Lucía UCV",
+    estadoFirestore.docs.set("usuariosPrivado/uid-ucv", {
+      uid: "uid-ucv",
       universidadId: "ucv",
       fcmToken: ["token-lucia-ucv"],
-      bloqueados: [],
     });
 
     const req = {
@@ -488,11 +587,17 @@ describe("api/enviar-push.js (TAREA 3)", () => {
     expect(res.statusCode).toBe(200);
     expect(estadoFirestore.whereCalls).toEqual([
       {
-        collection: "usuarios",
+        collection: "usuariosPrivado",
         field: "universidadId",
         op: "==",
         val: "unp",
         limit: 300,
+      },
+      {
+        collection: "bloqueos",
+        field: "bloqueadoUid",
+        op: "==",
+        val: "uid-remitente",
       },
     ]);
 
@@ -508,11 +613,11 @@ describe("api/enviar-push.js (TAREA 3)", () => {
     });
   });
 
-  it("tokens inválidos devueltos por FCM se limpian en el servidor con arrayRemove y NO aparecen en la respuesta JSON", async () => {
-    estadoFirestore.docs.set("usuarios/uid-destinatario", {
-      nombre: "Ana Destinataria",
+  it("tokens inválidos leídos de usuariosPrivado se limpian en usuariosPrivado/{uid} con arrayRemove y NO aparecen en la respuesta JSON", async () => {
+    estadoFirestore.docs.set("usuariosPrivado/uid-destinatario", {
+      uid: "uid-destinatario",
+      universidadId: "unp",
       fcmToken: ["token-valido", "token-vencido"],
-      bloqueados: [],
     });
     estadoFirestore.docs.set("chats/chat-1", {
       participantes: ["uid-remitente", "uid-destinatario"],
@@ -554,7 +659,7 @@ describe("api/enviar-push.js (TAREA 3)", () => {
 
     expect(estadoFirestore.updates).toHaveLength(1);
     expect(estadoFirestore.updates[0]).toEqual({
-      path: "usuarios/uid-destinatario",
+      path: "usuariosPrivado/uid-destinatario",
       data: {
         fcmToken: {
           _type: "arrayRemove",

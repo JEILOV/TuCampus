@@ -83,6 +83,61 @@ const esErrorYaExiste = (err) =>
   /already exists/i.test(err?.message || "");
 
 /**
+ * Resuelve los tokens FCM de un destinatario único (mensaje o reseña),
+ * priorizando /usuariosPrivado/{destUid} y cayendo al campo legado de
+ * /usuarios/{destUid}. Omite el destinatario si bloqueó al remitente en
+ * /bloqueos/{destUid}_{remitenteUid} o en el arreglo legado `bloqueados`.
+ */
+const resolverDestinatarioUnico = async (db, destUid, remitenteUid) => {
+  const [privSnap, pubSnap, bloqueoSnap] = await Promise.all([
+    db.collection("usuariosPrivado").doc(destUid).get(),
+    db.collection("usuarios").doc(destUid).get(),
+    db.collection("bloqueos").doc(`${destUid}_${remitenteUid}`).get(),
+  ]);
+
+  if (!privSnap.exists && !pubSnap.exists) {
+    return [];
+  }
+
+  const pubData = pubSnap.exists ? pubSnap.data() || {} : {};
+  const bloqueadosLegados = Array.isArray(pubData.bloqueados)
+    ? pubData.bloqueados
+    : [];
+  if (bloqueoSnap.exists || bloqueadosLegados.includes(remitenteUid)) {
+    return [];
+  }
+
+  const privData = privSnap.exists ? privSnap.data() || {} : {};
+  const tokensPrivados = Array.isArray(privData.fcmToken)
+    ? privData.fcmToken.filter((t) => typeof t === "string" && t.trim())
+    : [];
+  if (tokensPrivados.length > 0) {
+    return [
+      {
+        uid: destUid,
+        coleccionOrigen: "usuariosPrivado",
+        tokens: tokensPrivados,
+      },
+    ];
+  }
+
+  const tokensLegados = Array.isArray(pubData.fcmToken)
+    ? pubData.fcmToken.filter((t) => typeof t === "string" && t.trim())
+    : [];
+  if (tokensLegados.length > 0) {
+    return [
+      {
+        uid: destUid,
+        coleccionOrigen: "usuarios",
+        tokens: tokensLegados,
+      },
+    ];
+  }
+
+  return [];
+};
+
+/**
  * Verifica e incrementa el tope horario de pushes de producto en limitesApi/pushProducto_${uid}.
  * Si Firestore falla, registra el error y deja pasar (fail open).
  */
@@ -238,10 +293,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ omitido: true });
       }
 
-      const destSnap = await db.collection("usuarios").doc(otroUid).get();
-      if (destSnap.exists) {
-        docsDestinatarios = [{ uid: otroUid, data: destSnap.data() || {} }];
-      }
+      docsDestinatarios = await resolverDestinatarioUnico(db, otroUid, uid);
 
       titulo = nombreRemitente;
       cuerpo =
@@ -292,10 +344,7 @@ export default async function handler(req, res) {
         });
       }
 
-      const destSnap = await db.collection("usuarios").doc(vendedorUid).get();
-      if (destSnap.exists) {
-        docsDestinatarios = [{ uid: vendedorUid, data: destSnap.data() || {} }];
-      }
+      docsDestinatarios = await resolverDestinatarioUnico(db, vendedorUid, uid);
 
       const estrellas = Number(resenaData.estrellas) || 5;
       titulo = "⭐ Nueva calificación";
@@ -338,15 +387,34 @@ export default async function handler(req, res) {
         return res.status(200).json({ omitido: true });
       }
 
-      const usuariosSnap = await db
-        .collection("usuarios")
-        .where("universidadId", "==", prodData.universidadId)
-        .limit(MAX_USUARIOS_CAMPUS)
-        .get();
+      const [privadosSnap, bloqueosSnap] = await Promise.all([
+        db
+          .collection("usuariosPrivado")
+          .where("universidadId", "==", prodData.universidadId)
+          .limit(MAX_USUARIOS_CAMPUS)
+          .get(),
+        db
+          .collection("bloqueos")
+          .where("bloqueadoUid", "==", uid)
+          .get(),
+      ]);
 
-      docsDestinatarios = usuariosSnap.docs
-        .filter((d) => d.id !== uid)
-        .map((d) => ({ uid: d.id, data: d.data() || {} }));
+      const bloqueadoresSet = new Set(
+        bloqueosSnap.docs
+          .map((d) => d.data()?.bloqueadorUid)
+          .filter((u) => typeof u === "string" && u.trim())
+      );
+
+      docsDestinatarios = privadosSnap.docs
+        .filter((d) => d.id !== uid && !bloqueadoresSet.has(d.id))
+        .map((d) => {
+          const data = d.data() || {};
+          return {
+            uid: d.id,
+            coleccionOrigen: "usuariosPrivado",
+            tokens: Array.isArray(data.fcmToken) ? data.fcmToken : [],
+          };
+        });
 
       const primeraFoto =
         Array.isArray(prodData.imagenes) && prodData.imagenes.length > 0
@@ -362,31 +430,29 @@ export default async function handler(req, res) {
       claveDedup = `p_${productoId}`;
     }
 
-    // e) Filtrar destinatarios que bloquearon al remitente y recolectar fcmToken
-    const mapaTokenAUsuarios = new Map();
+    // e) Recolectar fcmToken junto con su colección de origen para la limpieza
+    const mapaTokenADestinos = new Map();
     for (const dest of docsDestinatarios) {
-      const bloqueados = Array.isArray(dest.data.bloqueados)
-        ? dest.data.bloqueados
-        : [];
-      if (bloqueados.includes(uid)) {
-        continue;
-      }
+      const tokensUsuario = Array.isArray(dest.tokens) ? dest.tokens : [];
+      const coleccionOrigen = dest.coleccionOrigen || "usuariosPrivado";
 
-      const tokensUsuario = Array.isArray(dest.data.fcmToken)
-        ? dest.data.fcmToken
-        : [];
       for (const tk of tokensUsuario) {
         if (typeof tk === "string" && tk.trim()) {
           const tokenLimpio = tk.trim();
-          if (!mapaTokenAUsuarios.has(tokenLimpio)) {
-            mapaTokenAUsuarios.set(tokenLimpio, new Set());
+          if (!mapaTokenADestinos.has(tokenLimpio)) {
+            mapaTokenADestinos.set(tokenLimpio, new Map());
           }
-          mapaTokenAUsuarios.get(tokenLimpio).add(dest.uid);
+          mapaTokenADestinos
+            .get(tokenLimpio)
+            .set(`${coleccionOrigen}/${dest.uid}`, {
+              coleccion: coleccionOrigen,
+              uid: dest.uid,
+            });
         }
       }
     }
 
-    const listaTokens = Array.from(mapaTokenAUsuarios.keys()).slice(
+    const listaTokens = Array.from(mapaTokenADestinos.keys()).slice(
       0,
       MAX_TOKENS
     );
@@ -425,7 +491,7 @@ export default async function handler(req, res) {
     if (iconUrl) dataPlano.icon = iconUrl;
     if (imageUrl) dataPlano.image = imageUrl;
 
-    // h) Envío vía FCM y limpieza de tokens inválidos en el servidor
+    // h) Envío vía FCM y limpieza de tokens inválidos en la colección de origen
     const respuesta = await admin.messaging().sendEachForMulticast({
       tokens: listaTokens,
       data: dataPlano,
@@ -435,26 +501,32 @@ export default async function handler(req, res) {
     });
 
     if (respuesta.failureCount > 0 && Array.isArray(respuesta.responses)) {
-      const tokensPorUsuarioLimpiar = new Map();
+      const tokensPorDocLimpiar = new Map();
 
       respuesta.responses.forEach((r, idx) => {
         if (!r.success && CODIGOS_TOKEN_INVALIDO.has(r.error?.code)) {
           const tokenInvalido = listaTokens[idx];
-          const uidsDuenios = mapaTokenAUsuarios.get(tokenInvalido) || [];
-          uidsDuenios.forEach((destUid) => {
-            if (!tokensPorUsuarioLimpiar.has(destUid)) {
-              tokensPorUsuarioLimpiar.set(destUid, []);
+          const destinos = mapaTokenADestinos.get(tokenInvalido);
+          if (destinos) {
+            for (const [docKey, info] of destinos.entries()) {
+              if (!tokensPorDocLimpiar.has(docKey)) {
+                tokensPorDocLimpiar.set(docKey, {
+                  coleccion: info.coleccion,
+                  uid: info.uid,
+                  tokens: [],
+                });
+              }
+              tokensPorDocLimpiar.get(docKey).tokens.push(tokenInvalido);
             }
-            tokensPorUsuarioLimpiar.get(destUid).push(tokenInvalido);
-          });
+          }
         }
       });
 
       const promesasLimpieza = [];
-      for (const [destUid, tokensInvalidos] of tokensPorUsuarioLimpiar.entries()) {
+      for (const { coleccion, uid: destUid, tokens: tokensInvalidos } of tokensPorDocLimpiar.values()) {
         promesasLimpieza.push(
           db
-            .collection("usuarios")
+            .collection(coleccion)
             .doc(destUid)
             .update({
               fcmToken: admin.firestore.FieldValue.arrayRemove(

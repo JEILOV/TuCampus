@@ -21,7 +21,12 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { onAuthStateChanged, signOut }                                  from "firebase/auth";
 import { auth }                                                         from "../services/firebase";
-import { obtenerOCrearPerfilUsuario, sincronizarFavoritos }             from "../services/userService";
+import {
+  obtenerOCrearPerfilUsuario,
+  sincronizarFavoritos,
+  obtenerMisBloqueos,
+  migrarBloqueosLegados,
+}                                                                       from "../services/userService";
 import {
   obtenerFavoritos,
   guardarFavoritos,
@@ -36,14 +41,16 @@ const AuthContext = createContext(null);
 
 // ── 2. Provider ──────────────────────────────────────────────
 export const AuthProvider = ({ children }) => {
-  // user    → objeto Firebase Auth (uid, email, displayName, photoURL…)
-  // perfil  → documento Firestore del usuario (nombre, bio, teléfono…)
-  // favoritos → Set<string> de IDs de productos favoritos
-  // cargando → true mientras Firebase resuelve el estado inicial
-  const [user,      setUser]      = useState(null);
-  const [perfil,    setPerfil]    = useState(null);
-  const [favoritos, setFavoritos] = useState(new Set());
-  const [cargando,  setCargando]  = useState(true); // empieza en true: aún no sabemos
+  // user       → objeto Firebase Auth (uid, email, displayName, photoURL…)
+  // perfil     → documento Firestore del usuario (nombre, bio, teléfono…)
+  // favoritos  → Set<string> de IDs de productos favoritos
+  // bloqueados → Set<string> de UIDs bloqueados por el usuario actual
+  // cargando   → true mientras Firebase resuelve el estado inicial
+  const [user,       setUser]       = useState(null);
+  const [perfil,     setPerfil]     = useState(null);
+  const [favoritos,  setFavoritos]  = useState(new Set());
+  const [bloqueados, setBloqueados] = useState(new Set());
+  const [cargando,   setCargando]   = useState(true); // empieza en true: aún no sabemos
 
  // ── 3. Listener único de autenticación ───────────────────
   useEffect(() => {
@@ -53,6 +60,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setPerfil(null);
         setFavoritos(new Set());
+        setBloqueados(new Set());
         setCargando(false);
         return;
       }
@@ -69,6 +77,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setPerfil(null);
         setFavoritos(new Set());
+        setBloqueados(new Set());
         setCargando(false);
         return; // ⛔ DETENEMOS LA EJECUCIÓN AQUÍ
       }
@@ -78,6 +87,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setPerfil(null);
         setFavoritos(new Set());
+        setBloqueados(new Set());
         setCargando(false);
         return;
       }
@@ -88,8 +98,46 @@ export const AuthProvider = ({ children }) => {
         const favoritosInvitado = obtenerFavoritos();
 
         // Obtener o crear perfil en Firestore (usa el servicio ya existente)
-        const { perfil: perfilObtenido, favoritosGuardados } =
-          await obtenerOCrearPerfilUsuario(firebaseUser);
+        const {
+          perfil: perfilObtenido,
+          favoritosGuardados,
+          bloqueadosLegados = [],
+        } = await obtenerOCrearPerfilUsuario(firebaseUser);
+
+        // Leemos cualquier arreglo legado `bloqueados` solo en esta etapa y nos
+        // aseguramos de que no quede en el perfil en memoria.
+        const legadosDelPerfil = Array.isArray(perfilObtenido?.bloqueados)
+          ? perfilObtenido.bloqueados
+          : [];
+        const listaLegados = [
+          ...new Set(
+            [...bloqueadosLegados, ...legadosDelPerfil].filter(
+              (u) => typeof u === "string" && u.trim()
+            )
+          ),
+        ];
+        if (perfilObtenido && typeof perfilObtenido === "object") {
+          delete perfilObtenido.email;
+          delete perfilObtenido.favoritos;
+          delete perfilObtenido.bloqueados;
+          delete perfilObtenido.fcmToken;
+        }
+
+        // Cargar mis bloqueos desde /bloqueos y fusionar con los legados
+        let misBloqueos = [];
+        try {
+          misBloqueos = await obtenerMisBloqueos(firebaseUser.uid);
+        } catch {
+          misBloqueos = [];
+        }
+        const setMisBloqueos = new Set(misBloqueos);
+        const faltantesPorMigrar = listaLegados.filter(
+          (uid) => uid !== firebaseUser.uid && !setMisBloqueos.has(uid)
+        );
+        if (faltantesPorMigrar.length > 0) {
+          migrarBloqueosLegados(firebaseUser.uid, faltantesPorMigrar).catch(() => {});
+        }
+        const bloqueadosFusionados = new Set([...misBloqueos, ...listaLegados]);
 
         // Fusionar favoritos invitado + Firestore sin duplicados
         const favoritosFusionados = fusionarFavoritos(favoritosInvitado, favoritosGuardados);
@@ -105,12 +153,14 @@ export const AuthProvider = ({ children }) => {
         setUser(firebaseUser);
         setPerfil(perfilObtenido);
         setFavoritos(new Set(favoritosFusionados));
+        setBloqueados(bloqueadosFusionados);
       } catch (error) {
         // Si Firestore falla, al menos tenemos el user de Auth
         console.error("[AuthContext] Error al cargar perfil:", error);
         setUser(firebaseUser);
         setPerfil(null);
         setFavoritos(new Set(obtenerFavoritos()));
+        setBloqueados(new Set());
       } finally {
         setCargando(false);
       }
@@ -144,6 +194,18 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   /**
+   * Actualiza en memoria el Set de UIDs bloqueados por el usuario actual.
+   * Acepta una función `(prevSet) => nuevoSetOArray` o un Set/Array directo.
+   */
+  const actualizarBloqueados = useCallback((fnONuevos) => {
+    setBloqueados((prev) => {
+      const resultado =
+        typeof fnONuevos === "function" ? fnONuevos(new Set(prev)) : fnONuevos;
+      return resultado instanceof Set ? new Set(resultado) : new Set(resultado || []);
+    });
+  }, []);
+
+  /**
    * Cierra la sesión de Firebase y limpia el estado global.
    * Centralizado aquí: antes cada página tenía su propio signOut + localStorage.clear().
    */
@@ -166,9 +228,11 @@ export const AuthProvider = ({ children }) => {
     user,           // Firebase Auth user object (o null)
     perfil,         // Documento Firestore del usuario (o null)
     favoritos,      // Set<string> de IDs favoritos
+    bloqueados,     // Set<string> de UIDs bloqueados por mí
     cargando,       // boolean — true mientras se resuelve el estado inicial
     actualizarPerfil,
     actualizarFavoritos,
+    actualizarBloqueados,
     cerrarSesion,
   };
 

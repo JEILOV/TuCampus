@@ -5,23 +5,34 @@ import {
   mockAddDoc,
   mockGetDoc,
   mockGetDocs,
+  mockSetDoc,
   resetAllMocks,
 } from "./__mocks__/firebase";
 
-const { mockSolicitarPush } = vi.hoisted(() => ({
+const { mockSolicitarPush, mockGetToken } = vi.hoisted(() => ({
   mockSolicitarPush: vi.fn(),
+  mockGetToken: vi.fn(),
 }));
 
 vi.mock("../services/pushService", () => ({
   solicitarPush: mockSolicitarPush,
 }));
 
+vi.mock("firebase/messaging", () => ({
+  isSupported: vi.fn(async () => true),
+  getMessaging: vi.fn(() => ({})),
+  getToken: mockGetToken,
+  onMessage: vi.fn(),
+}));
+
 // logError está mockeado en __mocks__/firebase.js —
 // lo importamos aquí para afirmar sobre sus llamadas.
 import { logError } from "../utils/errorHandler";
+import { auth } from "../services/firebase";
 
 import {
   crearNotificacion,
+  solicitarPermisoNotificaciones,
   notificarNuevoMensaje,
   notificarNuevaResena,
   notificarNuevoProductoEnSede,
@@ -227,6 +238,70 @@ describe("notificationService", () => {
       await notificarNuevoProductoEnSede({});
 
       expect(mockSolicitarPush).not.toHaveBeenCalled();
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════
+  describe("solicitarPermisoNotificaciones — guarda en usuariosPrivado (FASE 6A - TAREA 4)", () => {
+    beforeEach(() => {
+      vi.stubEnv("VITE_FIREBASE_VAPID_KEY", "vapid-test-key");
+      const mockNotification = {
+        requestPermission: vi.fn(async () => "granted"),
+      };
+      vi.stubGlobal("window", { Notification: mockNotification });
+      vi.stubGlobal("Notification", mockNotification);
+      vi.stubGlobal("navigator", {
+        serviceWorker: {
+          register: vi.fn(async () => ({ scope: "/" })),
+        },
+      });
+      mockGetToken.mockResolvedValue("fcm-token-nuevo");
+      mockSetDoc.mockResolvedValue(undefined);
+      auth.currentUser = null;
+    });
+
+    it("guarda el token en usuariosPrivado/{uid} con universidadId del perfil y merge: true", async () => {
+      const token = await solicitarPermisoNotificaciones("uid-10", "unp");
+
+      expect(token).toBe("fcm-token-nuevo");
+      expect(mockSetDoc).toHaveBeenCalledTimes(1);
+      expect(mockSetDoc.mock.calls[0]).toEqual([
+        { _col: "usuariosPrivado", _id: "uid-10" },
+        {
+          uid: "uid-10",
+          universidadId: "unp",
+          fcmToken: { _type: "arrayUnion", args: ["fcm-token-nuevo"] },
+        },
+        { merge: true },
+      ]);
+    });
+
+    it("deriva universidadId del correo con detectarUniversidad cuando no se pasa universidadId", async () => {
+      auth.currentUser = { email: "alumno@ucvvirtual.edu.pe" };
+
+      const token = await solicitarPermisoNotificaciones("uid-11");
+
+      expect(token).toBe("fcm-token-nuevo");
+      expect(mockSetDoc).toHaveBeenCalledTimes(1);
+      expect(mockSetDoc.mock.calls[0][1]).toEqual({
+        uid: "uid-11",
+        universidadId: "ucv",
+        fcmToken: { _type: "arrayUnion", args: ["fcm-token-nuevo"] },
+      });
+    });
+
+    it("omite solo universidadId y aun así escribe el token si no se conoce la sede", async () => {
+      auth.currentUser = null;
+
+      const token = await solicitarPermisoNotificaciones("uid-12");
+
+      expect(token).toBe("fcm-token-nuevo");
+      expect(mockSetDoc).toHaveBeenCalledTimes(1);
+      expect(mockSetDoc.mock.calls[0][1]).toEqual({
+        uid: "uid-12",
+        fcmToken: { _type: "arrayUnion", args: ["fcm-token-nuevo"] },
+      });
+      expect(mockSetDoc.mock.calls[0][1]).not.toHaveProperty("universidadId");
     });
   });
 
