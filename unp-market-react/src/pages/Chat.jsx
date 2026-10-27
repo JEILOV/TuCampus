@@ -45,6 +45,7 @@ import BottomNav                       from "../components/BottomNav";
 import BotonNotificaciones             from "../components/BotonNotificaciones";
 import MenuChat, { MenuMensaje }       from "../components/MenuChat";
 import { useEsEscritorio }             from "../hooks/useMediaQuery";
+import { construirRespondiendoA }       from "../utils/chatUtils";
 
 // Placeholder — reemplazar por los archivos finales de la mascota
 // (mismo ícono que usan Home.jsx/Publicar.jsx en su header azul).
@@ -87,24 +88,6 @@ const obtenerProductoRef = (chat) => {
     titulo: chat.productoTitulo || "",
     imagenUrl: chat.productoImagen || "",
     precio: null,
-  };
-};
-
-// 🔒 S08: Trunca texto a 200 caracteres (con "…" si se cortó) y autorNombre a 100
-// para cumplir con esRespondiendoAValido() en firestore.rules.
-// eslint-disable-next-line react-refresh/only-export-components
-export const construirRespondiendoA = (mensajeRespondiendo, miUid, otroNombre) => {
-  if (!mensajeRespondiendo) return null;
-  const textoCrudo = mensajeRespondiendo.texto || (mensajeRespondiendo.imagen ? "📷 Imagen" : "");
-  const texto = textoCrudo.length > 200 ? `${textoCrudo.slice(0, 199)}…` : textoCrudo;
-  const nombreCrudo = mensajeRespondiendo.deUid === miUid
-    ? "Tú"
-    : (otroNombre || "Estudiante UNP");
-  const autorNombre = nombreCrudo.slice(0, 100);
-  return {
-    id:          mensajeRespondiendo.id,
-    texto,
-    autorNombre,
   };
 };
 
@@ -799,17 +782,7 @@ const Chat = () => {
   // para que siempre use el nombre más fresco de `otroInfo` (perfil en
   // vivo) y no un dato viejo capturado al momento del click en "responder".
   const armarRespondiendoA = useCallback(() => {
-    if (!mensajeRespondiendo) return null;
-    return {
-      id:    mensajeRespondiendo.id,
-      texto: (() => {
-        const t = mensajeRespondiendo.texto || (mensajeRespondiendo.imagen ? "📷 Imagen" : "");
-        return t.length > 200 ? `${t.slice(0, 199)}…` : t;
-      })(),
-      autorNombre: mensajeRespondiendo.deUid === user?.uid
-        ? "Tú"
-        : (otroInfo.nombre || "Estudiante UNP").slice(0, 100),
-    };
+    return construirRespondiendoA(mensajeRespondiendo, user?.uid, otroInfo.nombre);
   }, [mensajeRespondiendo, user?.uid, otroInfo.nombre]);
 
   // ── Enviar mensaje de texto ────────────────────────────────

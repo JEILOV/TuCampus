@@ -1,6 +1,6 @@
 // src/tests/chatRespondiendoA.test.js
 import { describe, it, expect } from "vitest";
-import { construirRespondiendoA } from "../pages/Chat";
+import { construirRespondiendoA } from "../utils/chatUtils";
 
 describe("construirRespondiendoA (S08 — truncado de citas)", () => {
   it("devuelve null cuando no hay mensajeRespondiendo", () => {

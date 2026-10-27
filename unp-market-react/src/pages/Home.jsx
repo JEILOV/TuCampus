@@ -476,7 +476,7 @@ const Home = () => {
                 se monta sobre el borde inferior del header; en md muestra
                 chips + botón Filtros; en lg lo reemplaza CabeceraEscritorio
                 + PanelFiltrosLateral. */}
-            <div className="relative z-10 -mt-5 md:mt-4 lg:hidden">
+            <div className="relative z-10 -mt-5 md:z-auto md:mt-4 lg:hidden">
               <FeedFiltros
                 categoriaActiva={categoriaActiva}
                 onCategoriaChange={handleSeleccionarCategoria}
