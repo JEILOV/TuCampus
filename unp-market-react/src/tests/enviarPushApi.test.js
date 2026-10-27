@@ -365,66 +365,6 @@ describe("api/enviar-push.js (TAREA 3)", () => {
     expect(mockSendEachForMulticast).not.toHaveBeenCalled();
   });
 
-  it("respaldo legado: cuando el destinatario NO tiene doc en usuariosPrivado, lee fcmToken de /usuarios/{dest} y limpia ahí si resulta inválido", async () => {
-    estadoFirestore.docs.delete("usuariosPrivado/uid-destinatario");
-    estadoFirestore.docs.set("usuarios/uid-destinatario", {
-      nombre: "Ana Legada",
-      fcmToken: ["token-legado-ok", "token-legado-vencido"],
-      bloqueados: [],
-    });
-    estadoFirestore.docs.set("chats/chat-1", {
-      participantes: ["uid-remitente", "uid-destinatario"],
-    });
-    estadoFirestore.docs.set("chats/chat-1/mensajes/msg-legado", {
-      deUid: "uid-remitente",
-      texto: "Hola con token legado",
-      tipo: "texto",
-      fecha: { toMillis: () => Date.now() - 1000 },
-    });
-
-    mockSendEachForMulticast.mockResolvedValueOnce({
-      successCount: 1,
-      failureCount: 1,
-      responses: [
-        { success: true },
-        {
-          success: false,
-          error: { code: "messaging/invalid-registration-token" },
-        },
-      ],
-    });
-
-    const res = crearRes();
-    await handler(
-      {
-        method: "POST",
-        headers: { authorization: "Bearer token-ok" },
-        body: { tipo: "mensaje", chatId: "chat-1", mensajeId: "msg-legado" },
-      },
-      res
-    );
-
-    expect(res.statusCode).toBe(200);
-    expect(mockSendEachForMulticast).toHaveBeenCalledTimes(1);
-    expect(mockSendEachForMulticast.mock.calls[0][0].tokens).toEqual([
-      "token-legado-ok",
-      "token-legado-vencido",
-    ]);
-
-    // La limpieza se hace en usuarios/uid-destinatario porque el token vino del doc legado
-    expect(estadoFirestore.updates).toEqual([
-      {
-        path: "usuarios/uid-destinatario",
-        data: {
-          fcmToken: {
-            _type: "arrayRemove",
-            items: ["token-legado-vencido"],
-          },
-        },
-      },
-    ]);
-  });
-
   it("bloqueo vía /bloqueos/{dest}_{uid} → no envía a ese usuario (200 con omitido: true)", async () => {
     estadoFirestore.docs.set("bloqueos/uid-destinatario_uid-remitente", {
       bloqueadorUid: "uid-destinatario",
@@ -449,35 +389,6 @@ describe("api/enviar-push.js (TAREA 3)", () => {
       },
       res
     );
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual({ omitido: true });
-    expect(mockSendEachForMulticast).not.toHaveBeenCalled();
-  });
-
-  it("destinatario que bloqueó al remitente (respaldo legado en usuarios.bloqueados) → no envía a ese usuario (200 con omitido: true)", async () => {
-    estadoFirestore.docs.set("usuarios/uid-destinatario", {
-      nombre: "Ana Destinataria",
-      bloqueados: ["uid-remitente"],
-    });
-    estadoFirestore.docs.set("chats/chat-1", {
-      participantes: ["uid-remitente", "uid-destinatario"],
-    });
-    estadoFirestore.docs.set("chats/chat-1/mensajes/msg-1", {
-      deUid: "uid-remitente",
-      texto: "Hola",
-      tipo: "texto",
-      fecha: { toMillis: () => Date.now() - 1000 },
-    });
-
-    const req = {
-      method: "POST",
-      headers: { authorization: "Bearer token-ok" },
-      body: { tipo: "mensaje", chatId: "chat-1", mensajeId: "msg-1" },
-    };
-    const res = crearRes();
-
-    await handler(req, res);
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ omitido: true });

@@ -20,7 +20,6 @@ import {
   desbloquearUsuario,
   obtenerMisBloqueos,
   existeBloqueo,
-  migrarBloqueosLegados,
 } from "../services/userService";
 import { propagarPerfilAProductos } from "../pages/Perfil";
 
@@ -374,7 +373,7 @@ describe("userService", () => {
         .mockResolvedValueOnce(makeSnap("user-nuevo", datosPublicos))
         .mockResolvedValueOnce(makeSnap("user-nuevo", datosPrivados));
 
-      const { perfil, favoritosGuardados, bloqueadosLegados } =
+      const { perfil, favoritosGuardados } =
         await obtenerOCrearPerfilUsuario(userFake);
 
       // Como ya tiene doc privado, no escribe nada
@@ -385,10 +384,9 @@ describe("userService", () => {
       expect(perfil).not.toHaveProperty("bloqueados");
       expect(perfil).not.toHaveProperty("fcmToken");
       expect(favoritosGuardados).toEqual(["prod-priv-1", "prod-priv-2"]);
-      expect(bloqueadosLegados).toEqual(["uid-bloq-1"]);
     });
 
-    it("usuario existente SIN doc privado: autorrepara creando usuariosPrivado con valores legados y usa favoritos legados", async () => {
+    it("usuario existente SIN doc privado: autorrepara creando usuariosPrivado vacío con sede detectada y devuelve favoritosGuardados vacío", async () => {
       const datosPublicos = {
         uid:       "user-nuevo",
         nombre:    "Valery B.",
@@ -411,10 +409,10 @@ describe("userService", () => {
         uid: "user-nuevo",
         email: "vbedregal@alumnos.unp.edu.pe",
         universidadId: "unp",
-        favoritos: ["prod-1", "prod-2"],
-        fcmToken: ["tk-1"],
+        favoritos: [],
+        fcmToken: [],
       });
-      expect(favoritosGuardados).toEqual(["prod-1", "prod-2"]);
+      expect(favoritosGuardados).toEqual([]);
       expect(perfil).not.toHaveProperty("email");
       expect(perfil).not.toHaveProperty("favoritos");
       expect(perfil).not.toHaveProperty("fcmToken");
@@ -435,7 +433,7 @@ describe("userService", () => {
       const { perfil, favoritosGuardados } = await obtenerOCrearPerfilUsuario(userFake);
 
       expect(perfil.nombre).toBe("Valery");
-      expect(favoritosGuardados).toEqual(["p-legado"]);
+      expect(favoritosGuardados).toEqual([]);
     });
 
     it("usa string vacío para avatar si photoURL es null", async () => {
@@ -491,11 +489,11 @@ describe("userService", () => {
   });
 
   // ══════════════════════════════════════════════════════════
-  describe("bloqueos en /bloqueos/{miUid}_{otroUid} (FASE 6A - TAREA 3)", () => {
+  describe("bloqueos en /bloqueos/{miUid}_{otroUid} (FASE 6A/6B - TAREA 3)", () => {
 
-    it("bloquearUsuario escribe /bloqueos/{miUid}_{otroUid} y el arrayUnion legado en usuarios/{miUid}", async () => {
+    it("bloquearUsuario crea /bloqueos/{miUid}_{otroUid} con serverTimestamp y desbloquearUsuario lo elimina (sin tocar /usuarios)", async () => {
       mockSetDoc.mockResolvedValueOnce(undefined);
-      mockUpdateDoc.mockResolvedValueOnce(undefined);
+      mockDeleteDoc.mockResolvedValueOnce(undefined);
 
       await bloquearUsuario("yo", "otro");
 
@@ -508,18 +506,7 @@ describe("userService", () => {
           creadoEn: { _type: "serverTimestamp" },
         },
       ]);
-      expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
-      expect(mockUpdateDoc.mock.calls[0]).toEqual([
-        { _col: "usuarios", _id: "yo" },
-        {
-          bloqueados: { _type: "arrayUnion", args: ["otro"] },
-        },
-      ]);
-    });
-
-    it("desbloquearUsuario borra /bloqueos/{miUid}_{otroUid} y hace el arrayRemove legado en usuarios/{miUid}", async () => {
-      mockDeleteDoc.mockResolvedValueOnce(undefined);
-      mockUpdateDoc.mockResolvedValueOnce(undefined);
+      expect(mockUpdateDoc).not.toHaveBeenCalled();
 
       await desbloquearUsuario("yo", "otro");
 
@@ -528,29 +515,7 @@ describe("userService", () => {
         _col: "bloqueos",
         _id: "yo_otro",
       });
-      expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
-      expect(mockUpdateDoc.mock.calls[0]).toEqual([
-        { _col: "usuarios", _id: "yo" },
-        {
-          bloqueados: { _type: "arrayRemove", args: ["otro"] },
-        },
-      ]);
-    });
-
-    it("si el updateDoc legado falla en bloquear o desbloquear, la operación principal sigue siendo exitosa y no lanza error", async () => {
-      mockSetDoc.mockResolvedValueOnce(undefined);
-      mockUpdateDoc.mockRejectedValueOnce(new Error("Denied legacy block"));
-
-      await expect(bloquearUsuario("yo", "otro")).resolves.toBeUndefined();
-      expect(mockSetDoc).toHaveBeenCalledTimes(1);
-      expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
-
-      mockDeleteDoc.mockResolvedValueOnce(undefined);
-      mockUpdateDoc.mockRejectedValueOnce(new Error("Denied legacy unblock"));
-
-      await expect(desbloquearUsuario("yo", "otro")).resolves.toBeUndefined();
-      expect(mockDeleteDoc).toHaveBeenCalledTimes(1);
-      expect(mockUpdateDoc).toHaveBeenCalledTimes(2);
+      expect(mockUpdateDoc).not.toHaveBeenCalled();
     });
 
     it("obtenerMisBloqueos devuelve los bloqueadoUid y ante error devuelve []", async () => {
@@ -578,20 +543,6 @@ describe("userService", () => {
       await expect(existeBloqueo("otro", "yo")).resolves.toBe(true);
       await expect(existeBloqueo("otro", "yo")).resolves.toBe(false);
       await expect(existeBloqueo("otro", "yo")).resolves.toBe(false);
-    });
-
-    it("migrarBloqueosLegados escribe cada bloqueo único tolerando fallos individuales", async () => {
-      mockSetDoc
-        .mockResolvedValueOnce(undefined)
-        .mockRejectedValueOnce(new Error("Fallo puntual"));
-
-      await expect(
-        migrarBloqueosLegados("yo", ["u1", "u1", "yo", "u2"])
-      ).resolves.toBeUndefined();
-
-      expect(mockSetDoc).toHaveBeenCalledTimes(2);
-      expect(mockSetDoc.mock.calls[0][0]).toEqual({ _col: "bloqueos", _id: "yo_u1" });
-      expect(mockSetDoc.mock.calls[1][0]).toEqual({ _col: "bloqueos", _id: "yo_u2" });
     });
 
   });

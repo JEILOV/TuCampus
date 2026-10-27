@@ -217,13 +217,10 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
       } catch (errPriv) {
         logError("[userService.obtenerOCrearPerfilUsuario.crearPrivado]", errPriv);
       }
-      return { perfil: perfilBase, favoritosGuardados: [], bloqueadosLegados: [] };
+      return { perfil: perfilBase, favoritosGuardados: [] };
     }
 
     const datosGuardados = snap.data() || {};
-    const bloqueadosLegados = Array.isArray(datosGuardados.bloqueados)
-      ? datosGuardados.bloqueados.filter((u) => typeof u === "string" && u.trim())
-      : [];
 
     const existePrivado = Boolean(
       privSnap && typeof privSnap.exists === "function" && privSnap.exists()
@@ -231,23 +228,13 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
     const datosPrivados = existePrivado ? privSnap.data() || {} : null;
 
     if (!existePrivado) {
-      const favsLegados = Array.isArray(datosGuardados.favoritos)
-        ? datosGuardados.favoritos
-            .filter((f) => typeof f === "string" && f.trim())
-            .slice(0, 500)
-        : [];
-      const tokensLegados = Array.isArray(datosGuardados.fcmToken)
-        ? datosGuardados.fcmToken
-            .filter((t) => typeof t === "string" && t.trim())
-            .slice(-20)
-        : [];
       try {
         await setDoc(privRef, {
           uid: user.uid,
-          email: user.email || datosGuardados.email || "",
-          universidadId: datosGuardados.universidadId || universidad?.id || null,
-          favoritos: favsLegados,
-          fcmToken: tokensLegados,
+          email: user.email,
+          universidadId: universidad?.id || null,
+          favoritos: [],
+          fcmToken: [],
         });
       } catch (errPriv) {
         logError(
@@ -259,9 +246,7 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
 
     const favoritosGuardados = Array.isArray(datosPrivados?.favoritos)
       ? datosPrivados.favoritos
-      : Array.isArray(datosGuardados.favoritos)
-        ? datosGuardados.favoritos
-        : [];
+      : [];
 
     const perfilLimpio = { ...perfilBase, ...datosGuardados };
     delete perfilLimpio.email;
@@ -272,7 +257,6 @@ export const obtenerOCrearPerfilUsuario = async (user) => {
     return {
       perfil: perfilLimpio,
       favoritosGuardados,
-      bloqueadosLegados,
     };
   } catch (err) {
     logError("[userService.obtenerOCrearPerfilUsuario]", err);
@@ -321,15 +305,6 @@ export const bloquearUsuario = async (miUid, otroUid) => {
     logError("[userService.bloquearUsuario]", err);
     throw new Error(traducirError(err, "firestore"));
   }
-
-  // LEGACY: eliminar en Fase 6B
-  try {
-    await updateDoc(doc(db, "usuarios", miUid), {
-      bloqueados: arrayUnion(otroUid),
-    });
-  } catch (errLegado) {
-    logError("[userService.bloquearUsuario.legado]", errLegado);
-  }
 };
 
 /**
@@ -344,15 +319,6 @@ export const desbloquearUsuario = async (miUid, otroUid) => {
   } catch (err) {
     logError("[userService.desbloquearUsuario]", err);
     throw new Error(traducirError(err, "firestore"));
-  }
-
-  // LEGACY: eliminar en Fase 6B
-  try {
-    await updateDoc(doc(db, "usuarios", miUid), {
-      bloqueados: arrayRemove(otroUid),
-    });
-  } catch (errLegado) {
-    logError("[userService.desbloquearUsuario.legado]", errLegado);
   }
 };
 
@@ -396,35 +362,5 @@ export const existeBloqueo = async (bloqueadorUid, bloqueadoUid) => {
   } catch (err) {
     logError("[userService.existeBloqueo]", err);
     return false;
-  }
-};
-
-/**
- * Crea en /bloqueos los documentos que falten a partir del arreglo legado
- * `bloqueados` del documento público, con try/catch por documento y sin bloquear.
- * @param {string} miUid
- * @param {string[]} bloqueadosLegados
- */
-export const migrarBloqueosLegados = async (miUid, bloqueadosLegados = []) => {
-  if (!miUid || !Array.isArray(bloqueadosLegados) || bloqueadosLegados.length === 0) {
-    return;
-  }
-  const unicos = [
-    ...new Set(
-      bloqueadosLegados.filter(
-        (u) => typeof u === "string" && u.trim().length > 0 && u !== miUid
-      )
-    ),
-  ];
-  for (const otroUid of unicos) {
-    try {
-      await setDoc(doc(db, "bloqueos", `${miUid}_${otroUid}`), {
-        bloqueadorUid: miUid,
-        bloqueadoUid: otroUid,
-        creadoEn: serverTimestamp(),
-      });
-    } catch (err) {
-      logError("[userService.migrarBloqueosLegados]", err);
-    }
   }
 };

@@ -33,7 +33,6 @@ import {
   ocultarChat,
 }                                       from "../services/chatService";
 import {
-  obtenerPerfilVendedor,
   bloquearUsuario,
   desbloquearUsuario,
   existeBloqueo,
@@ -600,8 +599,6 @@ const Chat = () => {
   // ── Fase 6: Chat Avanzado ─────────────────────────────────
   const [menuAbierto, setMenuAbierto]         = useState(false);
   const [meBloqueoPorDoc, setMeBloqueoPorDoc] = useState(false);
-  // LEGACY: eliminar en Fase 6B
-  const [otroBloqueados, setOtroBloqueados]   = useState([]); // bloqueados[] del OTRO usuario (¿me bloqueó?)
   const [subiendoImagen, setSubiendoImagen] = useState(false);
   const [progresoImagen, setProgresoImagen] = useState(0);
   const fileInputRef = useRef(null);
@@ -709,23 +706,17 @@ const Chat = () => {
     }
   }, [chatId, cargandoAntiguos, hayMasAntiguos, mensajesAntiguos, mensajes, mostrarToast]);
 
-  // Fase 6A: ¿el otro usuario me bloqueó? — lectura puntual en /bloqueos/{otro}_{yo}
-  // más respaldo temporal del arreglo legado `bloqueados` en /usuarios/{otro}.
+  // Fase 6B: ¿el otro usuario me bloqueó? — lectura puntual en /bloqueos/{otro}_{yo}
   useEffect(() => {
     const otro = chatMeta?.participantes?.find((u) => u !== user?.uid);
     if (!otro || !user?.uid) {
       setMeBloqueoPorDoc(false);
-      setOtroBloqueados([]);
       return;
     }
     let cancelado = false;
     existeBloqueo(otro, user.uid)
       .then((existe) => { if (!cancelado) setMeBloqueoPorDoc(Boolean(existe)); })
       .catch(() => { if (!cancelado) setMeBloqueoPorDoc(false); });
-    // LEGACY: eliminar en Fase 6B
-    obtenerPerfilVendedor(otro)
-      .then((p) => { if (!cancelado) setOtroBloqueados(p?.bloqueados || []); })
-      .catch(() => { if (!cancelado) setOtroBloqueados([]); });
     return () => { cancelado = true; };
   }, [chatMeta, user?.uid]);
 
@@ -787,8 +778,7 @@ const Chat = () => {
 
   // Fase 6: bloqueado en cualquiera de los dos sentidos → no se puede escribir
   const yoLoBloquee           = Boolean(otroUid && bloqueados?.has(otroUid));
-  // LEGACY: eliminar en Fase 6B
-  const elMeBloqueo           = meBloqueoPorDoc || otroBloqueados.includes(user?.uid);
+  const elMeBloqueo           = meBloqueoPorDoc;
   const conversacionBloqueada = yoLoBloquee || elMeBloqueo;
 
   // Fase 8 · Contexto dinámico: producto activo de esta conversación,

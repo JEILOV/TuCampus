@@ -30,6 +30,7 @@ firebase-debug.log
 coverage/
 backup-reputacion-*.json
 backup-privados-*.json
+backup-limpieza-*.json
 
 *serviceAccount*.json
 *-firebase-adminsdk-*.json

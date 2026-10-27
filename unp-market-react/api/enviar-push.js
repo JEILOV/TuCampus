@@ -83,58 +83,34 @@ const esErrorYaExiste = (err) =>
   /already exists/i.test(err?.message || "");
 
 /**
- * Resuelve los tokens FCM de un destinatario único (mensaje o reseña),
- * priorizando /usuariosPrivado/{destUid} y cayendo al campo legado de
- * /usuarios/{destUid}. Omite el destinatario si bloqueó al remitente en
- * /bloqueos/{destUid}_{remitenteUid} o en el arreglo legado `bloqueados`.
+ * Resuelve los tokens FCM de un destinatario único (mensaje o reseña)
+ * desde /usuariosPrivado/{destUid}, omitiéndolo si bloqueó al remitente
+ * en /bloqueos/{destUid}_{remitenteUid}.
  */
 const resolverDestinatarioUnico = async (db, destUid, remitenteUid) => {
-  const [privSnap, pubSnap, bloqueoSnap] = await Promise.all([
+  const [privSnap, bloqueoSnap] = await Promise.all([
     db.collection("usuariosPrivado").doc(destUid).get(),
-    db.collection("usuarios").doc(destUid).get(),
     db.collection("bloqueos").doc(`${destUid}_${remitenteUid}`).get(),
   ]);
 
-  if (!privSnap.exists && !pubSnap.exists) {
+  if (!privSnap.exists || bloqueoSnap.exists) {
     return [];
   }
 
-  const pubData = pubSnap.exists ? pubSnap.data() || {} : {};
-  const bloqueadosLegados = Array.isArray(pubData.bloqueados)
-    ? pubData.bloqueados
-    : [];
-  if (bloqueoSnap.exists || bloqueadosLegados.includes(remitenteUid)) {
-    return [];
-  }
-
-  const privData = privSnap.exists ? privSnap.data() || {} : {};
+  const privData = privSnap.data() || {};
   const tokensPrivados = Array.isArray(privData.fcmToken)
     ? privData.fcmToken.filter((t) => typeof t === "string" && t.trim())
     : [];
-  if (tokensPrivados.length > 0) {
-    return [
-      {
-        uid: destUid,
-        coleccionOrigen: "usuariosPrivado",
-        tokens: tokensPrivados,
-      },
-    ];
+  if (tokensPrivados.length === 0) {
+    return [];
   }
 
-  const tokensLegados = Array.isArray(pubData.fcmToken)
-    ? pubData.fcmToken.filter((t) => typeof t === "string" && t.trim())
-    : [];
-  if (tokensLegados.length > 0) {
-    return [
-      {
-        uid: destUid,
-        coleccionOrigen: "usuarios",
-        tokens: tokensLegados,
-      },
-    ];
-  }
-
-  return [];
+  return [
+    {
+      uid: destUid,
+      tokens: tokensPrivados,
+    },
+  ];
 };
 
 /**
@@ -411,7 +387,6 @@ export default async function handler(req, res) {
           const data = d.data() || {};
           return {
             uid: d.id,
-            coleccionOrigen: "usuariosPrivado",
             tokens: Array.isArray(data.fcmToken) ? data.fcmToken : [],
           };
         });
@@ -430,29 +405,22 @@ export default async function handler(req, res) {
       claveDedup = `p_${productoId}`;
     }
 
-    // e) Recolectar fcmToken junto con su colección de origen para la limpieza
-    const mapaTokenADestinos = new Map();
+    // e) Recolectar fcmToken junto con los UIDs destinatarios para la limpieza
+    const mapaTokenAUids = new Map();
     for (const dest of docsDestinatarios) {
       const tokensUsuario = Array.isArray(dest.tokens) ? dest.tokens : [];
-      const coleccionOrigen = dest.coleccionOrigen || "usuariosPrivado";
-
       for (const tk of tokensUsuario) {
         if (typeof tk === "string" && tk.trim()) {
           const tokenLimpio = tk.trim();
-          if (!mapaTokenADestinos.has(tokenLimpio)) {
-            mapaTokenADestinos.set(tokenLimpio, new Map());
+          if (!mapaTokenAUids.has(tokenLimpio)) {
+            mapaTokenAUids.set(tokenLimpio, new Set());
           }
-          mapaTokenADestinos
-            .get(tokenLimpio)
-            .set(`${coleccionOrigen}/${dest.uid}`, {
-              coleccion: coleccionOrigen,
-              uid: dest.uid,
-            });
+          mapaTokenAUids.get(tokenLimpio).add(dest.uid);
         }
       }
     }
 
-    const listaTokens = Array.from(mapaTokenADestinos.keys()).slice(
+    const listaTokens = Array.from(mapaTokenAUids.keys()).slice(
       0,
       MAX_TOKENS
     );
@@ -491,7 +459,7 @@ export default async function handler(req, res) {
     if (iconUrl) dataPlano.icon = iconUrl;
     if (imageUrl) dataPlano.image = imageUrl;
 
-    // h) Envío vía FCM y limpieza de tokens inválidos en la colección de origen
+    // h) Envío vía FCM y limpieza de tokens inválidos en /usuariosPrivado
     const respuesta = await admin.messaging().sendEachForMulticast({
       tokens: listaTokens,
       data: dataPlano,
@@ -501,32 +469,28 @@ export default async function handler(req, res) {
     });
 
     if (respuesta.failureCount > 0 && Array.isArray(respuesta.responses)) {
-      const tokensPorDocLimpiar = new Map();
+      const tokensPorUsuarioLimpiar = new Map();
 
       respuesta.responses.forEach((r, idx) => {
         if (!r.success && CODIGOS_TOKEN_INVALIDO.has(r.error?.code)) {
           const tokenInvalido = listaTokens[idx];
-          const destinos = mapaTokenADestinos.get(tokenInvalido);
-          if (destinos) {
-            for (const [docKey, info] of destinos.entries()) {
-              if (!tokensPorDocLimpiar.has(docKey)) {
-                tokensPorDocLimpiar.set(docKey, {
-                  coleccion: info.coleccion,
-                  uid: info.uid,
-                  tokens: [],
-                });
+          const uids = mapaTokenAUids.get(tokenInvalido);
+          if (uids) {
+            for (const destUid of uids) {
+              if (!tokensPorUsuarioLimpiar.has(destUid)) {
+                tokensPorUsuarioLimpiar.set(destUid, []);
               }
-              tokensPorDocLimpiar.get(docKey).tokens.push(tokenInvalido);
+              tokensPorUsuarioLimpiar.get(destUid).push(tokenInvalido);
             }
           }
         }
       });
 
       const promesasLimpieza = [];
-      for (const { coleccion, uid: destUid, tokens: tokensInvalidos } of tokensPorDocLimpiar.values()) {
+      for (const [destUid, tokensInvalidos] of tokensPorUsuarioLimpiar.entries()) {
         promesasLimpieza.push(
           db
-            .collection(coleccion)
+            .collection("usuariosPrivado")
             .doc(destUid)
             .update({
               fcmToken: admin.firestore.FieldValue.arrayRemove(

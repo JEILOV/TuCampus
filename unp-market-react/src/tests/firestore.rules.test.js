@@ -17,6 +17,10 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
+  deleteField,
+  increment,
+  arrayUnion,
   serverTimestamp,
   setLogLevel,
 } from "firebase/firestore";
@@ -697,6 +701,426 @@ describe.runIf(EMULATOR_ACTIVO)("Firestore Security Rules — Fase 1", () => {
       // B NO puede borrar A_B; solo A puede borrar A_B
       await assertFails(deleteDoc(doc(dbB, "bloqueos", "A_B")));
       await assertSucceeds(deleteDoc(doc(dbA, "bloqueos", "A_B")));
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────
+  //  10. FASE 6B: /usuarios/{userId} endurecido (crear y editar)
+  // ──────────────────────────────────────────────────────────
+  describe("FASE 6B: /usuarios/{userId} — creación y edición de perfil público", () => {
+    const perfilInicial6A = (uid = "est1", universidadId = "unp") => ({
+      uid,
+      nombre: "Estudiante UNP",
+      avatar: "https://lh3.googleusercontent.com/a/default",
+      ubicacion: "Piura",
+      bio: "Estudiante UNP",
+      acercaDe: "¡Hola! Bienvenido a mi tienda en el campus.",
+      universidadId,
+      aceptaYape: false,
+      aceptaPlin: false,
+      calificacionPromedio: 0,
+      totalResenas: 0,
+    });
+
+    const perfilConCamposLegados = (uid = "u1", universidadId = "unp") => ({
+      ...perfilInicial6A(uid, universidadId),
+      email: `${uid}@alumnos.unp.edu.pe`,
+      favoritos: ["p1"],
+      bloqueados: ["u2"],
+      fcmToken: ["tk-1"],
+      telefono: "987654321",
+    });
+
+    // ── Creación de perfil (/usuarios/{userId}) ───────────────
+    it("crear perfil válido (exactamente lo que crea el cliente 6A) → PERMITIDO", async () => {
+      const dbEst1 = ctxEstudiante("est1", "est1@alumnos.unp.edu.pe", true).firestore();
+      await assertSucceeds(
+        setDoc(doc(dbEst1, "usuarios", "est1"), perfilInicial6A("est1", "unp"))
+      );
+    });
+
+    it("crear perfil con email → DENEGADO", async () => {
+      const dbE2 = ctxEstudiante("e2").firestore();
+      await assertFails(
+        setDoc(doc(dbE2, "usuarios", "e2"), {
+          ...perfilInicial6A("e2"),
+          email: "e2@alumnos.unp.edu.pe",
+        })
+      );
+    });
+
+    it("crear perfil con calificacionPromedio: 5 → DENEGADO", async () => {
+      const dbE2 = ctxEstudiante("e2").firestore();
+      await assertFails(
+        setDoc(doc(dbE2, "usuarios", "e2"), {
+          ...perfilInicial6A("e2"),
+          calificacionPromedio: 5,
+        })
+      );
+    });
+
+    it("crear perfil con totalResenas: 3 → DENEGADO", async () => {
+      const dbE2 = ctxEstudiante("e2").firestore();
+      await assertFails(
+        setDoc(doc(dbE2, "usuarios", "e2"), {
+          ...perfilInicial6A("e2"),
+          totalResenas: 3,
+        })
+      );
+    });
+
+    it("crear perfil con sumaEstrellas → DENEGADO", async () => {
+      const dbE2 = ctxEstudiante("e2").firestore();
+      await assertFails(
+        setDoc(doc(dbE2, "usuarios", "e2"), {
+          ...perfilInicial6A("e2"),
+          sumaEstrellas: 0,
+        })
+      );
+    });
+
+    it("crear perfil con una clave extra → DENEGADO", async () => {
+      const dbE2 = ctxEstudiante("e2").firestore();
+      await assertFails(
+        setDoc(doc(dbE2, "usuarios", "e2"), {
+          ...perfilInicial6A("e2"),
+          rol: "admin",
+        })
+      );
+    });
+
+    it("crear perfil con universidadId que no corresponde a su correo → DENEGADO", async () => {
+      const dbE2 = ctxEstudiante("e2", "e2@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        setDoc(doc(dbE2, "usuarios", "e2"), {
+          ...perfilInicial6A("e2", "ucv"),
+        })
+      );
+    });
+
+    it("crear perfil con uid distinto del auth → DENEGADO", async () => {
+      const dbE2 = ctxEstudiante("e2").firestore();
+      await assertFails(
+        setDoc(doc(dbE2, "usuarios", "e2"), {
+          ...perfilInicial6A("otro-uid", "unp"),
+        })
+      );
+    });
+
+    it("crear el perfil de otro usuario → DENEGADO", async () => {
+      const dbOtro = ctxEstudiante("otro", "otro@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        setDoc(doc(dbOtro, "usuarios", "e2"), perfilInicial6A("e2", "unp"))
+      );
+    });
+
+    it("crear perfil desde cuenta sin verificar → DENEGADO", async () => {
+      const dbNoVerif = ctxEstudiante("noverif", "noverif@alumnos.unp.edu.pe", false).firestore();
+      await assertFails(
+        setDoc(doc(dbNoVerif, "usuarios", "noverif"), perfilInicial6A("noverif", "unp"))
+      );
+    });
+
+    it("crear perfil con aceptaYape: true al crear → DENEGADO", async () => {
+      const dbE2 = ctxEstudiante("e2").firestore();
+      await assertFails(
+        setDoc(doc(dbE2, "usuarios", "e2"), {
+          ...perfilInicial6A("e2"),
+          aceptaYape: true,
+        })
+      );
+    });
+
+    it("crear perfil con nombre vacío → DENEGADO", async () => {
+      const dbE2 = ctxEstudiante("e2").firestore();
+      await assertFails(
+        setDoc(doc(dbE2, "usuarios", "e2"), {
+          ...perfilInicial6A("e2"),
+          nombre: "",
+        })
+      );
+    });
+
+    it("crear perfil con nombre de 101 caracteres → DENEGADO", async () => {
+      const dbE2 = ctxEstudiante("e2").firestore();
+      await assertFails(
+        setDoc(doc(dbE2, "usuarios", "e2"), {
+          ...perfilInicial6A("e2"),
+          nombre: "A".repeat(101),
+        })
+      );
+    });
+
+    // ── Edición de perfil sobre doc CON campos legados (email, favoritos, bloqueados, fcmToken, telefono) ──
+    it("dueño con doc que conserva campos legados: edita solo nombre → PERMITIDO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilConCamposLegados("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertSucceeds(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { nombre: "Valery Nuevo Nombre" })
+      );
+    });
+
+    it("dueño con doc que conserva campos legados: el batch.update exacto de guardarContactoPrivado (con telefono: deleteField()) → PERMITIDO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilConCamposLegados("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      const batch = writeBatch(dbU1);
+      batch.set(
+        doc(dbU1, "usuarios", "u1", "privado", "contacto"),
+        {
+          telefono: "999888777",
+          metodosPago: {
+            yape: { activo: true, numero: "999888777" },
+            plin: { activo: false, numero: "" },
+          },
+        },
+        { merge: true }
+      );
+      batch.update(doc(dbU1, "usuarios", "u1"), {
+        nombre: "Valery Editada",
+        bio: "Ing. Informática",
+        acercaDe: "Vendo libros y calculadoras",
+        ubicacion: "Campus UNP",
+        avatar: "https://i.ibb.co/avatar.webp",
+        portada: "https://i.ibb.co/portada.webp",
+        aceptaYape: true,
+        aceptaPlin: false,
+        telefono: deleteField(),
+      });
+      await assertSucceeds(batch.commit());
+    });
+
+    it("dueño con doc que conserva campos legados: totalPublicaciones +1 → PERMITIDO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilConCamposLegados("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertSucceeds(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { totalPublicaciones: increment(1) })
+      );
+    });
+
+    it("dueño con doc que conserva campos legados: cambia el valor de email → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilConCamposLegados("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { email: "otro@alumnos.unp.edu.pe" })
+      );
+    });
+
+    it("dueño con doc que conserva campos legados: agrega un elemento a favoritos → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilConCamposLegados("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { favoritos: arrayUnion("p2") })
+      );
+    });
+
+    it("dueño con doc que conserva campos legados: borra email → PERMITIDO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilConCamposLegados("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertSucceeds(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { email: deleteField() })
+      );
+    });
+
+    it("dueño con doc que conserva campos legados: borra todos los campos legados (email, favoritos, bloqueados, fcmToken, telefono) → PERMITIDO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilConCamposLegados("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertSucceeds(
+        updateDoc(doc(dbU1, "usuarios", "u1"), {
+          email: deleteField(),
+          favoritos: deleteField(),
+          bloqueados: deleteField(),
+          fcmToken: deleteField(),
+          telefono: deleteField(),
+        })
+      );
+    });
+
+    // ── Edición de perfil sobre doc SIN campos legados ────────
+    it("doc sin campos legados: agregar email → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { email: "u1@alumnos.unp.edu.pe" })
+      );
+    });
+
+    it("doc sin campos legados: agregar favoritos → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { favoritos: ["p1"] })
+      );
+    });
+
+    it("doc sin campos legados: agregar bloqueados → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { bloqueados: ["u2"] })
+      );
+    });
+
+    it("doc sin campos legados: agregar fcmToken → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { fcmToken: ["tk-1"] })
+      );
+    });
+
+    it("doc sin campos legados: agregar telefono → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { telefono: "987654321" })
+      );
+    });
+
+    it("doc sin campos legados: editar los 8 campos de guardarContactoPrivado cuando ya no hay telefono → PERMITIDO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertSucceeds(
+        updateDoc(doc(dbU1, "usuarios", "u1"), {
+          nombre: "Valery Editada 2",
+          bio: "Ing. Informática",
+          acercaDe: "Vendo apuntes",
+          ubicacion: "Piura",
+          avatar: "https://i.ibb.co/avatar2.webp",
+          portada: "https://i.ibb.co/portada2.webp",
+          aceptaYape: false,
+          aceptaPlin: true,
+        })
+      );
+    });
+
+    it("editar perfil (dueño): cambiar uid → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(updateDoc(doc(dbU1, "usuarios", "u1"), { uid: "otro" }));
+    });
+
+    it("editar perfil (dueño): cambiar universidadId → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(updateDoc(doc(dbU1, "usuarios", "u1"), { universidadId: "ucv" }));
+    });
+
+    it("editar perfil (dueño): totalPublicaciones +1 (desde no existir → 1, y de 1 → 2) → PERMITIDO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertSucceeds(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { totalPublicaciones: increment(1) })
+      );
+      await assertSucceeds(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { totalPublicaciones: increment(1) })
+      );
+    });
+
+    it("editar perfil (dueño): totalPublicaciones +5 → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), {
+          ...perfilInicial6A("u1", "unp"),
+          totalPublicaciones: 2,
+        });
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { totalPublicaciones: increment(5) })
+      );
+    });
+
+    it("editar perfil (dueño): totalPublicaciones -1 → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), {
+          ...perfilInicial6A("u1", "unp"),
+          totalPublicaciones: 2,
+        });
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { totalPublicaciones: increment(-1) })
+      );
+    });
+
+    it("editar perfil (dueño): nombre vacío → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(updateDoc(doc(dbU1, "usuarios", "u1"), { nombre: "" }));
+    });
+
+    it("editar perfil (dueño): nombre de 101 caracteres → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        updateDoc(doc(dbU1, "usuarios", "u1"), { nombre: "X".repeat(101) })
+      );
+    });
+
+    it("editar perfil (dueño): aceptaYape no booleano → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(updateDoc(doc(dbU1, "usuarios", "u1"), { aceptaYape: "si" }));
+    });
+
+    it("editar perfil (dueño): update que mezcle nombre + calificacionPromedio → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbU1 = ctxEstudiante("u1", "u1@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        updateDoc(doc(dbU1, "usuarios", "u1"), {
+          nombre: "Nombre Valido",
+          calificacionPromedio: 5,
+        })
+      );
+    });
+
+    it("editar perfil: otro usuario editando nombre del perfil ajeno → DENEGADO", async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "usuarios", "u1"), perfilInicial6A("u1", "unp"));
+      });
+      const dbOtro = ctxEstudiante("otro", "otro@alumnos.unp.edu.pe", true).firestore();
+      await assertFails(
+        updateDoc(doc(dbOtro, "usuarios", "u1"), { nombre: "Intruso" })
+      );
     });
   });
 });

@@ -161,6 +161,51 @@ service cloud.firestore {
           && (!('fcmToken' in d) || (d.fcmToken is list && d.fcmToken.size() <= 20));
     }
 
+    // Fase 6B: creación del perfil público. Reputación en cero, sin datos sensibles.
+    function esPerfilInicialValido(userId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['uid', 'nombre', 'avatar', 'ubicacion', 'bio', 'acercaDe',
+                               'universidadId', 'aceptaYape', 'aceptaPlin',
+                               'calificacionPromedio', 'totalResenas'])
+          && d.keys().hasAll(['uid', 'nombre', 'universidadId'])
+          && d.uid == userId
+          && d.nombre is string && d.nombre.size() > 0 && d.nombre.size() <= 100
+          && (!('avatar' in d)    || (d.avatar    is string && d.avatar.size()    <= 1000))
+          && (!('ubicacion' in d) || (d.ubicacion is string && d.ubicacion.size() <= 100))
+          && (!('bio' in d)       || (d.bio       is string && d.bio.size()       <= 300))
+          && (!('acercaDe' in d)  || (d.acercaDe  is string && d.acercaDe.size()  <= 1000))
+          && d.universidadId == universidadDelToken()
+          && (!('aceptaYape' in d) || d.aceptaYape == false)
+          && (!('aceptaPlin' in d) || d.aceptaPlin == false)
+          && (!('calificacionPromedio' in d) || d.calificacionPromedio == 0)
+          && (!('totalResenas' in d) || d.totalResenas == 0);
+    }
+
+    // Fase 6B: edición del perfil por su dueño. Solo campos editables; los datos
+    // sensibles legados pueden BORRARSE pero nunca escribirse.
+    function esPerfilEditableValido() {
+      let d = request.resource.data;
+      let cambios = d.diff(resource.data).affectedKeys();
+      return cambios.hasOnly(['nombre', 'avatar', 'portada', 'bio', 'acercaDe', 'ubicacion',
+                              'aceptaYape', 'aceptaPlin', 'totalPublicaciones',
+                              'email', 'favoritos', 'bloqueados', 'fcmToken', 'telefono'])
+          && (!cambios.hasAny(['email'])      || !('email' in d))
+          && (!cambios.hasAny(['favoritos'])  || !('favoritos' in d))
+          && (!cambios.hasAny(['bloqueados']) || !('bloqueados' in d))
+          && (!cambios.hasAny(['fcmToken'])   || !('fcmToken' in d))
+          && (!cambios.hasAny(['telefono'])   || !('telefono' in d))
+          && (!cambios.hasAny(['nombre'])    || (d.nombre    is string && d.nombre.size() > 0 && d.nombre.size() <= 100))
+          && (!cambios.hasAny(['avatar'])    || (d.avatar    is string && d.avatar.size()    <= 1000))
+          && (!cambios.hasAny(['portada'])   || (d.portada   is string && d.portada.size()   <= 1000))
+          && (!cambios.hasAny(['bio'])       || (d.bio       is string && d.bio.size()       <= 300))
+          && (!cambios.hasAny(['acercaDe'])  || (d.acercaDe  is string && d.acercaDe.size()  <= 1000))
+          && (!cambios.hasAny(['ubicacion']) || (d.ubicacion is string && d.ubicacion.size() <= 100))
+          && (!cambios.hasAny(['aceptaYape']) || d.aceptaYape is bool)
+          && (!cambios.hasAny(['aceptaPlin']) || d.aceptaPlin is bool)
+          && (!cambios.hasAny(['totalPublicaciones'])
+              || d.totalPublicaciones == resource.data.get('totalPublicaciones', 0) + 1);
+    }
+
 
     // ──────────────────────────────────────────────────────────
     //  COLECCIÓN: productos
@@ -185,14 +230,16 @@ service cloud.firestore {
     //  COLECCIÓN: usuarios
     // ──────────────────────────────────────────────────────────
     match /usuarios/{userId} {
-      // ⚠️ PENDIENTE (S01): lectura pública del documento completo. Se cierra
-      // en la Fase 5 separando perfil público y datos privados.
+      // Lectura pública intencional: el perfil público ya no contiene datos sensibles
+      // (viven en /usuariosPrivado, /bloqueos y /usuarios/{uid}/privado/contacto).
       allow read: if true;
-      allow create, delete: if esDuenio(userId) && esEstudianteValido();
+      allow create: if esDuenio(userId) && esEstudianteValido() && esPerfilInicialValido(userId);
+      allow delete: if esDuenio(userId) && esEstudianteValido();
 
-      // ⚠️ PENDIENTE (S02/S03): el dueño puede editar cualquier campo y la
-      // rama de reputación no valida valores. Fases 4 y 5.
-      allow update: if esDuenio(userId)
+      // ⚠️ PENDIENTE (S02): la rama de reputación sigue permitiendo escribir los
+      // tres campos (calificacionPromedio, totalResenas, sumaEstrellas) a cualquier
+      // estudiante verificado.
+      allow update: if (esDuenio(userId) && esEstudianteValido() && esPerfilEditableValido())
                     || (
                       esEstudianteValido() &&
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seguidores']) &&

@@ -91,7 +91,7 @@ const obtenerMessaging = () => {
 /**
  * Pide permiso de notificaciones al navegador y, si el usuario acepta,
  * registra el Service Worker de FCM, obtiene el token del dispositivo
- * y lo guarda en /usuarios/{usuarioId}.fcmToken (arreglo — un usuario
+ * y lo guarda en /usuariosPrivado/{usuarioId} (arreglo `fcmToken` — un usuario
  * puede tener varios dispositivos/navegadores con push activo).
  *
  * Fire-safe: nunca lanza. Devuelve el token si todo salió bien, o

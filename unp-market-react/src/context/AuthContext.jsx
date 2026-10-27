@@ -25,7 +25,6 @@ import {
   obtenerOCrearPerfilUsuario,
   sincronizarFavoritos,
   obtenerMisBloqueos,
-  migrarBloqueosLegados,
 }                                                                       from "../services/userService";
 import {
   obtenerFavoritos,
@@ -101,21 +100,8 @@ export const AuthProvider = ({ children }) => {
         const {
           perfil: perfilObtenido,
           favoritosGuardados,
-          bloqueadosLegados = [],
         } = await obtenerOCrearPerfilUsuario(firebaseUser);
 
-        // Leemos cualquier arreglo legado `bloqueados` solo en esta etapa y nos
-        // aseguramos de que no quede en el perfil en memoria.
-        const legadosDelPerfil = Array.isArray(perfilObtenido?.bloqueados)
-          ? perfilObtenido.bloqueados
-          : [];
-        const listaLegados = [
-          ...new Set(
-            [...bloqueadosLegados, ...legadosDelPerfil].filter(
-              (u) => typeof u === "string" && u.trim()
-            )
-          ),
-        ];
         if (perfilObtenido && typeof perfilObtenido === "object") {
           delete perfilObtenido.email;
           delete perfilObtenido.favoritos;
@@ -123,21 +109,13 @@ export const AuthProvider = ({ children }) => {
           delete perfilObtenido.fcmToken;
         }
 
-        // Cargar mis bloqueos desde /bloqueos y fusionar con los legados
+        // Cargar mis bloqueos desde /bloqueos
         let misBloqueos = [];
         try {
           misBloqueos = await obtenerMisBloqueos(firebaseUser.uid);
         } catch {
           misBloqueos = [];
         }
-        const setMisBloqueos = new Set(misBloqueos);
-        const faltantesPorMigrar = listaLegados.filter(
-          (uid) => uid !== firebaseUser.uid && !setMisBloqueos.has(uid)
-        );
-        if (faltantesPorMigrar.length > 0) {
-          migrarBloqueosLegados(firebaseUser.uid, faltantesPorMigrar).catch(() => {});
-        }
-        const bloqueadosFusionados = new Set([...misBloqueos, ...listaLegados]);
 
         // Fusionar favoritos invitado + Firestore sin duplicados
         const favoritosFusionados = fusionarFavoritos(favoritosInvitado, favoritosGuardados);
@@ -153,7 +131,7 @@ export const AuthProvider = ({ children }) => {
         setUser(firebaseUser);
         setPerfil(perfilObtenido);
         setFavoritos(new Set(favoritosFusionados));
-        setBloqueados(bloqueadosFusionados);
+        setBloqueados(new Set(misBloqueos));
       } catch (error) {
         // Si Firestore falla, al menos tenemos el user de Auth
         console.error("[AuthContext] Error al cargar perfil:", error);
