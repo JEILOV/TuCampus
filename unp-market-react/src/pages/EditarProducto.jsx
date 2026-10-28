@@ -1,8 +1,8 @@
 // src/pages/EditarProducto.jsx
-import { useState, useEffect, useRef }  from "react";
+import { useState, useEffect, useRef, lazy, Suspense }  from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { doc, getDoc }                  from "firebase/firestore";
-import { ChevronLeft, Camera, Send, X, Plus } from "lucide-react";
+import { ChevronLeft, Camera, Send, X, Plus, Crop } from "lucide-react";
 import { db }                           from "../services/firebase";
 import { useAuth }                      from "../context/AuthContext";
 import { comprimirImagen, subirBlobsComprimidos } from "../utils/imageUtils";
@@ -11,6 +11,9 @@ import { limpiarCacheSecciones }        from "../services/seccionesService";
 import { useObjectUrls }                from "../hooks/useObjectUrls";
 import Spinner                          from "../components/Spinner";
 import Toast, { useToast }              from "../components/Toast";
+
+// Carga diferida del recortador para no engordar el bundle inicial
+const RecortadorFoto = lazy(() => import("../components/RecortadorFoto"));
 
 // 🖼️ Mismo tope que Publicar.jsx / productService.js.
 const MAX_FOTOS = 4;
@@ -65,6 +68,9 @@ const EditarProducto = () => {
   const mostrarToast = useToast(setToast, { single: true });
 
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  // ✂️ Estado para el modal de recortar/rotar foto
+  const [fotoParaRecortar, setFotoParaRecortar] = useState(null);
   const enviandoRef = useRef(false); // 🔧 guard contra doble-submit, ver Publicar.jsx
   const { crearUrl, revocarUrl } = useObjectUrls();
 
@@ -134,6 +140,7 @@ const EditarProducto = () => {
   }, [productoId, user, navigate]);
 
   const MAX_IMAGEN_MB = 5;
+  const MAX_FOTO_CAMARA_MB = 25;
 
   const handleFileChange = async (e) => {
     const filesSeleccionados = Array.from(e.target.files || []);
@@ -210,6 +217,130 @@ const EditarProducto = () => {
       if (objetivo?.kind === "new") revocarUrl(objetivo.url);
       return prev.filter((f) => f.id !== id);
     });
+  };
+
+  // 📷 Maneja la captura directa desde la cámara móvil
+  const handleCameraChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+
+    if (!file) {
+      // El usuario canceló la captura de la cámara: sin ranuras vacías ni errores
+      return;
+    }
+
+    if (fotos.length >= MAX_FOTOS) {
+      mostrarToast(`Ya tienes el máximo de ${MAX_FOTOS} fotos.`, "error");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      mostrarToast("El archivo capturado debe ser una imagen.", "error");
+      return;
+    }
+
+    if (file.size > MAX_FOTO_CAMARA_MB * 1024 * 1024) {
+      mostrarToast(`La foto supera ${MAX_FOTO_CAMARA_MB}MB. Elige una más liviana.`, "error");
+      return;
+    }
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const fileEnMemoria = new File([buffer], file.name || "foto.jpg", { type: file.type });
+      setFotoParaRecortar({
+        origen: fileEnMemoria,
+        tipo: "camara",
+      });
+    } catch (err) {
+      console.error("[EditarProducto] Error al leer foto de cámara en memoria:", err);
+      mostrarToast("No se pudo leer la foto. Inténtalo de nuevo.", "error");
+    }
+  };
+
+  // ✂️ Abre el modal de recorte para una foto existente o ya agregada
+  const abrirRecortadorExistente = (foto) => {
+    setFotoParaRecortar({
+      origen: foto.blob || foto.url,
+      tipo: "editar",
+      id: foto.id,
+    });
+  };
+
+  // ✂️ Recorte confirmado por el usuario en RecortadorFoto
+  const handleRecorteListo = async (fileRecortado) => {
+    if (!fotoParaRecortar) return;
+    setProcesandoImagenes(true);
+    try {
+      const blobComprimido = await comprimirImagen(fileRecortado);
+
+      if (fotoParaRecortar.tipo === "camara") {
+        setFotos((prev) => [
+          ...prev,
+          {
+            id: `new-${fileRecortado.name}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            kind: "new",
+            blob: blobComprimido,
+            url: crearUrl(blobComprimido),
+          },
+        ]);
+      } else if (fotoParaRecortar.tipo === "editar") {
+        const id = fotoParaRecortar.id;
+        setFotos((prev) =>
+          prev.map((item) => {
+            if (item.id === id) {
+              if (item.kind === "new") {
+                revocarUrl(item.url);
+              }
+              return {
+                id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                kind: "new",
+                blob: blobComprimido,
+                url: crearUrl(blobComprimido),
+              };
+            }
+            return item;
+          })
+        );
+      }
+    } catch (err) {
+      console.error("[EditarProducto] Error al procesar imagen recortada:", err);
+      mostrarToast("No se pudo procesar la foto recortada.", "error");
+    } finally {
+      setProcesandoImagenes(false);
+      setFotoParaRecortar(null);
+    }
+  };
+
+  // ✂️ Omitir recorte y usar foto original
+  const handleUsarSinRecortar = async (imagenOriginal) => {
+    if (!fotoParaRecortar) return;
+    if (fotoParaRecortar.tipo === "camara") {
+      setProcesandoImagenes(true);
+      try {
+        const blobComprimido = await comprimirImagen(imagenOriginal);
+        setFotos((prev) => [
+          ...prev,
+          {
+            id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            kind: "new",
+            blob: blobComprimido,
+            url: crearUrl(blobComprimido),
+          },
+        ]);
+      } catch (err) {
+        console.error("[EditarProducto] Error al procesar imagen original:", err);
+        mostrarToast("No se pudo procesar la foto.", "error");
+      } finally {
+        setProcesandoImagenes(false);
+        setFotoParaRecortar(null);
+      }
+    } else {
+      setFotoParaRecortar(null);
+    }
+  };
+
+  const handleCancelarRecorte = () => {
+    setFotoParaRecortar(null);
   };
 
   const handleSubmit = async (e) => {
@@ -356,58 +487,119 @@ const EditarProducto = () => {
                   </div>
 
                   {fotos.length === 0 ? (
-                    <div
-                      onClick={() => !procesandoImagenes && fileInputRef.current?.click()}
-                      aria-disabled={procesandoImagenes}
-                      className={`mt-2 rounded-2xl border-2 border-dashed border-ink/15 bg-background p-5 text-center transition-colors ${
-                        procesandoImagenes ? "cursor-wait opacity-60" : "cursor-pointer"
-                      }`}
-                    >
-                      <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        <Camera size={26} />
+                    <div className="mt-2 rounded-2xl border-2 border-dashed border-ink/15 bg-background p-5 text-center">
+                      <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Camera size={24} />
                       </span>
                       <p className="mt-2 text-[14.5px] font-extrabold text-ink">
-                        {procesandoImagenes ? "Procesando foto..." : "Toca para abrir la cámara o galería"}
+                        {procesandoImagenes ? "Procesando foto..." : "Agrega fotos de tu producto"}
                       </p>
                       <p className="mt-1 text-[12px] font-semibold text-ink/40">
                         Hasta {MAX_FOTOS} fotos · JPG, PNG · Máx. 5MB c/u
                       </p>
-                    </div>
-                  ) : (
-                    <div className="mt-2 grid grid-cols-4 gap-2">
-                      {fotos.map((f, idx) => (
-                        <div key={f.id} className="relative aspect-square overflow-hidden rounded-2xl bg-background">
-                          <img src={f.url} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" />
-                          {idx === 0 && (
-                            <span className="absolute bottom-1 left-1 rounded-chip bg-black/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
-                              Portada
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => quitarFoto(f.id)}
-                            aria-label={`Quitar foto ${idx + 1}`}
-                            className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
-                          >
-                            <X size={12} strokeWidth={3} />
-                          </button>
-                        </div>
-                      ))}
-
-                      {fotos.length < MAX_FOTOS && (
+                      <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => cameraInputRef.current?.click()}
+                          disabled={procesandoImagenes}
+                          className="inline-flex items-center gap-2 rounded-btn bg-primary px-4 py-2 text-[13px] font-bold text-background shadow-soft transition-colors hover:bg-primary-dark disabled:opacity-50 md:hidden"
+                        >
+                          <Camera size={16} />
+                          <span>Tomar foto</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
                           disabled={procesandoImagenes}
-                          aria-label="Agregar foto"
-                          className="flex aspect-square items-center justify-center rounded-2xl border-2 border-dashed border-ink/15 bg-background text-ink/30 transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-wait disabled:opacity-60"
+                          className="inline-flex items-center gap-2 rounded-btn border border-ink/15 bg-card px-4 py-2 text-[13px] font-bold text-ink shadow-soft transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-50"
                         >
-                          <Plus size={22} />
+                          <Plus size={16} />
+                          <span>Elegir de galería</span>
                         </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="mt-2 grid grid-cols-4 gap-2">
+                        {fotos.map((f, idx) => (
+                          <div key={f.id} className="relative aspect-square overflow-hidden rounded-2xl bg-background group">
+                            <img src={f.url} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" />
+                            {idx === 0 && (
+                              <span className="absolute bottom-1 left-1 rounded-chip bg-black/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                                Portada
+                              </span>
+                            )}
+                            {/* Botón editar / recortar */}
+                            <button
+                              type="button"
+                              onClick={() => abrirRecortadorExistente(f)}
+                              aria-label={`Recortar foto ${idx + 1}`}
+                              className="absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white transition-transform active:scale-90 hover:bg-black/80"
+                            >
+                              <Crop size={12} strokeWidth={2.5} />
+                            </button>
+                            {/* Botón quitar */}
+                            <button
+                              type="button"
+                              onClick={() => quitarFoto(f.id)}
+                              aria-label={`Quitar foto ${idx + 1}`}
+                              className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white transition-transform active:scale-90 hover:bg-black/80"
+                            >
+                              <X size={12} strokeWidth={3} />
+                            </button>
+                          </div>
+                        ))}
+
+                        {fotos.length < MAX_FOTOS && (
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={procesandoImagenes}
+                            aria-label="Agregar foto de galería"
+                            className="flex aspect-square items-center justify-center rounded-2xl border-2 border-dashed border-ink/15 bg-background text-ink/30 transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-wait disabled:opacity-60"
+                          >
+                            <Plus size={22} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Botones inferiores para agregar más fotos */}
+                      {fotos.length < MAX_FOTOS && (
+                        <div className="mt-2.5 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => cameraInputRef.current?.click()}
+                            disabled={procesandoImagenes}
+                            className="inline-flex items-center gap-1.5 rounded-btn border border-primary/20 bg-primary/10 px-3 py-1.5 text-[12px] font-bold text-primary transition-colors hover:bg-primary/20 disabled:opacity-50 md:hidden"
+                          >
+                            <Camera size={14} />
+                            <span>Tomar foto</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={procesandoImagenes}
+                            className="inline-flex items-center gap-1.5 rounded-btn border border-ink/15 bg-background px-3 py-1.5 text-[12px] font-bold text-ink transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-50"
+                          >
+                            <Plus size={14} />
+                            <span>Elegir de galería</span>
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}
 
+                  {/* Input de cámara móvil con capture="environment" */}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    ref={cameraInputRef}
+                    onChange={handleCameraChange}
+                    disabled={procesandoImagenes}
+                    className="hidden"
+                  />
+                  {/* Input de galería con selección múltiple */}
                   <input
                     type="file"
                     accept="image/*"
@@ -504,6 +696,18 @@ const EditarProducto = () => {
             </button>
           </form>
         </main>
+
+      {/* ✂️ Modal de recorte y rotación de fotos */}
+      {fotoParaRecortar && (
+        <Suspense fallback={null}>
+          <RecortadorFoto
+            imagen={fotoParaRecortar.origen}
+            onListo={handleRecorteListo}
+            onUsarOriginal={handleUsarSinRecortar}
+            onCancelar={handleCancelarRecorte}
+          />
+        </Suspense>
+      )}
 
       {/* ✅ TOAST LIMPIO */}
       {toast && (
